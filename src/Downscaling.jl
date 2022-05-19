@@ -1,5 +1,12 @@
 module Downscaling
 
-# Write your package code here.
+using Flux
+using Functors: @functor
+
+#include("generators.jl")
+include("discriminators.jl")
+
+export PatchBlock
+export PatchDiscriminator
 
 end

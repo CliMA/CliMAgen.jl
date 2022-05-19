@@ -3,6 +3,10 @@ uuid = "36c19f5a-2420-4be7-ae2a-5a58b2348981"
 authors = ["bischtob <tobias.bischoff@pm.me> and contributors"]
 version = "0.1.0"
 
+[deps]
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
+
 [compat]
 julia = "1"
 

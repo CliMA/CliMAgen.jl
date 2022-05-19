@@ -1,7 +1,3 @@
-
-using Flux
-using Functors
-
 struct UNetGenerator
     initial
     downblocks
