@@ -1,3 +1,7 @@
+
+using Flux
+using Functors
+
 struct UNetGenerator
     initial
     downblocks
@@ -21,15 +25,15 @@ function UNetGenerator(
     )
 
     downsampling_blocks = [
-        ConvBlock(3, num_features, num_features * 2, true, true; stride=2, pad=1, device=device),
-        ConvBlock(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1, device=device),
+        ConvBlock(3, num_features, num_features * 2, true, true, device; stride=2, pad=1),
+        ConvBlock(3, num_features * 2, num_features * 4, true, true, device; stride=2, pad=1),
     ]
 
     resnet_blocks = Chain([ResidualBlock(num_features * 4) for _ in range(1, length=num_residual)]...)
 
     upsampling_blocks = [
-        ConvBlock(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad(), device=device),
-        ConvBlock(3, num_features * 2, num_features, true, false; stride=2, pad=SamePad(), device=device),
+        ConvBlock(3, num_features * 4, num_features * 2, true, false, device; stride=2, pad=SamePad()),
+        ConvBlock(3, num_features * 2, num_features, true, false, device; stride=2, pad=SamePad()),
     ]
 
     final_layer = Conv((7, 7), num_features => in_channels; stride=1, pad=3)
@@ -55,6 +59,9 @@ function (net::UNetGenerator)(x)
     return tanh.(net.final(input))
 end
 
+"""
+    ConvBlock
+"""
 struct ConvBlock
     conv
 end
@@ -65,7 +72,7 @@ function ConvBlock(
     kernel_size::Int,
     in_channels::Int,
     out_channels::Int,
-    act::Bool=true,
+    with_activation::Bool=true,
     down::Bool=true,
     device = gpu;
     kwargs...
@@ -78,7 +85,7 @@ function ConvBlock(
                 ConvTranspose((kernel_size, kernel_size), in_channels => out_channels; kwargs...)
             end,
             InstanceNorm(out_channels),
-            if act
+            if with_activation
                 x -> relu.(x)
             else
                 identity
@@ -102,8 +109,8 @@ function ResidualBlock(
 )
     return ResidualBlock(
         Chain(
-            ConvBlock(3, in_channels, in_channels, true, true; pad=1, device=device),
-            ConvBlock(3, in_channels, in_channels, false, true; pad=1, device=device)
+            ConvBlock(3, in_channels, in_channels, true, true, device; pad=1),
+            ConvBlock(3, in_channels, in_channels, false, true, device; pad=1)
         )
     ) |> device
 end
