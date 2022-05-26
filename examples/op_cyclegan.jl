@@ -30,8 +30,10 @@ gen_lr = FT(0.0002)
 color_format = Gray
 
 # Define models
-generator_A = UNetGenerator(input_channels) |> device
-generator_B = UNetGenerator(input_channels) |> device
+num_features = 8
+σ = relu
+generator_A = OperatorUNetGenerator(input_channels) |> device
+generator_B = OperatorUNetGenerator(input_channels) |> device
 discriminator_A = PatchDiscriminator(input_channels) |> device # Discriminator For Domain A
 discriminator_B = PatchDiscriminator(input_channels) |> device # Discriminator For Domain B
 networks = (generator_A, generator_B, discriminator_A, discriminator_B)
@@ -126,6 +128,27 @@ function training()
         @info "Epoch duration: $(Dates.canonicalize(Dates.now() - epoch_start))"
     end
 end
+
+# function testing()
+#     # Load data
+#     dataA = load_dataset(input_path * exp_name * "/testA/", img_size, FT)[:, :, :, 1:num_examples] |> device
+#     dataB = load_dataset(input_path * exp_name * "/testB/", img_size, FT)[:, :, :, 1:num_examples] |> device
+#     data = DataLoader((dataA, dataB), batchsize=1, shuffle=false)
+
+#     # Load generators
+#     genA, genB, _, _ = @load output_path * exp_name * "checkpint_latest.bson"
+#     Flux.loadmodel!(generator_A, genA)
+#     Flux.loadmodel!(generator_B, genB)
+
+#     # Testing loop
+#     @info "Testing begins..."
+#     for (sample_idx, (a, b)) in enumerate(data)
+#         a, b = normalize(a), normalize(b)
+#         prefix_path = output_path * exp_name * "/testing/" * "image_$(sample_idx)"
+#         save_model_samples(path, a, b)
+#     end
+#     @info "Testing complete."
+# end
 
 # Utils
 function normalize(x)

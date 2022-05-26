@@ -97,6 +97,10 @@ function (net::ConvBlock)(x)
     return net.conv(x)
 end
 
+
+"""
+    ResidualBlock
+"""
 struct ResidualBlock
     block
 end
