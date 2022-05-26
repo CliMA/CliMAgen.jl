@@ -9,12 +9,14 @@ using Zygote
 
 include("generators.jl")
 include("discriminators.jl")
-include("cyclegan.jl")
+include("cyclegans.jl")
 
 export ConvBlock
 export ResidualBlock
 export PatchBlock
 export PatchDiscriminator
 export UNetGenerator
+export CycleGAN
+export update_cyclegan
 
 end

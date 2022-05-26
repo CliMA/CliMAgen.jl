@@ -55,14 +55,29 @@ float_types = [Float16, Float32]
         x = randn(FT, (img_size, img_size, in_channels, batch_size))
         @test residual_block(x) |> size == (97, 97, 3, 13)
 
-        #UNetGenerator
-        img_size = 512
-        batch_size = 13
+        # UNetGenerator
+        img_size = 128
+        batch_size = 5
         in_channels = 1
         num_features = 64
         num_residual = 9
         unet = UNetGenerator(in_channels, num_features, num_residual)
         x = randn(FT, (img_size, img_size, in_channels, batch_size))
-        @test unet(x) |> size == (img_size, img_size, in_channels, batch_size)  
+        @test unet(x) |> size == (img_size, img_size, in_channels, batch_size)
+
+        # CycleGAN
+        img_size = 128
+        batch_size = 5
+        in_channels = 3
+        dAB = PatchDiscriminator(in_channels)
+        dBA = PatchDiscriminator(in_channels)
+        gAB = UNetGenerator(in_channels)
+        gBA = UNetGenerator(in_channels)
+        cyclegan = CycleGAN(gAB, gBA, dAB, dBA)
+        opt_dscr = ADAM(0.00005, (0.5, 0.99))
+        opt_gen = ADAM(0.00005, (0.5, 0.99))
+        x = randn(FT, (img_size, img_size, in_channels, batch_size))
+        y = randn(FT, (img_size, img_size, in_channels, batch_size))
+        loss = update_cyclegan(opt_gen, opt_dscr, cyclegan, x, y)
     end
 end
