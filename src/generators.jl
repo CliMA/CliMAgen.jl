@@ -16,7 +16,6 @@ function UNetGenerator(
     in_channels::Int,
     num_features::Int=64,
     num_residual::Int=9,
-    device=gpu,
 )
     initial_layer = Chain(
         Conv((7, 7), in_channels => num_features; stride=1, pad=3),
@@ -25,26 +24,28 @@ function UNetGenerator(
     )
 
     downsampling_blocks = [
-        ConvBlock(3, num_features, num_features * 2, true, true, device; stride=2, pad=1),
-        ConvBlock(3, num_features * 2, num_features * 4, true, true, device; stride=2, pad=1),
+        ConvBlock(3, num_features, num_features * 2, true, true; stride=2, pad=1),
+        ConvBlock(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1),
     ]
 
     resnet_blocks = Chain([ResidualBlock(num_features * 4) for _ in range(1, length=num_residual)]...)
 
     upsampling_blocks = [
-        ConvBlock(3, num_features * 4, num_features * 2, true, false, device; stride=2, pad=SamePad()),
-        ConvBlock(3, num_features * 2, num_features, true, false, device; stride=2, pad=SamePad()),
+        ConvBlock(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad()),
+        ConvBlock(3, num_features * 2, num_features, true, false; stride=2, pad=SamePad()),
     ]
 
-    final_layer = Conv((7, 7), num_features => in_channels; stride=1, pad=3)
+    final_layer = Chain(
+        Conv((7, 7), num_features => in_channels; stride=1, pad=3)
+    )
 
     return UNetGenerator(
-        initial_layer, 
-        downsampling_blocks, 
-        resnet_blocks, 
-        upsampling_blocks, 
+        initial_layer,
+        downsampling_blocks,
+        resnet_blocks,
+        upsampling_blocks,
         final_layer
-    ) |> device
+    )
 end
 
 function (net::UNetGenerator)(x)
@@ -73,8 +74,7 @@ function ConvBlock(
     in_channels::Int,
     out_channels::Int,
     with_activation::Bool=true,
-    down::Bool=true,
-    device = gpu;
+    down::Bool=true;
     kwargs...
 )
     return ConvBlock(
@@ -90,7 +90,7 @@ function ConvBlock(
             else
                 identity
             end)
-    ) |> device
+    )
 end
 
 function (net::ConvBlock)(x)
@@ -104,15 +104,14 @@ end
 @functor ResidualBlock
 
 function ResidualBlock(
-    in_channels::Int,
-    device = gpu
+    in_channels::Int
 )
     return ResidualBlock(
         Chain(
-            ConvBlock(3, in_channels, in_channels, true, true, device; pad=1),
-            ConvBlock(3, in_channels, in_channels, false, true, device; pad=1)
+            ConvBlock(3, in_channels, in_channels, true, true; pad=1),
+            ConvBlock(3, in_channels, in_channels, false, true; pad=1)
         )
-    ) |> device
+    )
 end
 
 function (net::ResidualBlock)(x)

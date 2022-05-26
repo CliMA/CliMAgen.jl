@@ -1,1 +1,14 @@
+.DS_Store
+
 /Manifest.toml
+
+/data
+/output
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.ico
+*.svg
+*.bson
