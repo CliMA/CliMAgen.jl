@@ -30,7 +30,7 @@ function PatchDiscriminator(
     return PatchDiscriminator(
         Chain(
             Conv((4, 4), in_channels => features[1]; stride=2, pad=1),
-            x -> leakyrelu.(x, 0.2)
+            x -> leakyrelu.(x, 0.2f0)
         ),
         Chain(layers...)
     ) |> device
@@ -58,7 +58,7 @@ function PatchBlock(
         Chain(
             Conv((4, 4), in_channels => out_channels; stride=stride, pad=1),
             InstanceNorm(out_channels),
-            x -> leakyrelu.(x, 0.2)
+            x -> leakyrelu.(x, 0.2f0)
         )
     ) |> device
 end
