@@ -191,3 +191,5 @@ function save_model_samples(prefix_path, a, b)
         end
     end
 end
+
+training()
