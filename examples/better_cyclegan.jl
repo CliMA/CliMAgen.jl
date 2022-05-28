@@ -14,18 +14,17 @@ FT = Float32
 exp_name = "horse2zebra"
 input_path = "../data/"
 output_path = "./output/"
-eval_freq = 1
+eval_freq = 100
 checkpoint_freq = eval_freq
 device = gpu
-num_examples = 128
-num_epochs = 2
+num_examples = 1000
+num_epochs = 100
 batch_size = 4
 img_size = 28
 input_channels = 3
 dis_lr = FT(0.0001)
 gen_lr = FT(0.0001)
 λ = FT(10.0)
-λid = FT(0.0)
 
 # Define models
 generator_A = UNetGenerator(input_channels) |> device # Generator For A->B
@@ -40,9 +39,9 @@ function generator_A_loss(a, b)
     fake_prob = discriminator_B(b_fake) # Probability that generated image in domain B is real
     gen_loss = mean((fake_prob .- 1) .^ 2)
     rec_loss = mean(abs.(b - generator_A(a_fake))) # Cycle-consistency loss for domain B
-    idt_loss = mean(abs.(generator_A(b) - b))
+#    idt_loss = mean(abs.(generator_A(b) - b))
 
-    return gen_loss + λ * rec_loss + λid * λ * idt_loss
+    return gen_loss + λ * rec_loss #+ λid * λ * idt_loss
 end
 
 function generator_B_loss(a, b)
@@ -51,9 +50,9 @@ function generator_B_loss(a, b)
     fake_prob = discriminator_A(a_fake) # Probability that generated image in domain A is real
     gen_loss = mean((fake_prob .- 1) .^ 2)
     rec_loss = mean(abs.(a - generator_B(b_fake))) # Cycle-consistency loss for domain A
-    idt_loss = mean(abs.(generator_B(a) - a))
+#    idt_loss = mean(abs.(generator_B(a) - a))
 
-    return gen_loss + λ * rec_loss + λid * λ * idt_loss
+    return gen_loss + λ * rec_loss #+ λid * λ * idt_loss
 end
 
 function discriminator_A_loss(a, b)
@@ -200,13 +199,14 @@ function load_dataset(path, img_size=256, FT=Float32, color_format=RGB)
 end
 
 function save_model_samples(prefix_path, a, b)
-    fake_B = generator_A(a) |> cpu
-    fake_A = generator_B(b) |> cpu
-    rec_B = generator_A(fake_A) |> cpu
-    rec_A = generator_B(fake_B) |> cpu
-
+    fake_B = generator_A(a)
+    fake_A = generator_B(b)
+    rec_B = generator_A(fake_A)
+    rec_A = generator_B(fake_B)
+    
     # Save the images
-    imgs = map(unnormalize, [a, fake_A, rec_A, b, fake_B, rec_B])
+    imgs = [a, fake_A, rec_A, b, fake_B, rec_B] |> cpu
+    imgs = map(unnormalize, imgs) 
     suffices = ["real_A", "fake_A", "rec_A", "real_B", "fake_B", "rec_B"]
     for (img_batch, suffix) in zip(imgs, suffices)
         for img_idx in 1:size(img_batch)[end]
