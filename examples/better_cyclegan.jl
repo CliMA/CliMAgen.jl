@@ -14,7 +14,7 @@ FT = Float32
 exp_name = "horse2zebra"
 input_path = "../data/"
 output_path = "./output/"
-eval_freq = 500
+eval_freq = 100
 checkpoint_freq = eval_freq
 device = gpu
 num_examples = 1000
@@ -101,7 +101,6 @@ function training()
         for (batch_idx, (a, b)) in enumerate(data)
             a, b = normalize(a), normalize(b)
             g_loss, d_loss = train_step(opt_gen, opt_dis, a, b)
-            total_loss = g_loss + d_loss
             total_iters += batch_size
 
             if total_iters % eval_freq == 0
@@ -110,11 +109,9 @@ function training()
 
             if total_iters % checkpoint_freq == 0
                 @info "Total iteration: $total_iters - Checkpointing model."
-                file_iter = output_path * exp_name * "/checkpoint_iteration_$(total_iters)_loss_$(total_loss).bson"
                 file_last = output_path * exp_name * "/checkpoint_latest.bson"
                 networks_cpu = networks |> cpu
-                @save file_iter networks_cpu
-                cp(file_iter, file_last, force=true)
+                @save file_last networks_cpu
             
                 prefix_path = output_path * exp_name * "/training/" * "image_$(total_iters)"
                 save_model_samples(prefix_path, a, b)
