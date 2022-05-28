@@ -127,10 +127,9 @@ function train_step(a, b)
 
     # # Forward propagate to collect the losses
     gloss = generator_loss(a, b)
-    dAloss = dA_loss(a, b)
-    dBloss = dB_loss(a, b)
+    dloss = discriminator_loss(a, b)
 
-    return gloss, dAloss, dBloss
+    return gloss, dloss
 end
 
 # function save_weights(gen,dis)
