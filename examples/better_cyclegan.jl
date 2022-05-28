@@ -71,7 +71,7 @@ function dA_loss(a, b)
     dis_A_real_loss = mean((real_A_prob .- 1) .^ 2)
     dis_A_fake_loss = mean((fake_A_prob .- 0) .^ 2)
 
-    return (dis_A_real_loss + dis_A_fake_loss) / 2
+    return dis_A_real_loss + dis_A_fake_loss
 end
 
 # loss for discriminator for domain B
@@ -82,33 +82,28 @@ function dB_loss(a, b)
     dis_B_real_loss = mean((real_B_prob .- 1) .^ 2)
     dis_B_fake_loss = mean((fake_B_prob .- 0) .^ 2)
     
-    return (dis_B_real_loss + dis_B_fake_loss) / 2
+    return dis_B_real_loss + dis_B_fake_loss
 end
 
 function g_loss(a, b)
     # Forward Propogation
     fake_B = generator_A(a) # Fake image generated in domain B
     fake_B_prob = discriminator_B(fake_B) # Probability that generated image in domain B is real
-    real_B_prob = discriminator_B(b) # Probability that original image in domain B is real
 
     fake_A = generator_B(b) # Fake image generated in domain A
     fake_A_prob = discriminator_A(fake_A) # Probability that generated image in domain A is real
-    real_A_prob = discriminator_A(a) # Probability that original image in domain A is real
-
-    rec_A = generator_B(fake_B)
-    rec_B = generator_A(fake_A)
 
     # Generator loss for domain A->B 
     gen_B_loss = mean((fake_B_prob .- 1) .^ 2)
-    rec_B_loss = mean(abs.(b - rec_B) ) # mae(b, rec_B) # Cycle-consitency loss for domain B
+    rec_B_loss = mean(abs.(b - generator_A(fake_A)) ) # Cycle-consitency loss for domain B
 
     # Generator loss for domain B->A 
     gen_A_loss = mean((fake_A_prob .- 1) .^ 2)
-    rec_A_loss = mean(abs.(a - rec_A)) # mae(a, rec_A) # Cycle-consitency loss for domain A
+    rec_A_loss = mean(abs.(a - generator_B(fake_B))) # Cycle-consitency loss for domain A
 
     # gen_A should be identity if b is fed : ||gen_A(b) - b||
-    idt_A_loss = mean(abs.(generator_A(b) - b)) # mae(generator_A(b), b)
     # gen_B should be identity if a is fed : ||gen_B(a) - a||
+    idt_A_loss = mean(abs.(generator_A(b) - b)) # mae(generator_A(b), b)
     idt_B_loss = mean(abs.(generator_B(a) - a)) # mae(generator_B(a), a)
 
     return gen_A_loss + gen_B_loss + λ₁ * rec_A_loss + λ₂ * rec_B_loss + λid * (λ₁ * idt_A_loss + λ₂ * idt_B_loss)
