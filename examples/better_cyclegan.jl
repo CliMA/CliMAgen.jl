@@ -30,9 +30,9 @@ end
 FT = Float32
 device = gpu
 num_epochs = 100
-batch_size = 16
-num_examples = 128 # Temporary for experimentation
-verbose_freq = 2 # Verbose output after every 2 epochs
+batch_size = 4
+num_examples = 1000 # Temporary for experimentation
+verbose_freq = 10 # Verbose output after every 2 epochs
 input_channels = 3
 img_size = 28
 dis_lr = FT(0.0001)
@@ -84,7 +84,6 @@ function generator_loss(a, b)
     # Forward Propogation
     fake_B = generator_A(a) # Fake image generated in domain B
     fake_B_prob = discriminator_B(fake_B) # Probability that generated image in domain B is real
-
     fake_A = generator_B(b) # Fake image generated in domain A
     fake_A_prob = discriminator_A(fake_A) # Probability that generated image in domain A is real
 
@@ -96,8 +95,7 @@ function generator_loss(a, b)
     gen_A_loss = mean((fake_A_prob .- 1) .^ 2)
     rec_A_loss = mean(abs.(a - generator_B(fake_B))) # Cycle-consistency loss for domain A
 
-    # generator_A should be identity if b is fed : ||gen_A(b) - b||
-    # generator_B should be identity if a is fed : ||gen_B(a) - a||
+    # generator_A (generator_B) should be identity if b (a) is fed : ||gen_A(b) - b|| (||gen_B(a) - a||)
     idt_A_loss = mean(abs.(generator_A(b) - b)) # mae(generator_A(b), b)
     idt_B_loss = mean(abs.(generator_B(a) - a)) # mae(generator_B(a), a)
 
@@ -106,26 +104,17 @@ end
 
 # Forward prop, backprop, optimise!
 function train_step(a, b)
-
-    # Optimise Discriminators
-    # ps = params(discriminator_A)
-    # gs = gradient(() -> dA_loss(a, b), ps)
-    # update!(opt_disc_A, ps, gs)
-
-    # ps = params(discriminator_B)
-    # gs = gradient(() -> dB_loss(a, b), ps)
-    # update!(opt_disc_B, ps, gs)
-
+    # Optimize Discriminators
     ps = params(params(discriminator_A)..., params(discriminator_B))
     gs = gradient(() -> discriminator_loss(a, b), ps)
     update!(opt_disc, ps, gs)
 
-    # Optimise Generators
+    # Optimize Generators
     ps = params(params(generator_A)..., params(generator_B))
     gs = gradient(() -> generator_loss(a, b), ps)
     update!(opt_gen, ps, gs)
 
-    # # Forward propagate to collect the losses
+    # Forward propagate to collect the losses for keeping track of training progress
     gloss = generator_loss(a, b)
     dloss = discriminator_loss(a, b)
 
@@ -152,21 +141,20 @@ end
 #     end
 # end
 
-# function train()
-#     println("Training...")
-#     for epoch in 1:NUM_EPOCHS
-#         println("-----------Epoch : $epoch-----------")
-#         for i in 1:length(train_A)
-#             g_loss,dA_loss,dB_loss = train_step(train_A[i] |> gpu,train_B[i] |> gpu)
-#             if epoch % VERBOSE_FREQUENCY == 0
-#                 println("Gen Loss : $g_loss")
-#                 println("DisA Loss : $dA_loss")
-#                 println("DisB Loss : $dB_loss")
-#             end
-#         end
-#     end
-#     save_weights()
-# end
+function training()
+    println("Training...")
+    for epoch in 1:num_epochs
+        println("-----------Epoch : $epoch-----------")
+        for (a, b) in train
+            gloss, dloss = train_step(a, b)
+            if epoch % verbose_freq == 0
+                println("Generator Loss : $gloss")
+                println("Discriminator Loss : $dloss")
+            end
+        end
+    end
+    #save_weights()
+end
 
 # ### SAMPLING ###
 # function sampleA2B(X_A_test)
