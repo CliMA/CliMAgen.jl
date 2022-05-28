@@ -59,33 +59,28 @@ println("Model setup: Done!")
 
 # Define Optimizers
 opt_gen = ADAM(gen_lr, (0.5, 0.999))
-opt_disc_A = ADAM(dis_lr, (0.5, 0.999))
-opt_disc_B = ADAM(dis_lr, (0.5, 0.999))
+opt_disc = ADAM(dis_lr, (0.5, 0.999))
+# opt_disc_A = ADAM(dis_lr, (0.5, 0.999))
+# opt_disc_B = ADAM(dis_lr, (0.5, 0.999))
 println("Optimizer setup: Done!")
 
-# loss for discriminator for domain A
-function dA_loss(a, b)
+function discriminator_loss(a, b)
     fake_A = generator_B(b) # Fake image generated in domain A
     fake_A_prob = discriminator_A(fake_A) # Probability that generated image in domain A is real
     real_A_prob = discriminator_A(a) # Probability that an original image in domain A is real
     dis_A_real_loss = mean((real_A_prob .- 1) .^ 2)
     dis_A_fake_loss = mean((fake_A_prob .- 0) .^ 2)
 
-    return dis_A_real_loss + dis_A_fake_loss
-end
-
-# loss for discriminator for domain B
-function dB_loss(a, b)
     fake_B = generator_A(a) # Fake image generated in domain B
     fake_B_prob = discriminator_B(fake_B) # Probability that generated image in domain B is real
     real_B_prob = discriminator_B(b) # Probability that an original image in domain B is real
     dis_B_real_loss = mean((real_B_prob .- 1) .^ 2)
     dis_B_fake_loss = mean((fake_B_prob .- 0) .^ 2)
-    
-    return dis_B_real_loss + dis_B_fake_loss
+
+    return dis_A_real_loss + dis_A_fake_loss + dis_B_real_loss + dis_B_fake_loss
 end
 
-function g_loss(a, b)
+function generator_loss(a, b)
     # Forward Propogation
     fake_B = generator_A(a) # Fake image generated in domain B
     fake_B_prob = discriminator_B(fake_B) # Probability that generated image in domain B is real
@@ -95,7 +90,7 @@ function g_loss(a, b)
 
     # Generator loss for domain A->B 
     gen_B_loss = mean((fake_B_prob .- 1) .^ 2)
-    rec_B_loss = mean(abs.(b - generator_A(fake_A)) ) # Cycle-consistency loss for domain B
+    rec_B_loss = mean(abs.(b - generator_A(fake_A))) # Cycle-consistency loss for domain B
 
     # Generator loss for domain B->A 
     gen_A_loss = mean((fake_A_prob .- 1) .^ 2)
@@ -113,21 +108,25 @@ end
 function train_step(a, b)
 
     # Optimise Discriminators
-    ps = params(discriminator_A)
-    gs = gradient(() -> dA_loss(a, b), ps)
-    update!(opt_disc_A, ps, gs)
+    # ps = params(discriminator_A)
+    # gs = gradient(() -> dA_loss(a, b), ps)
+    # update!(opt_disc_A, ps, gs)
 
-    ps = params(discriminator_B)
-    gs = gradient(() -> dB_loss(a, b), ps)
-    update!(opt_disc_B, ps, gs) 
+    # ps = params(discriminator_B)
+    # gs = gradient(() -> dB_loss(a, b), ps)
+    # update!(opt_disc_B, ps, gs)
+
+    ps = params(params(discriminator_A)..., params(discriminator_B))
+    gs = gradient(() -> discriminator_loss(a, b), ps)
+    update!(opt_disc, ps, gs)
 
     # Optimise Generators
     ps = params(params(generator_A)..., params(generator_B))
-    gs = gradient(() -> g_loss(a, b), ps)
+    gs = gradient(() -> generator_loss(a, b), ps)
     update!(opt_gen, ps, gs)
 
     # # Forward propagate to collect the losses
-    gloss = g_loss(a, b)
+    gloss = generator_loss(a, b)
     dAloss = dA_loss(a, b)
     dBloss = dB_loss(a, b)
 
