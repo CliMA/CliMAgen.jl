@@ -36,7 +36,9 @@ function UNetGenerator(
         ConvBlock(3, num_features * 2, num_features, true, false, device; stride=2, pad=SamePad()),
     ]
 
-    final_layer = Conv((7, 7), num_features => in_channels; stride=1, pad=3)
+    final_layer = Chain(
+        Conv((7, 7), num_features => in_channels; stride=1, pad=3)
+    )
 
     return UNetGenerator(
         initial_layer, 
