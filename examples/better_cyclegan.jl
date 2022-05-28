@@ -95,14 +95,14 @@ function g_loss(a, b)
 
     # Generator loss for domain A->B 
     gen_B_loss = mean((fake_B_prob .- 1) .^ 2)
-    rec_B_loss = mean(abs.(b - generator_A(fake_A)) ) # Cycle-consitency loss for domain B
+    rec_B_loss = mean(abs.(b - generator_A(fake_A)) ) # Cycle-consistency loss for domain B
 
     # Generator loss for domain B->A 
     gen_A_loss = mean((fake_A_prob .- 1) .^ 2)
-    rec_A_loss = mean(abs.(a - generator_B(fake_B))) # Cycle-consitency loss for domain A
+    rec_A_loss = mean(abs.(a - generator_B(fake_B))) # Cycle-consistency loss for domain A
 
-    # gen_A should be identity if b is fed : ||gen_A(b) - b||
-    # gen_B should be identity if a is fed : ||gen_B(a) - a||
+    # generator_A should be identity if b is fed : ||gen_A(b) - b||
+    # generator_B should be identity if a is fed : ||gen_B(a) - a||
     idt_A_loss = mean(abs.(generator_A(b) - b)) # mae(generator_A(b), b)
     idt_B_loss = mean(abs.(generator_B(a) - a)) # mae(generator_B(a), a)
 
