@@ -17,15 +17,15 @@ output_path = "./output/"
 eval_freq = 100
 checkpoint_freq = eval_freq
 device = gpu
-num_examples = 1000
+num_examples = 100
 num_epochs = 100
 batch_size = 1
-img_size = 256
-input_channels = 3
-dis_lr = FT(0.0001)
-gen_lr = FT(0.0001)
+img_size = 28
+input_channels = 1
+dis_lr = FT(0.0002)
+gen_lr = FT(0.0002)
 λ = FT(10.0)
-λid = FT(0.0)
+color_format = Gray
 
 # Define models
 generator_A = UNetGenerator(input_channels) |> device # Generator For A->B
@@ -86,8 +86,8 @@ end
 
 function training()
     # Load data
-    dataA = load_dataset(input_path * exp_name * "/trainA/", img_size, FT)[:, :, :, 1:num_examples] |> device
-    dataB = load_dataset(input_path * exp_name * "/trainB/", img_size, FT)[:, :, :, 1:num_examples] |> device
+    dataA = load_dataset(input_path * exp_name * "/trainA/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
+    dataB = load_dataset(input_path * exp_name * "/trainB/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
     data = DataLoader((dataA, dataB), batchsize=batch_size, shuffle=true)
 
     # Define Optimizers
@@ -123,26 +123,26 @@ function training()
     end
 end
 
-function testing()
-    # Load data
-    dataA = load_dataset(input_path * exp_name * "/testA/", img_size, FT)[:, :, :, 1:num_examples] |> device
-    dataB = load_dataset(input_path * exp_name * "/testB/", img_size, FT)[:, :, :, 1:num_examples] |> device
-    data = DataLoader((dataA, dataB), batchsize=1, shuffle=false)
+# function testing()
+#     # Load data
+#     dataA = load_dataset(input_path * exp_name * "/testA/", img_size, FT)[:, :, :, 1:num_examples] |> device
+#     dataB = load_dataset(input_path * exp_name * "/testB/", img_size, FT)[:, :, :, 1:num_examples] |> device
+#     data = DataLoader((dataA, dataB), batchsize=1, shuffle=false)
 
-    # Load generators
-    genA, genB, _, _ = @load output_path * exp_name * "checkpint_latest.bson"
-    Flux.loadmodel!(generator_A, genA)
-    Flux.loadmodel!(generator_B, genB)
+#     # Load generators
+#     genA, genB, _, _ = @load output_path * exp_name * "checkpint_latest.bson"
+#     Flux.loadmodel!(generator_A, genA)
+#     Flux.loadmodel!(generator_B, genB)
 
-    # Testing loop
-    @info "Testing begins..."
-    for (sample_idx, (a, b)) in enumerate(data)
-        a, b = normalize(a), normalize(b)
-        prefix_path = output_path * exp_name * "/testing/" * "image_$(sample_idx)"
-        save_model_samples(path, a, b)
-    end
-    @info "Testing complete."
-end
+#     # Testing loop
+#     @info "Testing begins..."
+#     for (sample_idx, (a, b)) in enumerate(data)
+#         a, b = normalize(a), normalize(b)
+#         prefix_path = output_path * exp_name * "/testing/" * "image_$(sample_idx)"
+#         save_model_samples(path, a, b)
+#     end
+#     @info "Testing complete."
+# end
 
 # Utils
 function normalize(x)
@@ -156,13 +156,19 @@ end
 function load_image(path, img_size=256, FT=Float32, color_format=RGB)
     # channelview to convert to 3 channels
     img = path |> load .|> color_format |> channelview .|> FT
-    img = permutedims(img, (3, 2, 1))
+    if length(size(img)) == 3
+        img = permutedims(img, (3, 2, 1))
+    end
 
     return imresize(img, (img_size, img_size))
 end
 
 function save_image(path, img, color_format=RGB)
-    img = permutedims(img, (3, 2, 1))
+    if size(img)[3] == 3
+        img = permutedims(img, (3, 2, 1))
+    elseif size(img)[3] == 1
+        img = img[:, :, 1]
+    end
     img = colorview(color_format, img)
     save(path, img)
 end
@@ -187,9 +193,9 @@ function save_model_samples(prefix_path, a, b)
     for (img_batch, suffix) in zip(imgs, suffices)
         for img_idx in 1:size(img_batch)[end]
             path = prefix_path * "_$(suffix)_$(img_idx).png"
-            save_image(path, img_batch[:, :, :, img_idx])
+            save_image(path, img_batch[:, :, :, img_idx], color_format)
         end
     end
 end
 
-training()
+#training()
