@@ -11,16 +11,16 @@ using Downscaling: PatchDiscriminator, UNetGenerator
 
 # Parameters
 FT = Float32
-exp_name = "horse2zebra"
+exp_name = "moist2d"
 input_path = "../data/"
 output_path = "./output/"
-eval_freq = 100
+eval_freq = 350
 checkpoint_freq = eval_freq
 device = gpu
-num_examples = 100
+num_examples = 700
 num_epochs = 100
 batch_size = 1
-img_size = 28
+img_size = 256
 input_channels = 1
 dis_lr = FT(0.0002)
 gen_lr = FT(0.0002)
@@ -73,7 +73,7 @@ function train_step(opt_gen, opt_dis, a, b)
     update!(opt_dis, ps, gs)
 
     # Optimize Generators
-    ps = params(params(generator_A)..., params(generator_A)...)
+    ps = params(params(generator_A)..., params(generator_B)...)
     gs = gradient(() -> generator_loss(a, b), ps)
     update!(opt_gen, ps, gs)
 
@@ -198,4 +198,4 @@ function save_model_samples(prefix_path, a, b)
     end
 end
 
-#training()
+training()
