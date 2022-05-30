@@ -38,8 +38,8 @@ function generator_loss(a, b)
     a_fake = generator_B(b) # Fake image generated in domain A
     b_fake = generator_A(a) # Fake image generated in domain B
 
-    a_fake_prob = discriminator_B(b_fake) # Probability that generated image in domain B is real
-    b_fake_prob = discriminator_A(a_fake) # Probability that generated image in domain A is real
+    b_fake_prob = discriminator_B(b_fake) # Probability that generated image in domain B is real
+    a_fake_prob = discriminator_A(a_fake) # Probability that generated image in domain A is real
 
     gen_A_loss = mean((a_fake_prob .- 1) .^ 2)
     rec_A_loss = mean(abs.(b - generator_A(a_fake))) # Cycle-consistency loss for domain B
