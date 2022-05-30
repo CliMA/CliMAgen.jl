@@ -11,20 +11,21 @@ using Downscaling: PatchDiscriminator, UNetGenerator
 
 # Parameters
 FT = Float32
-exp_name = "horse2zebra"
+exp_name = "moist2d"
 input_path = "../data/"
 output_path = "./output/"
-eval_freq = 100
+eval_freq = 350
 checkpoint_freq = eval_freq
 device = gpu
-num_examples = 100
+num_examples = 700
 num_epochs = 100
 batch_size = 1
-img_size = 28
+img_size = 256
 input_channels = 1
 dis_lr = FT(0.0002)
 gen_lr = FT(0.0002)
 λ = FT(10.0)
+λid = FT(0.5)
 color_format = Gray
 
 # Define models
@@ -43,10 +44,12 @@ function generator_loss(a, b)
 
     gen_A_loss = mean((a_fake_prob .- 1) .^ 2)
     rec_A_loss = mean(abs.(b - generator_A(a_fake))) # Cycle-consistency loss for domain B
+    idt_A_loss = mean(abs.(generator_A(b) .- b)) # Identity loss for domain B
     gen_B_loss = mean((b_fake_prob .- 1) .^ 2)
     rec_B_loss = mean(abs.(a - generator_B(b_fake))) # Cycle-consistency loss for domain A
+    idt_B_loss = mean(abs.(generator_B(a) .- a)) # Identity loss for domain A
 
-    return gen_A_loss + gen_B_loss + λ * (rec_A_loss + rec_B_loss)
+    return gen_A_loss + gen_B_loss + λ * (rec_A_loss + rec_B_loss + λid * (idt_A_loss + idt_B_loss))
 end
 
 function discriminator_loss(a, b)
@@ -114,7 +117,7 @@ function training()
                 file_last = output_path * exp_name * "/checkpoint_latest.bson"
                 networks_cpu = networks |> cpu
                 @save file_last networks_cpu
-            
+
                 prefix_path = output_path * exp_name * "/training/" * "image_$(total_iters)"
                 save_model_samples(prefix_path, a, b)
             end
@@ -198,4 +201,4 @@ function save_model_samples(prefix_path, a, b)
     end
 end
 
-#training()
+training()
