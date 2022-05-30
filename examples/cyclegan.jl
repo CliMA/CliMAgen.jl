@@ -73,7 +73,7 @@ function train_step(opt_gen, opt_dis, a, b)
     update!(opt_dis, ps, gs)
 
     # Optimize Generators
-    ps = params(params(generator_A)..., params(generator_A)...)
+    ps = params(params(generator_A)..., params(generator_B)...)
     gs = gradient(() -> generator_loss(a, b), ps)
     update!(opt_gen, ps, gs)
 
