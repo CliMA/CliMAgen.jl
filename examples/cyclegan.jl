@@ -25,7 +25,7 @@ input_channels = 1
 dis_lr = FT(0.0002)
 gen_lr = FT(0.0002)
 λ = FT(10.0)
-λid = FT(0.5)
+λid = FT(5.0)
 color_format = Gray
 
 # Define models
@@ -49,7 +49,7 @@ function generator_loss(a, b)
     rec_B_loss = mean(abs.(a - generator_B(b_fake))) # Cycle-consistency loss for domain A
     idt_B_loss = mean(abs.(generator_B(a) .- a)) # Identity loss for domain A
 
-    return gen_A_loss + gen_B_loss + λ * (rec_A_loss + rec_B_loss + λid * (idt_A_loss + idt_B_loss))
+    return gen_A_loss + gen_B_loss + λ * (rec_A_loss + rec_B_loss) + λid * (idt_A_loss + idt_B_loss)
 end
 
 function discriminator_loss(a, b)
@@ -108,10 +108,12 @@ function training()
             g_loss, d_loss = train_step(opt_gen, opt_dis, a, b)
             total_iters += batch_size
 
+            # Print losses every eval_freq iterations
             if total_iters % eval_freq == 0
                 @info "Total iteration: $total_iters - Generator loss: $g_loss, Discriminator loss: $d_loss"
             end
 
+            # Save images every checkpoint_freq iterations
             if total_iters % checkpoint_freq == 0
                 @info "Total iteration: $total_iters - Checkpointing model."
                 file_last = output_path * exp_name * "/checkpoint_latest.bson"
