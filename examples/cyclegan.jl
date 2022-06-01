@@ -127,6 +127,30 @@ function training()
         @info "Epoch duration: $(Dates.canonicalize(Dates.now() - epoch_start))"
     end
 end
+# Prior to training/setting up training
+# Load data
+# Data Prep "Feature Engineering" - define transforms and inverse transforms  (may need entire set)
+# Save featurized data
+
+# Athlete
+# Define and set up model (GANs here)
+# Define loss (identity, cycle, GAN, regularization coefficients, image pool)
+# need a method for train_step!
+# train_step!(GAN, optimizers..., loss_function, a, b) # updates model params and optimizers
+# need a method for callback
+# logger[i] = callback(GAN networks, a, b)
+
+
+# Coach - start here
+# Coach.training_step! = GAN_train_step!()
+# train step function
+# Optimizer + parameters
+# Batch size, epochs
+# Logging info (uses callback function)
+# Checkpoint info (uses callback function)
+
+
+
 
 # function testing()
 #     # Load data
