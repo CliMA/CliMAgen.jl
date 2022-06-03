@@ -45,6 +45,7 @@ function generator_loss(a, b)
     gen_A_loss = mean((a_fake_prob .- 1) .^ 2)
     rec_A_loss = mean(abs.(b - generator_A(a_fake))) # Cycle-consistency loss for domain B
     idt_A_loss = mean(abs.(generator_A(b) .- b)) # Identity loss for domain B
+    
     gen_B_loss = mean((b_fake_prob .- 1) .^ 2)
     rec_B_loss = mean(abs.(a - generator_B(b_fake))) # Cycle-consistency loss for domain A
     idt_B_loss = mean(abs.(generator_B(a) .- a)) # Identity loss for domain A
@@ -68,6 +69,7 @@ function discriminator_loss(a, b)
 
     return real_A_loss + fake_A_loss + real_B_loss + fake_B_loss
 end
+
 
 function train_step(opt_gen, opt_dis, a, b)
     # Optimize Discriminators
