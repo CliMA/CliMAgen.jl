@@ -42,8 +42,9 @@ generator_A = Chain(
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    Dense(hidden, input_channels, σ=tanh),
+    Dense(hidden, input_channels),
     x -> permutedims(x, (3, 2, 1, 4)),
+    x -> tanh.(x),
 ) |> device
 generator_B = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
@@ -54,8 +55,9 @@ generator_B = Chain(
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    Dense(hidden, input_channels, σ=tanh),
+    Dense(hidden, input_channels),
     x -> permutedims(x, (3, 2, 1, 4)),
+    x -> tanh.(x),
 ) |> device
 discriminator_A = PatchDiscriminator(input_channels) |> device # Discriminator For Domain A
 discriminator_B = PatchDiscriminator(input_channels) |> device # Discriminator For Domain B
