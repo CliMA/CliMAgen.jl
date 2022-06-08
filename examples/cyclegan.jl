@@ -23,21 +23,19 @@ num_epochs = 100
 batch_size = 1
 img_size = 256
 input_channels = 1
-dis_lr = FT(0.001)
-gen_lr = FT(0.001)
+dis_lr = FT(0.0002)
+gen_lr = FT(0.0002)
 λ = FT(10.0)
-λid = FT(0.0)
+λid = FT(0.01)
 color_format = Gray
 
 # Define models
-hidden = 64
-modes = (24, 24)
-σ = gelu
+hidden = 32
+modes = (16, 16)
+σ = relu
 generator_A = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
     Dense(input_channels, hidden),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
@@ -49,8 +47,6 @@ generator_A = Chain(
 generator_B = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
     Dense(input_channels, hidden),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
