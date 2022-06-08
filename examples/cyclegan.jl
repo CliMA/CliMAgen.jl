@@ -23,10 +23,10 @@ num_epochs = 100
 batch_size = 1
 img_size = 256
 input_channels = 1
-dis_lr = FT(0.0002)
-gen_lr = FT(0.0002)
+dis_lr = FT(0.001)
+gen_lr = FT(0.001)
 λ = FT(10.0)
-λid = FT(0.5)
+λid = FT(0.0)
 color_format = Gray
 
 # Define models
