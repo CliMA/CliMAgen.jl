@@ -26,7 +26,7 @@ input_channels = 1
 dis_lr = FT(0.0002)
 gen_lr = FT(0.0002)
 λ = FT(10.0)
-λid = FT(0.01)
+λid = FT(0.5)
 color_format = Gray
 
 # Define models
