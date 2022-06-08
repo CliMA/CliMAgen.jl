@@ -6,6 +6,7 @@ using Images
 using Flux
 using Flux: params, update!
 using Flux.Data: DataLoader
+using NeuralOperators
 using Random
 using Downscaling: PatchDiscriminator, UNetGenerator
 
@@ -30,7 +31,7 @@ color_format = Gray
 
 # Define models
 hidden = 64
-modes = (16, 16)
+modes = (24, 24)
 σ = gelu
 generator_A = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
@@ -39,7 +40,9 @@ generator_A = Chain(
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    Dense(hidden, input_channels),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    Dense(hidden, input_channels, σ=tanh),
     x -> permutedims(x, (3, 2, 1, 4)),
 ) |> device
 generator_B = Chain(
@@ -49,23 +52,14 @@ generator_B = Chain(
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
     OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    Dense(hidden, input_channels),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    Dense(hidden, input_channels, σ=tanh),
     x -> permutedims(x, (3, 2, 1, 4)),
 ) |> device
 discriminator_A = PatchDiscriminator(input_channels) |> device # Discriminator For Domain A
 discriminator_B = PatchDiscriminator(input_channels) |> device # Discriminator For Domain B
 networks = (generator_A, generator_B, discriminator_A, discriminator_B)
-
-hidden = 8
-modes = (4, 4)
-σ = gelu
-model = Chain(
-    x -> permutedims(x, (3, 2, 1, 4)),
-    Dense(1, hidden),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    Dense(hidden, 1),
-    x -> permutedims(x, (3, 2, 1, 4)),)
 
 function generator_loss(a, b)
     a_fake = generator_B(b) # Fake image generated in domain A
