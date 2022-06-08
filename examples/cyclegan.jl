@@ -30,23 +30,23 @@ gen_lr = FT(0.0002)
 color_format = Gray
 
 # Define models
-num_features = 16
+num_features = 8
 σ = relu
 generator_A = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
     Dense(input_channels, num_features),
     x -> relu.(x),
-    OperatorConv(num_features => 2 * num_features, (64, 64), FourierTransform),
+    OperatorConv(num_features => 2 * num_features, (128, 128), FourierTransform),
     x -> relu.(x),
-    OperatorConv(2 * num_features => 4 * num_features, (32, 32), FourierTransform),
+    OperatorConv(2 * num_features => 4 * num_features, (64, 64), FourierTransform),
     x -> relu.(x),
     OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
     OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
     OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorConv(4 * input_channels => 2 * num_features, (64, 64), FourierTransform),
+    OperatorKernel(4 * num_features => 4 * num_features, (64, 64), FourierTransform, σ),
+    OperatorConv(4 * num_features => 2 * num_features, (128, 128), FourierTransform),
     x -> relu.(x),
-    OperatorConv(2 * num_features => num_features, (128, 128), FourierTransform),
+    OperatorConv(2 * num_features => num_features, (256, 256), FourierTransform),
     x -> relu.(x),
     Dense(num_features, input_channels),
     x -> tanh.(x),
@@ -56,17 +56,17 @@ generator_B = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
     Dense(input_channels, num_features),
     x -> relu.(x),
-    OperatorConv(num_features => 2 * num_features, (64, 64), FourierTransform),
+    OperatorConv(num_features => 2 * num_features, (128, 128), FourierTransform),
     x -> relu.(x),
-    OperatorConv(2 * num_features => 4 * num_features, (32, 32), FourierTransform),
+    OperatorConv(2 * num_features => 4 * num_features, (64, 64), FourierTransform),
     x -> relu.(x),
     OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
     OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
     OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorConv(4 * input_channels => 2 * num_features, (64, 64), FourierTransform),
+    OperatorKernel(4 * num_features => 4 * num_features, (64, 64), FourierTransform, σ),
+    OperatorConv(4 * num_features => 2 * num_features, (128, 128), FourierTransform),
     x -> relu.(x),
-    OperatorConv(2 * num_features => num_features, (128, 128), FourierTransform),
+    OperatorConv(2 * num_features => num_features, (256, 256), FourierTransform),
     x -> relu.(x),
     Dense(num_features, input_channels),
     x -> tanh.(x),
@@ -241,4 +241,5 @@ function save_model_samples(prefix_path, a, b)
         end
     end
 end
+
 training()
