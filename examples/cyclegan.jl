@@ -30,30 +30,47 @@ gen_lr = FT(0.0002)
 color_format = Gray
 
 # Define models
-hidden = 32
-modes = (16, 16)
+num_features = 16
 σ = relu
 generator_A = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
-    Dense(input_channels, hidden),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    Dense(hidden, input_channels),
-    x -> permutedims(x, (3, 2, 1, 4)),
+    Dense(input_channels, num_features),
+    x -> relu.(x),
+    OperatorConv(num_features => 2 * num_features, (64, 64), FourierTransform),
+    x -> relu.(x),
+    OperatorConv(2 * num_features => 4 * num_features, (32, 32), FourierTransform),
+    x -> relu.(x),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorConv(4 * input_channels => 2 * num_features, (64, 64), FourierTransform),
+    x -> relu.(x),
+    OperatorConv(2 * num_features => num_features, (128, 128), FourierTransform),
+    x -> relu.(x),
+    Dense(num_features, input_channels),
     x -> tanh.(x),
+    x -> permutedims(x, (3, 2, 1, 4))
 ) |> device
 generator_B = Chain(
     x -> permutedims(x, (3, 2, 1, 4)),
-    Dense(input_channels, hidden),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
-    Dense(hidden, input_channels),
-    x -> permutedims(x, (3, 2, 1, 4)),
+    Dense(input_channels, num_features),
+    x -> relu.(x),
+    OperatorConv(num_features => 2 * num_features, (64, 64), FourierTransform),
+    x -> relu.(x),
+    OperatorConv(2 * num_features => 4 * num_features, (32, 32), FourierTransform),
+    x -> relu.(x),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
+    OperatorConv(4 * input_channels => 2 * num_features, (64, 64), FourierTransform),
+    x -> relu.(x),
+    OperatorConv(2 * num_features => num_features, (128, 128), FourierTransform),
+    x -> relu.(x),
+    Dense(num_features, input_channels),
     x -> tanh.(x),
+    x -> permutedims(x, (3, 2, 1, 4))
 ) |> device
 discriminator_A = PatchDiscriminator(input_channels) |> device # Discriminator For Domain A
 discriminator_B = PatchDiscriminator(input_channels) |> device # Discriminator For Domain B
