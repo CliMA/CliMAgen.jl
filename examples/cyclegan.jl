@@ -29,11 +29,43 @@ gen_lr = FT(0.0002)
 color_format = Gray
 
 # Define models
-generator_A = UNetGenerator(input_channels) |> device # Generator For A->B
-generator_B = UNetGenerator(input_channels) |> device # Generator For B->A
+hidden = 64
+modes = (16, 16)
+σ = gelu
+generator_A = Chain(
+    x -> permutedims(x, (3, 2, 1, 4)),
+    Dense(input_channels, hidden),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    Dense(hidden, input_channels),
+    x -> permutedims(x, (3, 2, 1, 4)),
+) |> device
+generator_B = Chain(
+    x -> permutedims(x, (3, 2, 1, 4)),
+    Dense(input_channels, hidden),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    Dense(hidden, input_channels),
+    x -> permutedims(x, (3, 2, 1, 4)),
+) |> device
 discriminator_A = PatchDiscriminator(input_channels) |> device # Discriminator For Domain A
 discriminator_B = PatchDiscriminator(input_channels) |> device # Discriminator For Domain B
 networks = (generator_A, generator_B, discriminator_A, discriminator_B)
+
+hidden = 8
+modes = (4, 4)
+σ = gelu
+model = Chain(
+    x -> permutedims(x, (3, 2, 1, 4)),
+    Dense(1, hidden),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    OperatorKernel(hidden => hidden, modes, FourierTransform, σ, permuted=false),
+    Dense(hidden, 1),
+    x -> permutedims(x, (3, 2, 1, 4)),)
 
 function generator_loss(a, b)
     a_fake = generator_B(b) # Fake image generated in domain A
@@ -200,5 +232,4 @@ function save_model_samples(prefix_path, a, b)
         end
     end
 end
-
 training()

@@ -9,7 +9,9 @@ using Zygote
 
 include("generators.jl")
 include("discriminators.jl")
-include("cyclegans.jl")
+include("Trainer.jl")
+
+#include("cyclegans.jl")
 
 export ConvBlock
 export ResidualBlock
