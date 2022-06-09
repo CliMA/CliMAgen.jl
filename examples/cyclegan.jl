@@ -8,7 +8,7 @@ using Flux: params, update!
 using Flux.Data: DataLoader
 using NeuralOperators
 using Random
-using Downscaling: PatchDiscriminator, UNetGenerator
+using Downscaling: PatchDiscriminator, OperatorUNetGenerator
 
 # Parameters
 FT = Float32
