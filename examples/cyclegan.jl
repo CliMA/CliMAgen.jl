@@ -32,46 +32,8 @@ color_format = Gray
 # Define models
 num_features = 8
 σ = relu
-generator_A = Chain(
-    x -> permutedims(x, (3, 2, 1, 4)),
-    Dense(input_channels, num_features),
-    x -> relu.(x),
-    OperatorConv(num_features => 2 * num_features, (128, 128), FourierTransform),
-    x -> relu.(x),
-    OperatorConv(2 * num_features => 4 * num_features, (64, 64), FourierTransform),
-    x -> relu.(x),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (64, 64), FourierTransform, σ),
-    OperatorConv(4 * num_features => 2 * num_features, (128, 128), FourierTransform),
-    x -> relu.(x),
-    OperatorConv(2 * num_features => num_features, (256, 256), FourierTransform),
-    x -> relu.(x),
-    Dense(num_features, input_channels),
-    x -> tanh.(x),
-    x -> permutedims(x, (3, 2, 1, 4))
-) |> device
-generator_B = Chain(
-    x -> permutedims(x, (3, 2, 1, 4)),
-    Dense(input_channels, num_features),
-    x -> relu.(x),
-    OperatorConv(num_features => 2 * num_features, (128, 128), FourierTransform),
-    x -> relu.(x),
-    OperatorConv(2 * num_features => 4 * num_features, (64, 64), FourierTransform),
-    x -> relu.(x),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (32, 32), FourierTransform, σ),
-    OperatorKernel(4 * num_features => 4 * num_features, (64, 64), FourierTransform, σ),
-    OperatorConv(4 * num_features => 2 * num_features, (128, 128), FourierTransform),
-    x -> relu.(x),
-    OperatorConv(2 * num_features => num_features, (256, 256), FourierTransform),
-    x -> relu.(x),
-    Dense(num_features, input_channels),
-    x -> tanh.(x),
-    x -> permutedims(x, (3, 2, 1, 4))
-) |> device
+generator_A = OperatorUNetGenerator(input_channels) |> device
+generator_B = OperatorUNetGenerator(input_channels) |> device
 discriminator_A = PatchDiscriminator(input_channels) |> device # Discriminator For Domain A
 discriminator_B = PatchDiscriminator(input_channels) |> device # Discriminator For Domain B
 networks = (generator_A, generator_B, discriminator_A, discriminator_B)
