@@ -9,6 +9,11 @@ using Flux.Data: DataLoader
 using Random
 using Downscaling: PatchDiscriminator, UNetGenerator
 
+using FFTW
+using MultivariateStats
+using UnicodePlots
+using HDF5
+
 # Parameters
 FT = Float32
 exp_name = "moist2d"
@@ -89,41 +94,65 @@ end
 
 function training()
     # Load data
-    dataA = load_dataset(input_path * exp_name * "/trainA/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
-    dataB = load_dataset(input_path * exp_name * "/trainB/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
-    data = DataLoader((dataA, dataB), batchsize=batch_size, shuffle=true)
+    dataA_raw = load_dataset(input_path * exp_name * "/trainA/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
+    dataB_raw = load_dataset(input_path * exp_name * "/trainB/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
 
-    # Define Optimizers
-    opt_gen = ADAM(gen_lr, (0.5, 0.999))
-    opt_dis = ADAM(dis_lr, (0.5, 0.999))
+    # get and normalize data
+    μA = mean(dataA_raw, dims=4)
+    σA = std(dataA_raw, dims=4)
+    dataA = (dataA_raw .- μA) ./ σA
+    dataA = fft(dataA, 1:2)
+    dataA = reshape(dataA, img_size * img_size, num_examples)
+    dataA = vcat(real(dataA), imag(dataA))
+    pcaA = fit(PCA, dataA, maxoutdim=512)
+    dataA = predict(pcaA, dataA)
+    println("Variance retained in dataset A:")
+    println(principalratio(pcaA))
 
-    # Training loop
-    total_iters = 0
-    @info "Training begins..."
-    for epoch in 1:num_epochs
-        epoch_start = Dates.now()
-        @info "Epoch: $epoch -------------------------------------------------------------------"
-        for (batch_idx, (a, b)) in enumerate(data)
-            a, b = normalize(a), normalize(b)
-            g_loss, d_loss = train_step(opt_gen, opt_dis, a, b)
-            total_iters += batch_size
+    μB = mean(dataB_raw, dims=4)
+    σB = std(dataB_raw, dims=4)
+    dataB = (dataB_raw .- μB) ./ σB
+    dataB = fft(dataB, 1:2)
+    dataB = reshape(dataB, img_size * img_size, num_examples)
+    dataB = vcat(real(dataB), imag(dataB))
+    pcaB = fit(PCA, dataB, maxoutdim=512)
+    dataB = predict(pcaB, dataB)
+    println("Variance retained in dataset B:")
+    println(principalratio(pcaB))
 
-            if total_iters % eval_freq == 0
-                @info "Total iteration: $total_iters - Generator loss: $g_loss, Discriminator loss: $d_loss"
-            end
+    # data = DataLoader((dataA, dataB), batchsize=batch_size, shuffle=true)
 
-            if total_iters % checkpoint_freq == 0
-                @info "Total iteration: $total_iters - Checkpointing model."
-                file_last = output_path * exp_name * "/checkpoint_latest.bson"
-                networks_cpu = networks |> cpu
-                @save file_last networks_cpu
+    # # Define Optimizers
+    # opt_gen = ADAM(gen_lr, (0.5, 0.999))
+    # opt_dis = ADAM(dis_lr, (0.5, 0.999))
 
-                prefix_path = output_path * exp_name * "/training/" * "image_$(total_iters)"
-                save_model_samples(prefix_path, a, b)
-            end
-        end
-        @info "Epoch duration: $(Dates.canonicalize(Dates.now() - epoch_start))"
-    end
+    # # Training loop
+    # total_iters = 0
+    # @info "Training begins..."
+    # for epoch in 1:num_epochs
+    #     epoch_start = Dates.now()
+    #     @info "Epoch: $epoch -------------------------------------------------------------------"
+    #     for (batch_idx, (a, b)) in enumerate(data)
+    #         a, b = normalize(a), normalize(b)
+    #         g_loss, d_loss = train_step(opt_gen, opt_dis, a, b)
+    #         total_iters += batch_size
+
+    #         if total_iters % eval_freq == 0
+    #             @info "Total iteration: $total_iters - Generator loss: $g_loss, Discriminator loss: $d_loss"
+    #         end
+
+    #         if total_iters % checkpoint_freq == 0
+    #             @info "Total iteration: $total_iters - Checkpointing model."
+    #             file_last = output_path * exp_name * "/checkpoint_latest.bson"
+    #             networks_cpu = networks |> cpu
+    #             @save file_last networks_cpu
+
+    #             prefix_path = output_path * exp_name * "/training/" * "image_$(total_iters)"
+    #             save_model_samples(prefix_path, a, b)
+    #         end
+    #     end
+    #     @info "Epoch duration: $(Dates.canonicalize(Dates.now() - epoch_start))"
+    # end
 end
 
 # Utils
@@ -181,3 +210,14 @@ function save_model_samples(prefix_path, a, b)
 end
 
 training()
+
+    # test reconstruction
+    # ex_idx = 421
+    # offset = img_size * img_size
+    # x = data_rs[:, ex_idx]
+    # x_rec = reconstruct(M, predict(M, x))
+    # x_rec = reshape(x_rec[1:offset] + im * x_rec[offset+1:end], img_size, img_size)
+    # x_rec = real(ifft(x_rec))
+    # x_rec = μ .+ σ .* x_rec
+
+    # res = data[:, :, :, ex_idx] .- x_rec
