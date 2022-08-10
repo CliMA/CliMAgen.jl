@@ -10,6 +10,34 @@ using NeuralOperators
 using Random
 using Downscaling: PatchDiscriminator, OperatorUNetGenerator
 
+    # Load data
+    dataA = load_dataset(input_path * exp_name * "/trainA/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
+    dataB = load_dataset(input_path * exp_name * "/trainB/", img_size, FT, color_format)[:, :, :, 1:num_examples] |> device
+    data = DataLoader((dataA, dataB), batchsize=batch_size, shuffle=true)
+
+
+function load_dataset(path, img_size=256, FT=Float32, color_format=RGB)
+    loader = path -> load_image(path, img_size, FT, color_format)
+    imgs = map(loader, path .* readdir(path))
+
+    return Flux.stack(imgs, dims=4)
+end
+
+function get_dataloader(path; split_ratio=0.5, batchsize=4, sampling_rate=2)
+    # TODO! Make this HDF5 based stuff, wtf. single file path!
+    file = MAT.matopen(path)
+    X, Y = read(file, "coeff"), read(file, "sol")
+    X = permutedims(X[:, :, :, :], (4, 2, 3, 1))[:, 1:sampling_rate:end, 1:sampling_rate:end, :]
+    Y = permutedims(Y[:, :, :, :], (4, 2, 3, 1))[:, 1:sampling_rate:end, 1:sampling_rate:end, :]
+    close(file)
+
+    data_training, data_validation = MLUtils.splitobs((X, Y), at=split_ratio)
+    loader_training = Flux.DataLoader(data_training, batchsize=batchsize, shuffle=true)
+    loader_validation = Flux.DataLoader(data_validation, batchsize=batchsize, shuffle=true)
+
+    return (training=loader_training, validation=loader_validation,)
+end
+
 # Parameters
 FT = Float32
 exp_name = "moist2d"
