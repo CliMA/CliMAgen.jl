@@ -6,6 +6,7 @@ using Flux: params, update!
 using FluxTraining
 using HDF5
 using MLUtils
+using ProgressBars
 using Statistics: mean
 
 using Downscaling: PatchDiscriminator, UNetGenerator
@@ -18,7 +19,7 @@ Base.@kwdef struct HyperParams
     λid = FT(5.0)
 end
 
-function get_dataloader(path; field="vorticity", split_ratio=0.5, batch_size=1)
+function get_dataloader(path; field="vorticity", split_ratio=0.5, batch_size=1, dev=cpu)
     fid = h5open(path, "r")
     X_lo_res = read(fid, "low_resolution/" * field)
     X_hi_res = read(fid, "high_resolution/" * field)
@@ -33,8 +34,8 @@ function get_dataloader(path; field="vorticity", split_ratio=0.5, batch_size=1)
     X_hi_res ./= (maximum(X_hi_res) - minimum(X_hi_res)) / 2
 
     # fix data types to Float32 for training
-    X_lo_res = FT.(X_lo_res)
-    X_hi_res = FT.(X_hi_res)
+    X_lo_res = FT.(X_lo_res) |> dev
+    X_hi_res = FT.(X_hi_res) |> dev
 
     data_training, data_validation = MLUtils.splitobs((X_lo_res, X_hi_res), at=split_ratio)
     loader_training = Flux.DataLoader(data_training, batchsize=batch_size, shuffle=true)
@@ -95,18 +96,19 @@ function fit!(opt_gen, opt_dscr, gen_lores, gen_hires, dscr_lores, dscr_hires, d
     for epoch in 1:nepochs
         epoch_start = Dates.now()
         @info "Epoch: $epoch -------------------------------------------------------------------"
-        for (lores, hires) in data
+        for (lores, hires) in ProgressBar(data)
             train_step!(opt_gen, opt_dscr, gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires, hparams)
         end
 
         # print current error
+        lores, hires = first(data)
         g_loss = gen_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires, hparams)
         d_loss = dscr_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires)
         @info "Epoch: $epoch - Generator loss: $g_loss, Discriminator loss: $d_loss"
 
         # store current model
         @info "Checkpointing model."
-        output_path = joinpath(@__DIR__, "/output/checkpoint_latest.bson")
+        output_path = joinpath(@__DIR__, "output/checkpoint_latest.bson")
         networks_cpu = (gen_lores, gen_hires, dscr_lores, dscr_hires) |> cpu
         @save output_path networks_cpu
 
@@ -117,11 +119,11 @@ end
 
 function train(; cuda=true, lr=FT(0.0002), nepochs=100)
     if cuda && CUDA.has_cuda()
-        device = gpu
+        dev = gpu
         CUDA.allowscalar(false)
         @info "Training on GPU"
     else
-        device = cpu
+        dev = cpu
         @info "Training on CPU"
     end
 
@@ -129,15 +131,15 @@ function train(; cuda=true, lr=FT(0.0002), nepochs=100)
     hparams = HyperParams()
 
     # data
-    data = get_dataloader("../../data/moist2d/moist2d_512x512.hdf5", split_ratio=0.5, batch_size=1)
+    data = get_dataloader("../../data/moist2d/moist2d_512x512.hdf5", split_ratio=0.5, batch_size=1, dev=dev)
     data = data.training
 
     # models
     nchannels = 1
-    gen_hires = UNetGenerator(nchannels) |> device # Generator For lores->hires
-    gen_lores = UNetGenerator(nchannels) |> device # Generator For hires->lores
-    dscr_hires = PatchDiscriminator(nchannels) |> device # Discriminator For lores domain
-    dscr_lores = PatchDiscriminator(nchannels) |> device # Discriminator For hires domain
+    gen_hires = UNetGenerator(nchannels) |> dev # Generator For lores->hires
+    gen_lores = UNetGenerator(nchannels) |> dev # Generator For hires->lores
+    dscr_hires = PatchDiscriminator(nchannels) |> dev # Discriminator For lores domain
+    dscr_lores = PatchDiscriminator(nchannels) |> dev # Discriminator For hires domain
 
     # optimizers
     opt_gen = ADAM(lr, (0.5, 0.999))
