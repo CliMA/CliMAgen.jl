@@ -1,45 +1,27 @@
 using BSON
-using CUDA
-using Dates
 using Flux
-using Flux: params, update!
-using FluxTraining
-using HDF5
-using MLUtils
-using Statistics: mean
+using UnicodePlots
 
-using Downscaling: PatchDiscriminator, UNetGenerator
+using Downscaling
 
 
-function get_dataloader(path; field="vorticity", split_ratio=0.5, batchsize=1)
-    fid = h5open(path, "r")
-    X_lo_res = read(fid, "low_resolution/" * field)
-    X_hi_res = read(fid, "high_resolution/" * field)
-    close(fid)
+include("utils.jl")
 
-    # TODO: needs to be handled by a data transfomer object, e.g.
-    # by using a MinMaxScaler object
-    # normalize data
-    X_lo_res .-= (maximum(X_lo_res) + minimum(X_lo_res)) / 2
-    X_lo_res ./= (maximum(X_lo_res) - minimum(X_lo_res)) / 2
-    X_hi_res .-= (maximum(X_hi_res) + minimum(X_hi_res)) / 2
-    X_hi_res ./= (maximum(X_hi_res) - minimum(X_hi_res)) / 2
+function test(path)
+    data = get_dataloader(path, split_ratio=0.5, batch_size=1).validation
 
-    data_training, data_validation = MLUtils.splitobs((X_lo_res, X_hi_res), at=split_ratio)
-    loader_training = Flux.DataLoader(data_training, batchsize=batchsize, shuffle=true)
-    loader_validation = Flux.DataLoader(data_validation, batchsize=batchsize, shuffle=true)
+    model_path = joinpath(@__DIR__, "output/checkpoint_latest.bson")
+    model = BSON.load(model_path, @__MODULE__)[:model]
+    generator_A = model[1]
 
-    return (training=loader_training, validation=loader_validation,)
+    (a, _) = first(data)
+    heatmap(a[:, :, 1, 1], height=32)
+    heatmap(generator_A(a)[:, :, 1, 1], height=32)
 end
 
-function get_model()
-    model_path = joinpath(@__DIR__, "../model/")
-    model_file = readdir(model_path)[end]
-
-    return BSON.load(joinpath(model_path, model_file), @__MODULE__)[:model]
+# run if file is called directly but not if just included
+if abspath(PROGRAM_FILE) == @__FILE__
+    path_to_data = "../../data/moist2d/moist2d_512x512.hdf5"
+    test(path_to_data)
 end
 
-function test()
-end
-
-test()

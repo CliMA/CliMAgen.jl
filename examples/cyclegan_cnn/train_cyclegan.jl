@@ -11,113 +11,86 @@ using Statistics: mean
 
 using Downscaling: PatchDiscriminator, UNetGenerator
 
-FT = Float32
+
+include("utils.jl")
 
 # Parameters
-Base.@kwdef struct HyperParams
+Base.@kwdef struct HyperParams{FT}
     λ = FT(10.0)
     λid = FT(5.0)
+    lr = FT(0.0002)
+    nepochs = 100
 end
 
-function get_dataloader(path; field="vorticity", split_ratio=0.5, batch_size=1, dev=cpu)
-    fid = h5open(path, "r")
-    X_lo_res = read(fid, "low_resolution/" * field)
-    X_hi_res = read(fid, "high_resolution/" * field)
-    close(fid)
+function generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
+    a_fake = generator_B(b) # Fake image generated in domain A
+    b_fake = generator_A(a) # Fake image generated in domain B
 
-    # TODO: needs to be handled by a data transfomer object, e.g.
-    # by using a MinMaxScaler object
-    # normalize data
-    X_lo_res .-= (maximum(X_lo_res) + minimum(X_lo_res)) / 2
-    X_lo_res ./= (maximum(X_lo_res) - minimum(X_lo_res)) / 2
-    X_hi_res .-= (maximum(X_hi_res) + minimum(X_hi_res)) / 2
-    X_hi_res ./= (maximum(X_hi_res) - minimum(X_hi_res)) / 2
+    b_fake_prob = discriminator_B(b_fake) # Probability that generated image in domain B is real
+    a_fake_prob = discriminator_A(a_fake) # Probability that generated image in domain A is real
 
-    # fix data types to Float32 for training
-    X_lo_res = FT.(X_lo_res) |> dev
-    X_hi_res = FT.(X_hi_res) |> dev
+    gen_A_loss = mean((a_fake_prob .- 1) .^ 2)
+    rec_A_loss = mean(abs.(b - generator_A(a_fake))) # Cycle-consistency loss for domain B
+    idt_A_loss = mean(abs.(generator_A(b) .- b)) # Identity loss for domain B
+    gen_B_loss = mean((b_fake_prob .- 1) .^ 2)
+    rec_B_loss = mean(abs.(a - generator_B(b_fake))) # Cycle-consistency loss for domain A
+    idt_B_loss = mean(abs.(generator_B(a) .- a)) # Identity loss for domain A
 
-    data_training, data_validation = MLUtils.splitobs((X_lo_res, X_hi_res), at=split_ratio)
-    loader_training = Flux.DataLoader(data_training, batchsize=batch_size, shuffle=true)
-    loader_validation = Flux.DataLoader(data_validation, batchsize=batch_size, shuffle=true)
-
-    return (training=loader_training, validation=loader_validation,)
+    return gen_A_loss + gen_B_loss + hparams.λ * (rec_A_loss + rec_B_loss) + hparams.λid * (idt_A_loss + idt_B_loss)
 end
 
-function gen_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires, hparams)
-    lores_fake = gen_lores(hires) # Fake image generated in lores domain
-    hires_fake = gen_hires(lores) # Fake image generated in hires domain
+function discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b)
+    a_fake = generator_B(b) # Fake image generated in domain A
+    b_fake = generator_A(a) # Fake image generated in domain B
 
-    hires_fake_prob = dscr_hires(hires_fake) # Probability that generated image in hires domain is real
-    lores_fake_prob = dscr_lores(lores_fake) # Probability that generated image in lores domain is real
+    a_fake_prob = discriminator_A(a_fake) # Probability that generated image in domain A is real
+    a_real_prob = discriminator_A(a) # Probability that an original image in domain A is real
+    b_fake_prob = discriminator_B(b_fake) # Probability that generated image in domain B is real
+    b_real_prob = discriminator_B(b) # Probability that an original image in domain B is real
 
-    gen_lores_loss = mean((lores_fake_prob .- 1) .^ 2)
-    rec_lores_loss = mean(abs.(hires - gen_hires(lores_fake))) # Cycle-consistency loss for hires domain
-    idt_lores_loss = mean(abs.(gen_hires(hires) .- hires)) # Identity loss for hires domain
-    gen_hires_loss = mean((hires_fake_prob .- 1) .^ 2)
-    rec_hires_loss = mean(abs.(lores - gen_lores(hires_fake))) # Cycle-consistency loss for lores domain
-    idt_hires_loss = mean(abs.(gen_lores(lores) .- lores)) # Identity loss for lores domain
+    real_A_loss = mean((a_real_prob .- 1) .^ 2)
+    fake_A_loss = mean((a_fake_prob .- 0) .^ 2)
+    real_B_loss = mean((b_real_prob .- 1) .^ 2)
+    fake_B_loss = mean((b_fake_prob .- 0) .^ 2)
 
-    return gen_lores_loss + gen_hires_loss + hparams.λ * (rec_lores_loss + rec_hires_loss) + hparams.λid * (idt_lores_loss + idt_hires_loss)
+    return real_A_loss + fake_A_loss + real_B_loss + fake_B_loss
 end
 
-function dscr_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires)
-    lores_fake = gen_lores(hires) # Fake image generated in lores domain
-    hires_fake = gen_hires(lores) # Fake image generated in hires domain
-
-    lores_fake_prob = dscr_lores(lores_fake) # Probability that generated image in lores domain is real
-    lores_real_prob = dscr_lores(lores) # Probability that an original image in lores domain is real
-    hires_fake_prob = dscr_hires(hires_fake) # Probability that generated image in hires domain is real
-    hires_real_prob = dscr_hires(hires) # Probability that an original image in hires domain is real
-
-    real_lores_loss = mean((lores_real_prob .- 1) .^ 2)
-    fake_lores_loss = mean((lores_fake_prob .- 0) .^ 2)
-    real_hires_loss = mean((hires_real_prob .- 1) .^ 2)
-    fake_hires_loss = mean((hires_fake_prob .- 0) .^ 2)
-
-    return real_lores_loss + fake_lores_loss + real_hires_loss + fake_hires_loss
-end
-
-function train_step!(opt_gen, opt_dscr, gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires, hparams)
+function train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
     # Optimize Discriminators
-    ps = params(params(dscr_lores)..., params(dscr_hires)...)
-    gs = gradient(() -> dscr_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires), ps)
-    update!(opt_dscr, ps, gs)
+    ps = params(params(discriminator_A)..., params(discriminator_B)...)
+    gs = gradient(() -> discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b), ps)
+    update!(opt_dis, ps, gs)
 
     # Optimize Generators
-    ps = params(params(gen_hires)..., params(gen_lores)...)
-    gs = gradient(() -> gen_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires, hparams), ps)
+    ps = params(params(generator_A)..., params(generator_B)...)
+    gs = gradient(() -> generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams), ps)
     update!(opt_gen, ps, gs)
 end
 
-function fit!(opt_gen, opt_dscr, gen_lores, gen_hires, dscr_lores, dscr_hires, data, hparams, nepochs)
+function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, nepochs)
     # Training loop
-    @info "Training begins..."
-    for epoch in 1:nepochs
-        epoch_start = Dates.now()
+    for epoch in 1:hparams.nepochs
         @info "Epoch: $epoch -------------------------------------------------------------------"
-        for (lores, hires) in ProgressBar(data)
-            train_step!(opt_gen, opt_dscr, gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires, hparams)
+        for (a, b) in ProgressBar(data)
+            train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
         end
 
-        # print current error
-        lores, hires = first(data)
-        g_loss = gen_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires, hparams)
-        d_loss = dscr_loss(gen_lores, gen_hires, dscr_lores, dscr_hires, lores, hires)
-        @info "Epoch: $epoch - Generator loss: $g_loss, Discriminator loss: $d_loss"
+        # print current error estimates
+        a, b = first(data)
+        g_loss = generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
+        d_loss = discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b,)
+        @info "Epoch: $epoch - Generator loss: $g_loss, Discriminator loss: $d_loss (based on one sample)."
 
         # store current model
         @info "Checkpointing model."
         output_path = joinpath(@__DIR__, "output/checkpoint_latest.bson")
-        networks_cpu = (gen_lores, gen_hires, dscr_lores, dscr_hires) |> cpu
-        @save output_path networks_cpu
-
-        # print time elapsed
-        @info "Epoch duration: $(Dates.canonicalize(Dates.now() - epoch_start))"
+        model = (generator_A, generator_B, discriminator_A, discriminator_B) |> cpu
+        @save output_path model
     end
 end
 
-function train(; cuda=true, lr=FT(0.0002), nepochs=100)
+function train(path; cuda=true, )
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -127,32 +100,29 @@ function train(; cuda=true, lr=FT(0.0002), nepochs=100)
         @info "Training on CPU"
     end
 
-    # hyper params
+    # hyperparams
     hparams = HyperParams()
 
-    # data
-    data = get_dataloader("../../data/moist2d/moist2d_512x512.hdf5", split_ratio=0.5, batch_size=1, dev=dev)
-    data = data.training
+    # training data
+    data = get_dataloader(path, split_ratio=0.5, batch_size=1, dev=dev).training
 
-    # models
+    # models 
     nchannels = 1
-    gen_hires = UNetGenerator(nchannels) |> dev # Generator For lores->hires
-    gen_lores = UNetGenerator(nchannels) |> dev # Generator For hires->lores
-    dscr_hires = PatchDiscriminator(nchannels) |> dev # Discriminator For lores domain
-    dscr_lores = PatchDiscriminator(nchannels) |> dev # Discriminator For hires domain
+    generator_A = UNetGenerator(nchannels) |> dev # Generator For A->B
+    generator_B = UNetGenerator(nchannels) |> dev # Generator For B->A
+    discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
+    discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
 
     # optimizers
-    opt_gen = ADAM(lr, (0.5, 0.999))
-    opt_dis = ADAM(lr, (0.5, 0.999))
+    opt_gen = ADAM(hparams.lr, (0.5, 0.999))
+    opt_dis = ADAM(hparams.lr, (0.5, 0.999))
 
-    fit!(opt_gen, opt_dis, gen_lores, gen_hires, dscr_lores, dscr_hires, data, hparams, nepochs)
+    fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams)
 end
 
-function get_model()
-    model_path = joinpath(@__DIR__, "../model/")
-    model_file = readdir(model_path)[end]
-
-    return BSON.load(joinpath(model_path, model_file), @__MODULE__)[:model]
+# run if file is called directly but not if just included
+if abspath(PROGRAM_FILE) == @__FILE__
+    hparams = HyperParams()
+    path_to_data = "../../data/moist2d/moist2d_512x512.hdf5"
+    train(path_to_data, hparams)
 end
-
-train()
