@@ -68,29 +68,29 @@ function train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A
     update!(opt_gen, ps, gs)
 end
 
-function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, nepochs)
+function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams)
     # Training loop
+    g_loss, d_loss = 0, 0
+    iter = ProgressBar(data) 
     for epoch in 1:hparams.nepochs
-        @info "Epoch: $epoch -------------------------------------------------------------------"
-        for (a, b) in ProgressBar(data)
+        for (a, b) in iter
             train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
+            set_multiline_postfix(iter, "Epoch $epoch\nGenerator Loss: $g_loss\nDiscriminator Loss: $d_loss")
         end
 
         # print current error estimates
         a, b = first(data)
         g_loss = generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
         d_loss = discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b,)
-        @info "Epoch: $epoch - Generator loss: $g_loss, Discriminator loss: $d_loss (based on one sample)."
 
         # store current model
-        @info "Checkpointing model."
         output_path = joinpath(@__DIR__, "output/checkpoint_latest.bson")
         model = (generator_A, generator_B, discriminator_A, discriminator_B) |> cpu
         @save output_path model
     end
 end
 
-function train(path; cuda=true, )
+function train(path, field, hparams; cuda=true)
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -100,11 +100,8 @@ function train(path; cuda=true, )
         @info "Training on CPU"
     end
 
-    # hyperparams
-    hparams = HyperParams()
-
     # training data
-    data = get_dataloader(path, split_ratio=0.5, batch_size=1, dev=dev).training
+    data = get_dataloader(path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
 
     # models 
     nchannels = 1
@@ -122,7 +119,8 @@ end
 
 # run if file is called directly but not if just included
 if abspath(PROGRAM_FILE) == @__FILE__
-    hparams = HyperParams()
+    field = "vorticity"
+    hparams = HyperParams{Float32}()
     path_to_data = "../../data/moist2d/moist2d_512x512.hdf5"
-    train(path_to_data, hparams)
+    train(path_to_data, field, hparams)
 end
