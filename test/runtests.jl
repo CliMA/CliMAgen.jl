@@ -116,4 +116,22 @@ FT = Float32
     unet = UNetGenerator1D(in_channels, num_features, num_residual)
     x = randn(FT, (img_size, in_channels, batch_size))
     @test unet(x) |> size == (img_size, in_channels, batch_size)
+
+    img_size = 128
+    batch_size = 5
+    in_channels = 2
+    num_features = 64
+    num_residual = 9
+    unet = UNetGeneratorAR(in_channels, num_features, num_residual)
+    x = randn(FT, (img_size, img_size, in_channels, batch_size))
+    @test unet(x) |> size == (img_size, img_size, in_channels, batch_size)
+
+    img_size = 128
+    batch_size = 5
+    in_channels = 4
+    num_features = 64
+    num_residual = 9
+    unet = UNetGeneratorAR(in_channels, num_features, num_residual)
+    x = randn(FT, (img_size, img_size, in_channels, batch_size))
+    @test unet(x) |> size == (img_size, img_size, in_channels, batch_size)
 end
