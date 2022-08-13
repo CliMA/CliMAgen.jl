@@ -19,7 +19,7 @@ function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size=1, n
     X_hi_res = @. 2 * (X_hi_res - lowest) / (highest - lowest) - 1
 
     # random noise
-    noise = rand(FT, size(X_lo_res)...)
+    noise = 2 .* rand(size(X_lo_res)...) .- 1
 
     # Build pairs of images for noisy training
     X_lo_res = cat(X_lo_res, noise, dims=3)
