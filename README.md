@@ -1,4 +1,3 @@
 # Downscaling
 
-## Horses and Zebras Dataset
-The dataset can be downloaded from Berkley: https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/horse2zebra.zip
+This repository containns CliMA's superesolution/downscaling tools and technologies.
