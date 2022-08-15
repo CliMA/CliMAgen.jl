@@ -79,7 +79,7 @@ function (cnn::AutoregressiveCNN2D)(xt)
     nchannels_half = div(nchannels, 2)
 
     # time slices from channels
-    # idea is that the first half of channels come from the first time slice
+    # idea is that the first half of channels comes from the first time slice
     # and the second half of channels comes from the second time slice
     t1 = 1:nchannels_half
     t2 = nchannels_half+1:nchannels 
@@ -88,7 +88,7 @@ function (cnn::AutoregressiveCNN2D)(xt)
     xt1 = view(xt, :, :, t1, :)
     xt2 = view(xt, :, :, t2, :)
 
-    # zero field for initial input when the prvious time slice is missing
+    # zero field for initial input when the previous time slice is missing
     zer = 0 .* similar(xt1)
 
     # recursively call the network to patch things together
