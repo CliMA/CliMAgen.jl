@@ -112,6 +112,18 @@ FT = Float32
     batch_size = 5
     in_channels = 1
     num_features = 64
+    num_residual = 8
+    unet = NoisyUNetGenerator(in_channels, num_features, num_residual)
+    x = randn(FT, (img_size, img_size, in_channels, batch_size))
+    noise = 2 .* rand(FT, (div(img_size,4), div(img_size,4), num_features*4, batch_size)) .- 1
+    y = unet(x, noise)
+    @test unet(x, noise) |> size == (img_size, img_size, in_channels, batch_size)
+    @test_throws AssertionError NoisyUNetGenerator(in_channels, num_features, 3)
+
+    img_size = 128
+    batch_size = 5
+    in_channels = 1
+    num_features = 64
     num_residual = 9
     unet = UNetGenerator1D(in_channels, num_features, num_residual)
     x = randn(FT, (img_size, in_channels, batch_size))
