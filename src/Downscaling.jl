@@ -18,7 +18,10 @@ export ResidualBlock
 export PatchBlock
 export PatchDiscriminator
 export UNetGenerator
-export UNetGeneratorAR
+export PatchCNN2D
+export PatchUNet2D
+export AutoregressiveCNN2D
+export AutoregressiveUNet2D
 
 export ConvBlock1D
 export ResidualBlock1D

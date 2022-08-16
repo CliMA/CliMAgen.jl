@@ -9,7 +9,7 @@ using MLUtils
 using ProgressBars
 using Statistics: mean
 
-using Downscaling: PatchDiscriminator, UNetGenerator
+using Downscaling: PatchDiscriminator, PatchUNet2D
 
 
 include("utils.jl")
@@ -90,7 +90,7 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
     end
 end
 
-function train(path, field, hparams; cuda=true)
+function train(path="../../data/moist2d/moist2d_512x512.hdf5", field="moisture", hparams=HyperParams{Float32}(); cuda=true)
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -105,8 +105,8 @@ function train(path, field, hparams; cuda=true)
 
     # models 
     nchannels = 1
-    generator_A = UNetGenerator(nchannels) |> dev # Generator For A->B
-    generator_B = UNetGenerator(nchannels) |> dev # Generator For B->A
+    generator_A = PatchUNet2D(nchannels) |> dev # Generator For A->B
+    generator_B = PatchUNet2D(nchannels) |> dev # Generator For B->A
     discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
     discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
 

@@ -9,7 +9,7 @@ using MLUtils
 using ProgressBars
 using Statistics: mean
 
-using Downscaling: PatchDiscriminator, UNetGeneratorAR
+using Downscaling: PatchDiscriminator, AutoregressiveUNet2D
 
 
 include("utils.jl")
@@ -105,8 +105,8 @@ function train(path = "../../data/moist2d/moist2d_512x512.hdf5", field = "moistu
 
     # models 
     nchannels = 2
-    generator_A = UNetGeneratorAR(nchannels) |> dev # Generator For A->B
-    generator_B = UNetGeneratorAR(nchannels) |> dev # Generator For B->A
+    generator_A = AutoregressiveUNet2D(nchannels) |> dev # Generator For A->B
+    generator_B = AutoregressiveUNet2D(nchannels) |> dev # Generator For B->A
     discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
     discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
 
@@ -119,7 +119,7 @@ end
 
 # run if file is called directly but not if just included
 if abspath(PROGRAM_FILE) == @__FILE__
-    field = "vorticity"
+    field = "moisture"
     hparams = HyperParams{Float32}()
     path_to_data = "../../data/moist2d/moist2d_512x512.hdf5"
     train(path_to_data, field, hparams)

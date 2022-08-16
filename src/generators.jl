@@ -25,14 +25,12 @@ end
 
 function (cnn::PatchCNN2D)(x)
     img_size_x, img_size_y, nchannels, _ = size(x)
-    img_size_x_half = div(img_size_x, 2)
-    img_size_y_half = div(img_size_y, 2)
 
     # chunk pixel indices into 4 sections
-    px1 = 1:img_size_x_half
-    px2 = img_size_x_half+1:img_size_x
-    py1 = 1:img_size_y_half
-    py2 = img_size_y_half+1:img_size_y
+    px1 = 1:div(img_size_x, 2)
+    px2 = (div(img_size_x, 2)+1):img_size_x
+    py1 = 1:div(img_size_y, 2)
+    py2 = (div(img_size_y, 2)+1):img_size_y
 
     # chunk input into 4 patches
     x11 = view(x, px1, py1, :, :)
@@ -41,7 +39,7 @@ function (cnn::PatchCNN2D)(x)
     x22 = view(x, px2, py2, :, :)
 
     # zero field for boundary input when the adjacent patch is missing
-    zer = 0 .* similar(x11)
+    zer = zero(x11)
 
     # recursively call the network to patch things together
     y11 = view(cnn.net(cat(zer, zer, x11, dims=3)), :, :, (2*nchannels+1):3*nchannels, :)
@@ -50,7 +48,7 @@ function (cnn::PatchCNN2D)(x)
     y22 = view(cnn.net(cat(y21, y12, x22, dims=3)), :, :, (2*nchannels+1):3*nchannels, :)
 
     # cat the output patches together
-    y = cat(cat(y11, y12, dims=1), cat(y21, y22, dims=1), dims=2)
+    y = cat(cat(y11, y21, dims=1), cat(y12, y22, dims=1), dims=2)
 
     return y
 end
@@ -75,28 +73,24 @@ function AutoregressiveUNet2D(
 end
 
 function (cnn::AutoregressiveCNN2D)(xt)
-    nchannels = size(x)[3]
-    nchannels_half = div(nchannels, 2)
+    nchannels = size(xt)[3]
 
     # time slices from channels
     # idea is that the first half of channels comes from the first time slice
     # and the second half of channels comes from the second time slice
-    t1 = 1:nchannels_half
-    t2 = nchannels_half+1:nchannels 
+    t1 = 1:div(nchannels, 2)
+    t2 = (div(nchannels, 2)+1):nchannels
 
     # chunk input into 2 time slices
     xt1 = view(xt, :, :, t1, :)
     xt2 = view(xt, :, :, t2, :)
 
     # zero field for initial input when the previous time slice is missing
-    zer = 0 .* similar(xt1)
+    zer = zero(xt1)
 
     # recursively call the network to patch things together
     yt1 = view(cnn.net(cat(zer, xt1, dims=3)), :, :, t2, :)
-    yt2 = view(cnn.net(cat(yt1, xt2, dims=3)), :, :, t2, :)
-
-    # cat the output patches together
-    y = cat(yt1, yt2, dims=3)
+    y = cnn.net(cat(yt1, xt2, dims=3))
 
     return y
 end

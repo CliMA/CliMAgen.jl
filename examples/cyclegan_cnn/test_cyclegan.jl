@@ -16,5 +16,5 @@ model = BSON.load(model_path, @__MODULE__)[:model]
 generator_A = model[1]
 
 (a, _) = first(data)
-heatmap(a[:, :, 1, 1], height=32);
-heatmap(generator_A(a)[:, :, 1, 1], height=32);
+heatmap(a[:, :, 1, 1], height=50);
+heatmap(generator_A(a)[:, :, 1, 1], height=50);
