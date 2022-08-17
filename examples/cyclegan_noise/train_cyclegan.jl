@@ -13,7 +13,8 @@ using Downscaling
 using Downscaling: PatchDiscriminator, UNetGenerator
 
 examples_dir = joinpath(pkgdir(Downscaling), "examples")
-include("utils.jl")
+cyclegan_dir = joinpath(examples_dir, "cyclegan_noise")
+include(joinpath(cyclegan_dir, "utils.jl"))
 include(joinpath(examples_dir, "artifact_utils.jl"))
 
 # Parameters
@@ -70,7 +71,7 @@ function train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A
     update!(opt_gen, ps, gs)
 end
 
-function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams)
+function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, output_filepath)
     # Training loop
     g_loss, d_loss = 0, 0
     iter = ProgressBar(data) 
@@ -86,13 +87,12 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
         d_loss = discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b,noise)
 
         # store current model
-        output_path = joinpath(@__DIR__, "output/checkpoint_latest.bson")
         model = (generator_A, generator_B, discriminator_A, discriminator_B) |> cpu
-        @save output_path model
+        @save output_filepath model
     end
 end
 
-function train(path, field, hparams; cuda=true)
+function train(path, field, hparams, output_filepath; cuda=true)
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -116,18 +116,20 @@ function train(path, field, hparams; cuda=true)
     opt_gen = ADAM(hparams.lr, (0.5, 0.999))
     opt_dis = ADAM(hparams.lr, (0.5, 0.999))
 
-    fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams,)
+    fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, output_filepath)
 end
 
 # run if file is called directly but not if just included
 if abspath(PROGRAM_FILE) == @__FILE__
-    url = "https://caltech.box.com/shared/static/7oht5betdza54sjftk93ni0bsldtrptl.hdf5"
-    filename = "moist2d_512x512.hdf5"
-    dataname = "moist2d_512x512"
+
     # This downloads the data locally, if it not already present, and obtains the location of the directory holding it.
-    local_dataset_directory = obtain_local_dataset_path(examples_dir, dataname, url, filename)
-    local_dataset_path = joinpath(local_dataset_directory, filename)
+    local_dataset_directory = obtain_local_dataset_path(examples_dir, moist2d.dataname, moist2d.url, moist2d.filename)
+    local_dataset_path = joinpath(local_dataset_directory, moist2d.filename)
+
+    output_dir = joinpath(cyclegan_dir, "output")
+    mkpath(output_dir)
+    output_filepath = joinpath(output_dir, "checkpoint_latest.bson")
     field = "moisture"
     hparams = HyperParams{Float32}()
-    train(local_dataset_path, field, hparams)
+    train(local_dataset_path, field, hparams, output_filepath)
 end

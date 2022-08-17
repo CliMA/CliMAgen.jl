@@ -147,3 +147,5 @@ FT = Float32
     x = randn(FT, (img_size, img_size, in_channels, batch_size))
     @test unet(x) |> size == (img_size, img_size, in_channels, batch_size)
 end
+
+include("./test_artifact.jl")

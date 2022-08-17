@@ -9,10 +9,14 @@ using MLUtils
 using ProgressBars
 using Statistics: mean
 
-using Downscaling: PatchDiscriminator, UNetGeneratorAR
+using Downscaling
+using Downscaling: PatchDiscriminator, UNetGenerator
 
+examples_dir = joinpath(pkgdir(Downscaling), "examples")
+cyclegan_dir = joinpath(examples_dir, "cyclegan_ar_cnn")
+include(joinpath(cyclegan_dir, "utils.jl"))
+include(joinpath(examples_dir, "artifact_utils.jl"))
 
-include("utils.jl")
 
 # Parameters
 Base.@kwdef struct HyperParams{FT}
@@ -119,8 +123,10 @@ end
 
 # run if file is called directly but not if just included
 if abspath(PROGRAM_FILE) == @__FILE__
+    # This downloads the data locally, if it not already present, and obtains the location of the directory holding it.
+    local_dataset_directory = obtain_local_dataset_path(examples_dir, moist2d.dataname, moist2d.url, moist2d.filename)
+    local_dataset_path = joinpath(local_dataset_directory, moist2d.filename)
     field = "vorticity"
     hparams = HyperParams{Float32}()
-    path_to_data = "../../data/moist2d/moist2d_512x512.hdf5"
-    train(path_to_data, field, hparams)
+    train(local_dataset_path, field, hparams)
 end
