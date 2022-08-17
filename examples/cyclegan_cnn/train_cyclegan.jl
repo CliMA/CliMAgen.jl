@@ -119,7 +119,7 @@ end
 
 # run if file is called directly but not if just included
 if abspath(PROGRAM_FILE) == @__FILE__
-    field = "vorticity"
+    field = "moisture"
     hparams = HyperParams{Float32}()
     path_to_data = "../../data/moist2d/moist2d_512x512.hdf5"
     train(path_to_data, field, hparams)

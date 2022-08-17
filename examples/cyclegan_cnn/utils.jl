@@ -4,7 +4,7 @@ using MLUtils
 
 FT = Float32
 
-function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size=1, nsamples=1000, dev=cpu)
+function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size=1, nsamples=100, dev=cpu)
     fid = h5open(path, "r")
     X_lo_res = read(fid, "low_resolution/" * field)
     X_hi_res = read(fid, "high_resolution/" * field)
