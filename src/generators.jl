@@ -26,11 +26,11 @@ end
 function (net_ar::UNetGeneratorAR)(x)
     FT = eltype(x)
     img_size_x, img_size_y, nchannels, nbatch = size(x)
-    
+
     # TODO: not efficient but should work on GPU
     zero_field = CuArray(zeros(FT, (img_size_x, img_size_y, div(nchannels, 2), nbatch)))
     x1 = view(x, :, :, 1:div(nchannels, 2), :)
-    
+
     y1 = view(net_ar.unet(cat(zero_field, x1, dims=3)), :, :, div(nchannels, 2)+1:nchannels, :)
     x2 = view(x, :, :, div(nchannels, 2)+1:nchannels, :)
 
@@ -100,6 +100,66 @@ function (net::UNetGenerator)(x)
     return tanh.(net.final(input))
 end
 
+"""
+    PatchNet
+"""
+struct PatchNet
+    initial
+    downblocks
+    resblocks
+    upblocks
+    final
+end
+
+@functor PatchNet
+
+function PatchNet(
+    in_channels::Int,
+    num_features::Int=64,
+    num_residual::Int=9,
+)
+    initial_layer = Chain(
+        Conv((7, 7), in_channels => num_features; stride=1, pad=3),
+        InstanceNorm(num_features),
+        x -> relu.(x)
+    )
+
+    downsampling_blocks = [
+        ConvBlock(3, num_features, num_features * 2, true, true; stride=2, pad=1),
+        ConvBlock(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1),
+    ]
+
+    resnet_blocks = Chain([ResidualBlock(num_features * 4) for _ in range(1, length=num_residual)]...)
+
+    upsampling_blocks = [
+        ConvBlock(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad()),
+    ]
+
+    final_layer = Chain(
+        Conv((7, 7), num_features * 2 => in_channels; stride=1, pad=3)
+    )
+
+    return PatchNet(
+        initial_layer,
+        downsampling_blocks,
+        resnet_blocks,
+        upsampling_blocks,
+        final_layer
+    )
+end
+
+function (net::PatchNet)(x)
+    input = net.initial(x)
+    for layer in net.downblocks
+        input = layer(input)
+    end
+    input = net.resblocks(input)
+    for layer in net.upblocks
+        input = layer(input)
+    end
+    return tanh.(net.final(input))
+end
+
 
 """
     NoisyUNetGenerator
@@ -124,7 +184,7 @@ function NoisyUNetGenerator(
     num_features::Int=64,
     num_residual::Int=8,
 )
-    @assert iseven(num_residual) 
+    @assert iseven(num_residual)
     resnet_block_length = div(num_residual, 2)
 
     initial_layer = Chain(
@@ -171,7 +231,7 @@ function (net::NoisyUNetGenerator)(x, r)
     for layer in net.upblocks
         input = layer(input)
     end
-    
+
     return tanh.(net.final(input))
 end
 

@@ -20,6 +20,7 @@ export PatchDiscriminator
 export UNetGenerator
 export UNetGeneratorAR
 export NoisyUNetGenerator
+export PatchNet
 
 export ConvBlock1D
 export ResidualBlock1D
