@@ -15,6 +15,9 @@ model_path = joinpath(@__DIR__, "output/checkpoint_latest.bson")
 model = BSON.load(model_path, @__MODULE__)[:model]
 generator_A = model[1]
 
-(a, _) = first(data)
-heatmap(a[:, :, 1, 1], height=32);
-heatmap(generator_A(a)[:, :, 1, 1], height=32);
+a, _, noise = first(data)
+noise = rand(eltype(a), size(noise))
+
+
+heatmap(a[:, :, 1, 1], height=32)
+heatmap(generator_A(a, noise)[:, :, 1, 1], height=32)
