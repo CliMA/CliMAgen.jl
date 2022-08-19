@@ -18,8 +18,9 @@ export ResidualBlock
 export PatchBlock
 export PatchDiscriminator
 export UNetGenerator
-export UNetGeneratorAR
 export NoisyUNetGenerator
+export PatchNet
+export RecursiveNet
 
 export ConvBlock1D
 export ResidualBlock1D

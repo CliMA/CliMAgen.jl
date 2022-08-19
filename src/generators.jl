@@ -3,41 +3,6 @@ using CUDA: CuArray
 using Flux
 using Functors
 
-"""
-    UNetGeneratorAR
-"""
-struct UNetGeneratorAR
-    unet
-end
-
-@functor UNetGeneratorAR
-
-function UNetGeneratorAR(
-    in_channels::Int,
-    num_features::Int=64,
-    num_residual::Int=9,
-)
-    @assert in_channels > 1
-    unet = UNetGenerator(in_channels, num_features, num_residual)
-
-    return UNetGeneratorAR(unet)
-end
-
-function (net_ar::UNetGeneratorAR)(x)
-    FT = eltype(x)
-    img_size_x, img_size_y, nchannels, nbatch = size(x)
-    
-    # TODO: not efficient but should work on GPU
-    zero_field = CuArray(zeros(FT, (img_size_x, img_size_y, div(nchannels, 2), nbatch)))
-    x1 = view(x, :, :, 1:div(nchannels, 2), :)
-    
-    y1 = view(net_ar.unet(cat(zero_field, x1, dims=3)), :, :, div(nchannels, 2)+1:nchannels, :)
-    x2 = view(x, :, :, div(nchannels, 2)+1:nchannels, :)
-
-    y = net_ar.unet(cat(y1, x2, dims=3))
-
-    return y
-end
 
 """
     UNetGenerator
@@ -124,7 +89,7 @@ function NoisyUNetGenerator(
     num_features::Int=64,
     num_residual::Int=8,
 )
-    @assert iseven(num_residual) 
+    @assert iseven(num_residual)
     resnet_block_length = div(num_residual, 2)
 
     initial_layer = Chain(
@@ -171,10 +136,95 @@ function (net::NoisyUNetGenerator)(x, r)
     for layer in net.upblocks
         input = layer(input)
     end
-    
+
     return tanh.(net.final(input))
 end
 
+"""
+    PatchNet
+
+    A wrapper structure that allows for patch-wise generation of 2D images.
+    It uses another network like UNet as input.
+"""
+struct PatchNet
+    net
+end
+
+@functor PatchNet
+
+function (patch::PatchNet)(x)
+    nx, ny, _, _ = size(x)
+
+    # x and y patch index ranges
+    px1 = 1:div(nx, 2)
+    px2 = div(nx, 2)+1:nx
+    py1 = 1:div(nx, 2)
+    py2 = div(ny, 2)+1:ny
+
+    # generate patch 11
+    p11 = view(x, px1, py1, :, :)
+    zer = zero(p11)
+    x11 = cat(cat(zer, zer, dims=1), cat(zer, p11, dims=1), dims=2)
+    y11 = view(patch.net(x11), px2, py2, :, :)
+
+    # generate patch 12
+    p12 = view(x, px1, py2, :, :)
+    zer = zero(p12)
+    x12 = cat(cat(zer, y11, dims=1), cat(zer, p12, dims=1), dims=2)
+    y12 = view(patch.net(x12), px2, py2, :, :)
+
+    # generate patch 21
+    p21 = view(x, px2, py1, :, :)
+    zer = zero(p21)
+    x21 = cat(cat(zer, zer, dims=1), cat(y11, p21, dims=1), dims=2)
+    y21 = view(patch.net(x21), px2, py2, :, :)
+
+    # generate patch 22
+    p22 = view(x, px2, py2, :, :)
+    x22 = cat(cat(y11, y21, dims=1), cat(y12, p22, dims=1), dims=2)
+    y22 = view(patch.net(x22), px2, py2, :, :)
+
+    # assemble full output 
+    y = cat(cat(y11, y21, dims=1), cat(y12, y22, dims=1), dims=2)
+
+    return y
+end
+
+"""
+    RecursiveNet
+
+    A wrapper structure that allows for temporally consistent 2D images.
+    It uses another network like UNet as input.
+"""
+struct RecursiveNet
+    net
+end
+
+@functor RecursiveNet
+
+function (rec::RecursiveNet)(x)
+    _, _, nc, _ = size(x)
+
+    # t1 and t2 index ranges
+    p1 = 1:div(nc, 2)
+    p2 = (div(nc, 2)+1):nc
+
+    # generate yt1
+    pt1 = view(x, :, :, p1, :)
+    zer = zero(pt1)
+    xt1 = cat(zer, pt1, dims=3)
+    yt1 = view(rec.net(xt1), :, :, p2, :)
+
+    # generate yt2
+    pt2 = view(x, :, :, p2, :)
+    xt2 = cat(yt1, pt2, dims=3)
+    yt2 = view(rec.net(xt2), :, :, p2, :)
+
+    # assemble full output
+    y = cat(yt1, yt2, dims=3)
+
+    return y
+end
 
 """
     ConvBlock

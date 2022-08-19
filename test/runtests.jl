@@ -115,7 +115,7 @@ FT = Float32
     num_residual = 8
     unet = NoisyUNetGenerator(in_channels, num_features, num_residual)
     x = randn(FT, (img_size, img_size, in_channels, batch_size))
-    noise = 2 .* rand(FT, (div(img_size,4), div(img_size,4), num_features*4, batch_size)) .- 1
+    noise = 2 .* rand(FT, (div(img_size, 4), div(img_size, 4), num_features * 4, batch_size)) .- 1
     y = unet(x, noise)
     @test unet(x, noise) |> size == (img_size, img_size, in_channels, batch_size)
     @test_throws AssertionError NoisyUNetGenerator(in_channels, num_features, 3)
@@ -129,23 +129,27 @@ FT = Float32
     x = randn(FT, (img_size, in_channels, batch_size))
     @test unet(x) |> size == (img_size, in_channels, batch_size)
 
-    img_size = 128
-    batch_size = 5
-    in_channels = 2
-    num_features = 64
-    num_residual = 9
-    unet = UNetGeneratorAR(in_channels, num_features, num_residual)
-    x = randn(FT, (img_size, img_size, in_channels, batch_size))
-    @test unet(x) |> size == (img_size, img_size, in_channels, batch_size)
-
+    # PatchNet
     img_size = 128
     batch_size = 5
     in_channels = 4
     num_features = 64
     num_residual = 9
-    unet = UNetGeneratorAR(in_channels, num_features, num_residual)
+    patch = PatchNet(identity)
     x = randn(FT, (img_size, img_size, in_channels, batch_size))
-    @test unet(x) |> size == (img_size, img_size, in_channels, batch_size)
+    @test patch(x) |> size == (img_size, img_size, in_channels, batch_size)
+    @test all(patch(x) .== x)
+
+    # RecursiveNet
+    img_size = 128
+    batch_size = 5
+    in_channels = 4
+    num_features = 64
+    num_residual = 9
+    rec = RecursiveNet(identity)
+    x = randn(FT, (img_size, img_size, in_channels, batch_size))
+    @test rec(x) |> size == (img_size, img_size, in_channels, batch_size)
+    @test all(rec(x) .== x)
 end
 
 include("./test_artifact.jl")

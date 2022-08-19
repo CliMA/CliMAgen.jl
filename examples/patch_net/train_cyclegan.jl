@@ -10,13 +10,12 @@ using ProgressBars
 using Statistics: mean
 
 using Downscaling
-using Downscaling: PatchDiscriminator, UNetGenerator
+using Downscaling: PatchDiscriminator, UNetGenerator, PatchNet
 
 examples_dir = joinpath(pkgdir(Downscaling), "examples")
-cyclegan_dir = joinpath(examples_dir, "cyclegan_ar_cnn")
+cyclegan_dir = joinpath(examples_dir, "patch_net")
 include(joinpath(cyclegan_dir, "utils.jl"))
 include(joinpath(examples_dir, "artifact_utils.jl"))
-
 
 # Parameters
 Base.@kwdef struct HyperParams{FT}
@@ -94,7 +93,7 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
     end
 end
 
-function train(path = "../../data/moist2d/moist2d_512x512.hdf5", field = "moisture", hparams = HyperParams{Float32}(); cuda=true)
+function train(path, field, hparams; cuda=true)
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -108,9 +107,9 @@ function train(path = "../../data/moist2d/moist2d_512x512.hdf5", field = "moistu
     data = get_dataloader(path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
 
     # models 
-    nchannels = 2
-    generator_A = UNetGeneratorAR(nchannels) |> dev # Generator For A->B
-    generator_B = UNetGeneratorAR(nchannels) |> dev # Generator For B->A
+    nchannels = 1
+    generator_A = PatchNet(UNetGenerator(nchannels)) |> dev # Generator For A->B
+    generator_B = PatchNet(UNetGenerator(nchannels)) |> dev # Generator For B->A
     discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
     discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
 
