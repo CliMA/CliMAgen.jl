@@ -93,7 +93,7 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
     end
 end
 
-function train(path, field, hparams; cuda=true)
+function train(local_dataset_path, field, hparams; cuda=true)
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -104,7 +104,7 @@ function train(path, field, hparams; cuda=true)
     end
 
     # training data
-    data = get_dataloader(path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
+    data = get_dataloader(local_dataset_path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
 
     # models 
     nchannels = 1
@@ -125,7 +125,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # This downloads the data locally, if it not already present, and obtains the location of the directory holding it.
     local_dataset_directory = obtain_local_dataset_path(examples_dir, moist2d.dataname, moist2d.url, moist2d.filename)
     local_dataset_path = joinpath(local_dataset_directory, moist2d.filename)
-    field = "vorticity"
+    field = "moisture"
     hparams = HyperParams{Float32}()
     train(local_dataset_path, field, hparams)
 end

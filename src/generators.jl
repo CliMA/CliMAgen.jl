@@ -145,6 +145,7 @@ end
 
     A wrapper structure that allows for patch-wise generation of 2D images.
     It uses another network like UNet as input.
+    Assumes square inputs.
 """
 struct PatchNet
     net
@@ -153,36 +154,41 @@ end
 @functor PatchNet
 
 function (patch::PatchNet)(x)
-    nx, ny, _, _ = size(x)
+    nx, ny, nc, _ = size(x)
 
     # x and y patch index ranges
     px1 = 1:div(nx, 2)
     px2 = div(nx, 2)+1:nx
-    py1 = 1:div(nx, 2)
+    py1 = 1:div(ny, 2)
     py2 = div(ny, 2)+1:ny
+    pc1 = 1:nc
+    pc2 = nc+1:2nc
 
-    # generate patch 11
-    p11 = view(x, px1, py1, :, :)
-    zer = zero(p11)
-    x11 = cat(cat(zer, zer, dims=1), cat(zer, p11, dims=1), dims=2)
-    y11 = view(patch.net(x11), px2, py2, :, :)
+    # generate masks for each x_ij patch
+    o = view(zero(x) .+ 1, 1:div(nx, 2), 1:div(ny, 2), :, :)
+    z = view(zero(x), 1:div(nx, 2), 1:div(ny, 2), :, :)
+    m11 = cat(cat(o, z, dims=1), cat(z, z, dims=1), dims=2)
+    m12 = cat(cat(z, z, dims=1), cat(o, z, dims=1), dims=2)
+    m21 = cat(cat(z, o, dims=1), cat(z, z, dims=1), dims=2)
+    m22 = cat(cat(z, z, dims=1), cat(z, o, dims=1), dims=2)
 
-    # generate patch 12
-    p12 = view(x, px1, py2, :, :)
-    zer = zero(p12)
-    x12 = cat(cat(zer, y11, dims=1), cat(zer, p12, dims=1), dims=2)
-    y12 = view(patch.net(x12), px2, py2, :, :)
-
-    # generate patch 21
-    p21 = view(x, px2, py1, :, :)
-    zer = zero(p21)
-    x21 = cat(cat(zer, zer, dims=1), cat(y11, p21, dims=1), dims=2)
-    y21 = view(patch.net(x21), px2, py2, :, :)
-
-    # generate patch 22
-    p22 = view(x, px2, py2, :, :)
-    x22 = cat(cat(y11, y21, dims=1), cat(y12, p22, dims=1), dims=2)
-    y22 = view(patch.net(x22), px2, py2, :, :)
+    # generate y_ij recursively
+    # y11
+    input = cat(cat(z, z, dims=1), cat(z, z, dims=1), dims=2)
+    input = cat(input, x .* m11, dims=3)
+    y11 = view(patch.net(input), px1, py1, pc2, :)
+    # y12
+    input = cat(cat(y11, z, dims=1), cat(z, z, dims=1), dims=2)
+    input = cat(input, x .* m12, dims=3)
+    y12 = view(patch.net(input), px1, py2, pc2, :)
+    # y21
+    input = cat(cat(y11, z, dims=1), cat(z, z, dims=1), dims=2)
+    input = cat(input, x .* m21, dims=3)
+    y21 = view(patch.net(input), px2, py1, pc2, :)
+    # y22
+    input = cat(cat(y11, y21, dims=1), cat(y12, z, dims=1), dims=2)
+    input = cat(input, x .* m22, dims=3)
+    y22 = view(patch.net(input), px2, py2, pc2, :)
 
     # assemble full output 
     y = cat(cat(y11, y21, dims=1), cat(y12, y22, dims=1), dims=2)
