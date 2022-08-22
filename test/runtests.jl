@@ -138,7 +138,7 @@ FT = Float32
     patch = PatchNet(identity)
     x = randn(FT, (img_size, img_size, in_channels, batch_size))
     @test patch(x) |> size == (img_size, img_size, in_channels, batch_size)
-    @test all(patch(x) .== x)
+    @test all(patch(x)[65:128, 65:128, :, :] .== x[65:128, 65:128, :, :])
 
     # RecursiveNet
     img_size = 128

@@ -157,11 +157,11 @@ function (patch::PatchNet)(x)
     nx, ny, nc, _ = size(x)
 
     # x and y patch index ranges
-    px1 = 1:div(nx, 2)
-    px2 = div(nx, 2)+1:nx
-    py1 = 1:div(ny, 2)
-    py2 = div(ny, 2)+1:ny
-    pc1 = 1:nc
+    # px1 = 1:div(nx, 2)
+    # px2 = div(nx, 2)+1:nx
+    # py1 = 1:div(ny, 2)
+    # py2 = div(ny, 2)+1:ny
+    # pc1 = 1:nc
     pc2 = nc+1:2nc
 
     # generate masks for each x_ij patch
@@ -174,26 +174,20 @@ function (patch::PatchNet)(x)
 
     # generate y_ij recursively
     # y11
-    input = cat(cat(z, z, dims=1), cat(z, z, dims=1), dims=2)
-    input = cat(input, x .* m11, dims=3)
-    y11 = view(patch.net(input), px1, py1, pc2, :)
+    y00 = cat(cat(z, z, dims=1), cat(z, z, dims=1), dims=2)
+    input = cat(y00, x .* m11, dims=3)
+    y11 = view(patch.net(input), :, :, pc2, :) .* m11
     # y12
-    input = cat(cat(y11, z, dims=1), cat(z, z, dims=1), dims=2)
-    input = cat(input, x .* m12, dims=3)
-    y12 = view(patch.net(input), px1, py2, pc2, :)
+    input = cat(y11, x .* m12, dims=3)
+    y12 = view(patch.net(input), :, :, pc2, :) .* (m11 .+ m12)
     # y21
-    input = cat(cat(y11, z, dims=1), cat(z, z, dims=1), dims=2)
-    input = cat(input, x .* m21, dims=3)
-    y21 = view(patch.net(input), px2, py1, pc2, :)
+    input = cat(y12, x .* m21, dims=3)
+    y21 = view(patch.net(input), :, :, pc2, :) .* (m11 .+ m12 .+ m21)
     # y22
-    input = cat(cat(y11, y21, dims=1), cat(y12, z, dims=1), dims=2)
-    input = cat(input, x .* m22, dims=3)
-    y22 = view(patch.net(input), px2, py2, pc2, :)
+    input = cat(y21, x .* m22, dims=3)
+    y22 = view(patch.net(input), :, :, pc2, :)
 
-    # assemble full output 
-    y = cat(cat(y11, y21, dims=1), cat(y12, y22, dims=1), dims=2)
-
-    return y
+    return m11 .* y11 .+ m12 .* y12 .+ m21 .* y21 .+ m22 .* y22
 end
 
 """
@@ -209,22 +203,32 @@ end
 @functor RecursiveNet
 
 function (rec::RecursiveNet)(x)
-    _, _, nc, _ = size(x)
+    nc = size(x, 3)
 
-    # t1 and t2 index ranges
-    p1 = 1:div(nc, 2)
-    p2 = (div(nc, 2)+1):nc
+    # t1 and t2 time index ranges
+    c1 = 1:div(nc, 2) # first time slice
+    c2 = (div(nc, 2)+1):nc # second time slice
+    
+    # incoming x patches sliced by time
+    xt1 = view(x, :, :, c1, :)
+    xt2 = view(x, :, :, c2, :)
+
+    # zero input when the previous high resolution 
+    # time slice is not available
+    empty = zero(xt1)
+
+    # mask that tells the network whether or not
+    # the previous high res time slice is available
+    avail = view(empty, :, :, [1], :) .+ 1
+    notavail = avail .- 1
 
     # generate yt1
-    pt1 = view(x, :, :, p1, :)
-    zer = zero(pt1)
-    xt1 = cat(zer, pt1, dims=3)
-    yt1 = view(rec.net(xt1), :, :, p2, :)
+    input = cat(notavail, empty, xt1, dims=3)
+    yt1 = view(rec.net(input), :, :, c2.+1, :)
 
     # generate yt2
-    pt2 = view(x, :, :, p2, :)
-    xt2 = cat(yt1, pt2, dims=3)
-    yt2 = view(rec.net(xt2), :, :, p2, :)
+    input = cat(avail, yt1, xt2, dims=3)
+    yt2 = view(rec.net(input), :, :, c2.+1, :)
 
     # assemble full output
     y = cat(yt1, yt2, dims=3)

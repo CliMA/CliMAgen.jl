@@ -107,11 +107,11 @@ function train(local_dataset_path, field, hparams; cuda=true)
     data = get_dataloader(local_dataset_path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
 
     # models 
-    nchannels = 1
+    nchannels = 2
     generator_A = PatchNet(UNetGenerator(nchannels)) |> dev # Generator For A->B
     generator_B = PatchNet(UNetGenerator(nchannels)) |> dev # Generator For B->A
-    discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
-    discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
+    discriminator_A = PatchDiscriminator(1) |> dev # Discriminator For Domain A
+    discriminator_B = PatchDiscriminator(1) |> dev # Discriminator For Domain B
 
     # optimizers
     opt_gen = ADAM(hparams.lr, (0.5, 0.999))
