@@ -2,8 +2,8 @@
 
 /Manifest.toml
 
-/data
 /output
+
 *.png
 *.jpg
 *.jpeg

@@ -1,7 +1,3 @@
-
-using Flux
-using Functors
-
 """
     UNetGenerator1D
 """
@@ -60,6 +56,81 @@ function (net::UNetGenerator1D)(x)
     for layer in net.upblocks
         input = layer(input)
     end
+    return tanh.(net.final(input))
+end
+
+
+"""
+    NoisyUNetGenerator1D
+
+A UNetGenerator1D with an even number of resnet layers;
+noise is added to the input after half of the resnet layers
+operate.
+"""
+struct NoisyUNetGenerator1D
+    initial
+    downblocks
+    first_resnet_block
+    second_resnet_block
+    upblocks
+    final
+end
+
+@functor NoisyUNetGenerator1D
+
+function NoisyUNetGenerator1D(
+    in_channels::Int,
+    num_features::Int=64,
+    num_residual::Int=8,
+)
+    @assert iseven(num_residual)
+    resnet_block_length = div(num_residual, 2)
+
+    initial_layer = Chain(
+        Conv((7,), in_channels => num_features; stride=1, pad=3),
+        InstanceNorm(num_features),
+        x -> relu.(x)
+    )
+
+    downsampling_blocks = [
+        ConvBlock1D(3, num_features, num_features * 2, true, true; stride=2, pad=1),
+        ConvBlock1D(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1),
+    ]
+
+    first_resnet_block = Chain([ResidualBlock1D(num_features * 4) for _ in range(1, length=resnet_block_length)]...)
+    second_resnet_block = Chain([ResidualBlock1D(num_features * 4) for _ in range(1, length=resnet_block_length)]...)
+
+    upsampling_blocks = [
+        ConvBlock1D(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad()),
+        ConvBlock1D(3, num_features * 2, num_features, true, false; stride=2, pad=SamePad()),
+    ]
+
+    final_layer = Chain(
+        Conv((7,), num_features => in_channels; stride=1, pad=3)
+    )
+
+    return NoisyUNetGenerator1D(
+        initial_layer,
+        downsampling_blocks,
+        first_resnet_block,
+        second_resnet_block,
+        upsampling_blocks,
+        final_layer
+    )
+end
+
+function (net::NoisyUNetGenerator1D)(x, r)
+    input = net.initial(x)
+    for layer in net.downblocks
+        input = layer(input)
+    end
+    input = net.first_resnet_block(input)
+    input = input .+ r # add random noise
+    input = net.second_resnet_block(input)
+    for layer in net.upblocks
+        input = layer(input)
+    end
+
     return tanh.(net.final(input))
 end
 
