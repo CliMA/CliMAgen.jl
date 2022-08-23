@@ -111,6 +111,16 @@ FT = Float32
     img_size = 128
     batch_size = 5
     in_channels = 1
+    out_channels = 2
+    num_features = 64
+    num_residual = 9
+    unet = UNetGenerator(in_channels, num_features, num_residual, out_channels=out_channels)
+    x = randn(FT, (img_size, img_size, in_channels, batch_size))
+    @test unet(x) |> size == (img_size, img_size, out_channels, batch_size)
+
+    img_size = 128
+    batch_size = 5
+    in_channels = 1
     num_features = 64
     num_residual = 8
     unet = NoisyUNetGenerator(in_channels, num_features, num_residual)
@@ -146,10 +156,23 @@ FT = Float32
     in_channels = 4
     num_features = 64
     num_residual = 9
-    rec = RecursiveNet(identity)
+    net_basic = identity
+    net_recursive = x -> view(identity(x), :, :, 1:2, :)
+    rec = RecursiveNet(net_basic, net_recursive)
     x = randn(FT, (img_size, img_size, in_channels, batch_size))
     @test rec(x) |> size == (img_size, img_size, in_channels, batch_size)
     @test all(rec(x) .== x)
+
+    img_size = 128
+    batch_size = 5
+    in_channels = 4
+    num_features = 64
+    num_residual = 9
+    net_basic = UNetGenerator(2)
+    net_recursive = UNetGenerator(4, out_channels = 2)
+    rec = RecursiveNet(net_basic, net_recursive)
+    x = randn(FT, (img_size, img_size, in_channels, batch_size))
+    @test rec(x) |> size == (img_size, img_size, in_channels, batch_size)
 end
 
 include("./test_artifact.jl")

@@ -20,7 +20,8 @@ end
 function UNetGenerator(
     in_channels::Int,
     num_features::Int=64,
-    num_residual::Int=9,
+    num_residual::Int=9;
+    out_channels::Int=in_channels,
 )
     initial_layer = Chain(
         Conv((7, 7), in_channels => num_features; stride=1, pad=3),
@@ -41,7 +42,7 @@ function UNetGenerator(
     ]
 
     final_layer = Chain(
-        Conv((7, 7), num_features => in_channels; stride=1, pad=3)
+        Conv((7, 7), num_features => out_channels; stride=1, pad=3)
     )
 
     return UNetGenerator(
@@ -197,7 +198,8 @@ end
     It uses another network like UNet as input.
 """
 struct RecursiveNet
-    net
+    net_basic
+    net_recursive
 end
 
 @functor RecursiveNet
@@ -207,28 +209,18 @@ function (rec::RecursiveNet)(x)
 
     # t1 and t2 time index ranges
     c1 = 1:div(nc, 2) # first time slice
-    c2 = (div(nc, 2)+1):nc # second time slice
+    c2 = div(nc, 2)+1:nc # second time slice
     
     # incoming x patches sliced by time
     xt1 = view(x, :, :, c1, :)
     xt2 = view(x, :, :, c2, :)
 
-    # zero input when the previous high resolution 
-    # time slice is not available
-    empty = zero(xt1)
-
-    # mask that tells the network whether or not
-    # the previous high res time slice is available
-    avail = view(empty, :, :, [1], :) .+ 1
-    notavail = avail .- 1
-
     # generate yt1
-    input = cat(notavail, empty, xt1, dims=3)
-    yt1 = view(rec.net(input), :, :, c2.+1, :)
+    yt1 = rec.net_basic(xt1)
 
     # generate yt2
-    input = cat(avail, yt1, xt2, dims=3)
-    yt2 = view(rec.net(input), :, :, c2.+1, :)
+    input = cat(xt2, yt1, dims=3)
+    yt2 = rec.net_recursive(input)
 
     # assemble full output
     y = cat(yt1, yt2, dims=3)

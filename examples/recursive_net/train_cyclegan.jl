@@ -108,11 +108,10 @@ function train(path = "../../data/moist2d/moist2d_512x512.hdf5", field = "moistu
     data = get_dataloader(path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
 
     # models 
-    nchannels = 2
-    generator_A = RecursiveNet(UNetGenerator(nchannels)) |> dev # Generator For A->B
-    generator_B = RecursiveNet(UNetGenerator(nchannels)) |> dev # Generator For B->A
-    discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
-    discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
+    generator_A = RecursiveNet(UNetGenerator(1), UNetGenerator(2, out_channels=1)) |> dev # Generator For A->B
+    generator_B = RecursiveNet(UNetGenerator(1), UNetGenerator(2, out_channels=1)) |> dev # Generator For B->A
+    discriminator_A = PatchDiscriminator(1) |> dev # Discriminator For Domain A
+    discriminator_B = PatchDiscriminator(1) |> dev # Discriminator For Domain B
 
     # optimizers
     opt_gen = ADAM(hparams.lr, (0.5, 0.999))
