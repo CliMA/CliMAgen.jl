@@ -1,48 +1,7 @@
-
-using CUDA: CuArray
-using Flux
-using Functors
-
 """
-    UNetGeneratorAR
+    UNetGenerator2D
 """
-struct UNetGeneratorAR
-    unet
-end
-
-@functor UNetGeneratorAR
-
-function UNetGeneratorAR(
-    in_channels::Int,
-    num_features::Int=64,
-    num_residual::Int=9,
-)
-    @assert in_channels > 1
-    unet = UNetGenerator(in_channels, num_features, num_residual)
-
-    return UNetGeneratorAR(unet)
-end
-
-function (net_ar::UNetGeneratorAR)(x)
-    FT = eltype(x)
-    img_size_x, img_size_y, nchannels, nbatch = size(x)
-    
-    # TODO: not efficient but should work on GPU
-    zero_field = CuArray(zeros(FT, (img_size_x, img_size_y, div(nchannels, 2), nbatch)))
-    x1 = view(x, :, :, 1:div(nchannels, 2), :)
-    
-    y1 = view(net_ar.unet(cat(zero_field, x1, dims=3)), :, :, div(nchannels, 2)+1:nchannels, :)
-    x2 = view(x, :, :, div(nchannels, 2)+1:nchannels, :)
-
-    y = net_ar.unet(cat(y1, x2, dims=3))
-
-    return y
-end
-
-"""
-    UNetGenerator
-"""
-struct UNetGenerator
+struct UNetGenerator2D
     initial
     downblocks
     resblocks
@@ -50,9 +9,9 @@ struct UNetGenerator
     final
 end
 
-@functor UNetGenerator
+@functor UNetGenerator2D
 
-function UNetGenerator(
+function UNetGenerator2D(
     in_channels::Int,
     num_features::Int=64,
     num_residual::Int=9,
@@ -64,22 +23,22 @@ function UNetGenerator(
     )
 
     downsampling_blocks = [
-        ConvBlock(3, num_features, num_features * 2, true, true; stride=2, pad=1),
-        ConvBlock(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1),
+        ConvBlock2D(3, num_features, num_features * 2, true, true; stride=2, pad=1),
+        ConvBlock2D(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1),
     ]
 
-    resnet_blocks = Chain([ResidualBlock(num_features * 4) for _ in range(1, length=num_residual)]...)
+    resnet_blocks = Chain([ResidualBlock2D(num_features * 4) for _ in range(1, length=num_residual)]...)
 
     upsampling_blocks = [
-        ConvBlock(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad()),
-        ConvBlock(3, num_features * 2, num_features, true, false; stride=2, pad=SamePad()),
+        ConvBlock2D(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad()),
+        ConvBlock2D(3, num_features * 2, num_features, true, false; stride=2, pad=SamePad()),
     ]
 
     final_layer = Chain(
         Conv((7, 7), num_features => in_channels; stride=1, pad=3)
     )
 
-    return UNetGenerator(
+    return UNetGenerator2D(
         initial_layer,
         downsampling_blocks,
         resnet_blocks,
@@ -88,7 +47,7 @@ function UNetGenerator(
     )
 end
 
-function (net::UNetGenerator)(x)
+function (net::UNetGenerator2D)(x)
     input = net.initial(x)
     for layer in net.downblocks
         input = layer(input)
@@ -102,13 +61,13 @@ end
 
 
 """
-    NoisyUNetGenerator
+    NoisyUNetGenerator2D
 
-A UNetGenerator with an even number of resnet layers;
+A UNetGenerator2D with an even number of resnet layers;
 noise is added to the input after half of the resnet layers
 operate.
 """
-struct NoisyUNetGenerator
+struct NoisyUNetGenerator2D
     initial
     downblocks
     first_resnet_block
@@ -117,9 +76,9 @@ struct NoisyUNetGenerator
     final
 end
 
-@functor NoisyUNetGenerator
+@functor NoisyUNetGenerator2D
 
-function NoisyUNetGenerator(
+function NoisyUNetGenerator2D(
     in_channels::Int,
     num_features::Int=64,
     num_residual::Int=8,
@@ -134,23 +93,23 @@ function NoisyUNetGenerator(
     )
 
     downsampling_blocks = [
-        ConvBlock(3, num_features, num_features * 2, true, true; stride=2, pad=1),
-        ConvBlock(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1),
+        ConvBlock2D(3, num_features, num_features * 2, true, true; stride=2, pad=1),
+        ConvBlock2D(3, num_features * 2, num_features * 4, true, true; stride=2, pad=1),
     ]
 
-    first_resnet_block = Chain([ResidualBlock(num_features * 4) for _ in range(1, length=resnet_block_length)]...)
-    second_resnet_block = Chain([ResidualBlock(num_features * 4) for _ in range(1, length=resnet_block_length)]...)
+    first_resnet_block = Chain([ResidualBlock2D(num_features * 4) for _ in range(1, length=resnet_block_length)]...)
+    second_resnet_block = Chain([ResidualBlock2D(num_features * 4) for _ in range(1, length=resnet_block_length)]...)
 
     upsampling_blocks = [
-        ConvBlock(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad()),
-        ConvBlock(3, num_features * 2, num_features, true, false; stride=2, pad=SamePad()),
+        ConvBlock2D(3, num_features * 4, num_features * 2, true, false; stride=2, pad=SamePad()),
+        ConvBlock2D(3, num_features * 2, num_features, true, false; stride=2, pad=SamePad()),
     ]
 
     final_layer = Chain(
         Conv((7, 7), num_features => in_channels; stride=1, pad=3)
     )
 
-    return NoisyUNetGenerator(
+    return NoisyUNetGenerator2D(
         initial_layer,
         downsampling_blocks,
         first_resnet_block,
@@ -160,7 +119,7 @@ function NoisyUNetGenerator(
     )
 end
 
-function (net::NoisyUNetGenerator)(x, r)
+function (net::NoisyUNetGenerator2D)(x, r)
     input = net.initial(x)
     for layer in net.downblocks
         input = layer(input)
@@ -177,15 +136,15 @@ end
 
 
 """
-    ConvBlock
+    ConvBlock2D
 """
-struct ConvBlock
+struct ConvBlock2D
     conv
 end
 
-@functor ConvBlock
+@functor ConvBlock2D
 
-function ConvBlock(
+function ConvBlock2D(
     kernel_size::Int,
     in_channels::Int,
     out_channels::Int,
@@ -193,7 +152,7 @@ function ConvBlock(
     down::Bool=true;
     kwargs...
 )
-    return ConvBlock(
+    return ConvBlock2D(
         Chain(
             if down
                 Conv((kernel_size, kernel_size), in_channels => out_channels; kwargs...)
@@ -209,31 +168,31 @@ function ConvBlock(
     )
 end
 
-function (net::ConvBlock)(x)
+function (net::ConvBlock2D)(x)
     return net.conv(x)
 end
 
 
 """
-    ResidualBlock
+    ResidualBlock2D
 """
-struct ResidualBlock
+struct ResidualBlock2D
     block
 end
 
-@functor ResidualBlock
+@functor ResidualBlock2D
 
-function ResidualBlock(
+function ResidualBlock2D(
     in_channels::Int
 )
-    return ResidualBlock(
+    return ResidualBlock2D(
         Chain(
-            ConvBlock(3, in_channels, in_channels, true, true; pad=1),
-            ConvBlock(3, in_channels, in_channels, false, true; pad=1)
+            ConvBlock2D(3, in_channels, in_channels, true, true; pad=1),
+            ConvBlock2D(3, in_channels, in_channels, false, true; pad=1)
         )
     )
 end
 
-function (net::ResidualBlock)(x)
+function (net::ResidualBlock2D)(x)
     return x + net.block(x)
 end

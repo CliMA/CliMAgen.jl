@@ -1,27 +1,48 @@
-using Flux 
-using Flux: params, update!, loadmodel!
-using FluxTraining
+using ArgParse
 using BSON: @save, @load
 using CUDA
 using Dates
+using Flux
+using Flux: params, update!, loadmodel!
+using FluxTraining
 using HDF5
 using MLUtils
 using ProgressBars
 using Statistics: mean
 
 using Downscaling
+using Downscaling: PatchDiscriminator1D, UNetGenerator1D
 
-examples_dir = joinpath(pkgdir(Downscaling), "examples")
-cyclegan_dir = joinpath(examples_dir, "cyclegan_noise")
-include(joinpath(cyclegan_dir, "utils.jl"))
-include(joinpath(examples_dir, "artifact_utils.jl"))
+# command line utilities
+include(joinpath(pkgdir(Downscaling), "examples", "utils_argparse.jl"))
+PARGS = parse_commandline()
 
-# Parameters
+# get commandline arguments
+DATADIR = PARGS["datadir"]
+OUTDIR = PARGS["outdir"]
+RESTARTFILE = PARGS["restartfile"]
+
+# specify experiment metadata
+EXAMPLE_NAME = "kuramoto_sivashinsky/cyclegan"
+TIME = Dates.format(now(), "yyyy-mm-dd-HH:MM:SS")
+
+# set up storage directory for experiment
+OUTPUT_DIR = joinpath(OUTDIR, EXAMPLE_NAME, TIME)
+mkpath(OUTPUT_DIR)
+
+# get access to the datasets and dataloaders
+include(joinpath(DATADIR, "utils_data.jl"))
+
+# fix float type
+const FT = Float32
+
+
 Base.@kwdef struct HyperParams{FT}
     λ = FT(10.0)
     λid = FT(5.0)
-    lr = FT(0.0002)
+    lr = FT(0.00002)
     nepochs = 100
+    batch_size::Int = 4
 end
 
 function generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams)
@@ -41,7 +62,7 @@ function generator_loss(generator_A, generator_B, discriminator_A, discriminator
     return gen_A_loss + gen_B_loss + hparams.λ * (rec_A_loss + rec_B_loss) + hparams.λid * (idt_A_loss + idt_B_loss)
 end
 
-function discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise)
+function discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams)
     a_fake = generator_B(b, noise) # Fake image generated in domain A
     b_fake = generator_A(a, noise) # Fake image generated in domain B
 
@@ -61,7 +82,7 @@ end
 function train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams)
     # Optimize Discriminators
     ps = params(params(discriminator_A)..., params(discriminator_B)...)
-    gs = gradient(() -> discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise), ps)
+    gs = gradient(() -> discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams), ps)
     update!(opt_dis, ps, gs)
 
     # Optimize Generators
@@ -70,28 +91,36 @@ function train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A
     update!(opt_gen, ps, gs)
 end
 
-function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, output_filepath)
-    # Training loop
+function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, dev)
     g_loss, d_loss = 0, 0
-    iter = ProgressBar(data) 
+    iter = ProgressBar(data.training)
     for epoch in 1:hparams.nepochs
-        for (a, b, noise) in iter
+        # Training loop
+        for (a, b, noise) = iter
+            a, b, noise = (FT.(a), FT.(b), FT.(noise)) |> dev
             train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams)
             set_multiline_postfix(iter, "Epoch $epoch\nGenerator Loss: $g_loss\nDiscriminator Loss: $d_loss")
         end
 
-        # print current error estimates
-        a, b, noise = first(data)
-        g_loss = generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams)
-        d_loss = discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b,noise)
+        # error analysis loop
+        g_loss, d_loss, count = 0, 0, 0
+        for (a, b, noise) = data.validation
+            a, b, noise = (FT.(a), FT.(b), FT.(noise)) |> dev
+            g_loss += generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams)
+            d_loss += discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, noise, hparams)
+            count += 1
+        end
+        g_loss, d_loss = (g_loss, d_loss) ./ count
 
-        # store current model
+        # checkpointing
+        checkpoint_path = joinpath(output_dir, "checkpoint_cyclegan.bson")
         model = (generator_A, generator_B, discriminator_A, discriminator_B) |> cpu
-        @save output_filepath model opt_gen opt_dis
+        @save checkpoint_path model opt_gen opt_dis
     end
 end
 
-function train(path, field, hparams, output_filepath; cuda=true, restart = false)
+function train(dataset=KuramotoSivashinsky(), hparams=HyperParams{FT}(); cuda=true, restart=false)
+    # run with GPU if available
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -102,18 +131,19 @@ function train(path, field, hparams, output_filepath; cuda=true, restart = false
     end
 
     # training data
-    data = get_dataloader(path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
+    data = get_dataloader(dataset, batch_size=hparams.batch_size)
 
+    # make models
     nchannels = 1
     if restart && isfile(output_filepath)
         @info "Initializing with existing model and optimizers"
-        
+
         # First we need to make the model structure
-        generator_A = NoisyUNetGenerator(nchannels) # Generator For A->B
-        generator_B = NoisyUNetGenerator(nchannels) # Generator For B->A
-        discriminator_A = PatchDiscriminator(nchannels) # Discriminator For Domain A
-        discriminator_B = PatchDiscriminator(nchannels) # Discriminator For Domain B
-        
+        generator_A = NoisyUNetGenerator1D(nchannels) # Generator For A->B
+        generator_B = NoisyUNetGenerator1D(nchannels) # Generator For B->A
+        discriminator_A = PatchDiscriminator1D(nchannels) # Discriminator For Domain A
+        discriminator_B = PatchDiscriminator1D(nchannels) # Discriminator For Domain B
+
         # Now load the existing model parameters and fill in the parameters of the models we just made
         # This also loads the optimizers
         @load output_filepath model opt_gen opt_dis
@@ -129,29 +159,18 @@ function train(path, field, hparams, output_filepath; cuda=true, restart = false
         discriminator_B = discriminator_B |> dev
     else
         @info "Initializing a new model and optimizers from scratch"
-        generator_A = NoisyUNetGenerator(nchannels) |> dev # Generator For A->B
-        generator_B = NoisyUNetGenerator(nchannels) |> dev # Generator For B->A
-        discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
-        discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
+        generator_A = NoisyUNetGenerator1D(nchannels) |> dev # Generator For A->B
+        generator_B = NoisyUNetGenerator1D(nchannels) |> dev # Generator For B->A
+        discriminator_A = PatchDiscriminator1D(nchannels) |> dev # Discriminator For Domain A
+        discriminator_B = PatchDiscriminator1D(nchannels) |> dev # Discriminator For Domain B
 
         opt_gen = ADAM(hparams.lr, (0.5, 0.999))
         opt_dis = ADAM(hparams.lr, (0.5, 0.999))
     end
 
-    fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, output_filepath)
+    fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, dev)
 end
 
-# run if file is called directly but not if just included
 if abspath(PROGRAM_FILE) == @__FILE__
-
-    # This downloads the data locally, if it not already present, and obtains the location of the directory holding it.
-    local_dataset_directory = obtain_local_dataset_path(examples_dir, moist2d.dataname, moist2d.url, moist2d.filename)
-    local_dataset_path = joinpath(local_dataset_directory, moist2d.filename)
-
-    output_dir = joinpath(cyclegan_dir, "output")
-    mkpath(output_dir)
-    output_filepath = joinpath(output_dir, "checkpoint_latest.bson")
-    field = "moisture"
-    hparams = HyperParams{Float32}()
-    train(local_dataset_path, field, hparams, output_filepath; restart = true)
+    train()
 end
