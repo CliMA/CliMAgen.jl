@@ -30,8 +30,7 @@ function (net_ar::UNetGeneratorAR)(x)
     # TODO: not efficient but should work on GPU
     zero_field = CuArray(zeros(FT, (img_size_x, img_size_y, div(nchannels, 2), nbatch)))
     x1 = view(x, :, :, 1:div(nchannels, 2), :)
-    
-    y1 = view(net_ar.unet(cat(zero_field, x1, dims=3)), :, :, div(nchannels, 2)+1:nchannels, :)
+        y1 = view(net_ar.unet(cat(zero_field, x1, dims=3)), :, :, div(nchannels, 2)+1:nchannels, :)
     x2 = view(x, :, :, div(nchannels, 2)+1:nchannels, :)
 
     y = net_ar.unet(cat(y1, x2, dims=3))
