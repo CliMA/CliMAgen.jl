@@ -4,7 +4,7 @@ using MLUtils
 
 FT = Float32
 
-function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size=1, nsamples=1000, dev=cpu)
+function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size=1, nsamples=1000)
     fid = h5open(path, "r")
     X_lo_res = read(fid, "low_resolution/" * field)
     X_hi_res = read(fid, "high_resolution/" * field)
@@ -19,8 +19,8 @@ function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size=1, n
     X_hi_res = @. 2 * (X_hi_res - lowest) / (highest - lowest) - 1
 
     # fix data types and bring to device
-    X_lo_res = FT.(X_lo_res[:, :, :, 1:nsamples]) |> dev
-    X_hi_res = FT.(X_hi_res[:, :, :, 1:nsamples]) |> dev
+    X_lo_res = FT.(X_lo_res[:, :, :, 1:nsamples])
+    X_hi_res = FT.(X_hi_res[:, :, :, 1:nsamples])
 
     data_training, data_validation = MLUtils.splitobs((X_lo_res, X_hi_res), at=split_ratio)
     loader_training = Flux.DataLoader(data_training, batchsize=batch_size, shuffle=true)

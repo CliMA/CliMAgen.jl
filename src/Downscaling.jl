@@ -27,9 +27,4 @@ export PatchBlock1D
 export PatchDiscriminator1D
 export UNetGenerator1D
 
-export OperatorBlock2D
-export UNetOperator2D
-export UNetOperatorGenerator
-export UNetOperatorDiscriminator
-
 end

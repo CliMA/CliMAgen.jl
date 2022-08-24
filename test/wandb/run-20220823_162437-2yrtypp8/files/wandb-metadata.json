@@ -1,0 +1,21 @@
+{
+    "os": "macOS-10.15.7-x86_64-i386-64bit",
+    "python": "3.9.7",
+    "heartbeatAt": "2022-08-23T23:24:37.561627",
+    "startedAt": "2022-08-23T23:24:37.281154",
+    "docker": null,
+    "cpu_count": 16,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "<python with no main file>",
+    "git": {
+        "remote": "git@github.com:CliMA/Downscaling.jl.git",
+        "commit": "a204431723c81cf3ff43880b75132491a299dd95"
+    },
+    "email": "tobias.bischoff@pm.me",
+    "root": "/Users/toby/Downscaling.jl",
+    "host": "dhcp-72-184.caltech.edu",
+    "username": "toby",
+    "executable": "/Users/toby/.julia/conda/3/bin/python"
+}

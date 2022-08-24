@@ -8,22 +8,34 @@ using HDF5
 using MLUtils
 using ProgressBars
 using Statistics: mean
+using Wandb
+using Logging
 
 using Downscaling
 using Downscaling: PatchDiscriminator, UNetGenerator
 
-examples_dir = joinpath(pkgdir(Downscaling), "examples")
-cyclegan_dir = joinpath(examples_dir, "cyclegan_ar_cnn")
-include(joinpath(cyclegan_dir, "utils.jl"))
-include(joinpath(examples_dir, "artifact_utils.jl"))
+# dir handling & includes
+DATA_DIR = joinpath(pkgdir(Downscaling), "data")
+EXAMPLES_DIR = joinpath(pkgdir(Downscaling), "examples")
+EXPERIMENT_DIR = joinpath(EXAMPLES_DIR, "cyclegan_cnn")
+include(joinpath(EXPERIMENT_DIR, "utils.jl"))
+include(joinpath(EXAMPLES_DIR, "artifact_utils.jl"))
+
+# logging
+LOGGER = WandbLogger(
+        project="cyclegan", 
+        name="cyclegan-cnn-$(now())", 
+        config = Dict(),
+    )
+global_logger(LOGGER)
 
 
-# Parameters
 Base.@kwdef struct HyperParams{FT}
-    λ = FT(10.0)
-    λid = FT(5.0)
-    lr = FT(0.0002)
-    nepochs = 100
+    lr::FT = 2e-4
+    nepochs::Int = 100
+    batch_size::Int = 1
+    λ::FT = 10
+    λid::FT = 5
 end
 
 function generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
@@ -75,9 +87,10 @@ end
 function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams)
     # Training loop
     g_loss, d_loss = 0, 0
-    iter = ProgressBar(data) 
+    iter = ProgressBar(data)
     for epoch in 1:hparams.nepochs
         for (a, b) in iter
+            a, b = (a, b) |> devß
             train_step!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
             set_multiline_postfix(iter, "Epoch $epoch\nGenerator Loss: $g_loss\nDiscriminator Loss: $d_loss")
         end
@@ -87,6 +100,15 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
         g_loss = generator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b, hparams)
         d_loss = discriminator_loss(generator_A, generator_B, discriminator_A, discriminator_B, a, b,)
 
+        # wandb
+        log(
+            LOGGER,
+            Dict(
+                "Generator loss" => g_loss,
+                "Discriminator loss" => d_loss,
+            ),
+        )
+
         # store current model
         output_path = joinpath(@__DIR__, "output/checkpoint_latest.bson")
         model = (generator_A, generator_B, discriminator_A, discriminator_B) |> cpu
@@ -94,7 +116,7 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
     end
 end
 
-function train(path = "../../data/moist2d/moist2d_512x512.hdf5", field = "moisture", hparams = HyperParams{Float32}(); cuda=true)
+function train(; cuda=true)
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -104,13 +126,27 @@ function train(path = "../../data/moist2d/moist2d_512x512.hdf5", field = "moistu
         @info "Training on CPU"
     end
 
+    # load data setup
+    local_dataset_directory = obtain_local_dataset_path(DATA_DIR, moist2d.dataname, moist2d.url, moist2d.filename)
+    local_dataset_path = joinpath(local_dataset_directory, moist2d.filename)
+    field = "moisture"
+
+    # set hyperparams
+    hparams = HyperParams{Float32}()
+    update_config!(
+        LOGGER, 
+        Dict(
+            propertynames(hparams) .=> getfield.(Ref(hparams), propertynames(hparams))
+        )
+    )
+
     # training data
-    data = get_dataloader(path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
+    data = get_dataloader(local_dataset_path, field=field, split_ratio=0.5, batch_size=hparams.batch_size, dev=dev).training
 
     # models 
-    nchannels = 2
-    generator_A = UNetGeneratorAR(nchannels) |> dev # Generator For A->B
-    generator_B = UNetGeneratorAR(nchannels) |> dev # Generator For B->A
+    nchannels = 1
+    generator_A = UNetGenerator(nchannels) |> dev # Generator For A->B
+    generator_B = UNetGenerator(nchannels) |> dev # Generator For B->A
     discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
     discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
 
@@ -123,10 +159,7 @@ end
 
 # run if file is called directly but not if just included
 if abspath(PROGRAM_FILE) == @__FILE__
-    # This downloads the data locally, if it not already present, and obtains the location of the directory holding it.
-    local_dataset_directory = obtain_local_dataset_path(examples_dir, moist2d.dataname, moist2d.url, moist2d.filename)
-    local_dataset_path = joinpath(local_dataset_directory, moist2d.filename)
-    field = "vorticity"
-    hparams = HyperParams{Float32}()
-    train(local_dataset_path, field, hparams)
+    train()
 end
+
+close(LOGGER)
