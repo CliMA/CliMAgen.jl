@@ -1,16 +1,15 @@
+using Flux 
+using Flux: params, update!, loadmodel!
+using FluxTraining
 using BSON: @save, @load
 using CUDA
 using Dates
-using Flux
-using Flux: params, update!
-using FluxTraining
 using HDF5
 using MLUtils
 using ProgressBars
 using Statistics: mean
 
 using Downscaling
-using Downscaling: PatchDiscriminator, UNetGenerator
 
 examples_dir = joinpath(pkgdir(Downscaling), "examples")
 cyclegan_dir = joinpath(examples_dir, "cyclegan_noise")
@@ -88,11 +87,11 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
 
         # store current model
         model = (generator_A, generator_B, discriminator_A, discriminator_B) |> cpu
-        @save output_filepath model
+        @save output_filepath model opt_gen opt_dis
     end
 end
 
-function train(path, field, hparams, output_filepath; cuda=true)
+function train(path, field, hparams, output_filepath; cuda=true, restart = false)
     if cuda && CUDA.has_cuda()
         dev = gpu
         CUDA.allowscalar(false)
@@ -105,16 +104,39 @@ function train(path, field, hparams, output_filepath; cuda=true)
     # training data
     data = get_dataloader(path, field=field, split_ratio=0.5, batch_size=1, dev=dev).training
 
-    # models 
     nchannels = 1
-    generator_A = NoisyUNetGenerator(nchannels) |> dev # Generator For A->B
-    generator_B = NoisyUNetGenerator(nchannels) |> dev # Generator For B->A
-    discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
-    discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
+    if restart && isfile(output_filepath)
+        @info "Initializing with existing model and optimizers"
+        
+        # First we need to make the model structure
+        generator_A = NoisyUNetGenerator(nchannels) # Generator For A->B
+        generator_B = NoisyUNetGenerator(nchannels) # Generator For B->A
+        discriminator_A = PatchDiscriminator(nchannels) # Discriminator For Domain A
+        discriminator_B = PatchDiscriminator(nchannels) # Discriminator For Domain B
+        
+        # Now load the existing model parameters and fill in the parameters of the models we just made
+        # This also loads the optimizers
+        @load output_filepath model opt_gen opt_dis
+        loadmodel!(generator_A, model[1])
+        loadmodel!(generator_B, model[2])
+        loadmodel!(discriminator_A, model[3])
+        loadmodel!(discriminator_B, model[4])
 
-    # optimizers
-    opt_gen = ADAM(hparams.lr, (0.5, 0.999))
-    opt_dis = ADAM(hparams.lr, (0.5, 0.999))
+        # Push to device
+        generator_A = generator_A |> dev
+        generator_B = generator_B |> dev
+        discriminator_A = discriminator_A |> dev
+        discriminator_B = discriminator_B |> dev
+    else
+        @info "Initializing a new model and optimizers from scratch"
+        generator_A = NoisyUNetGenerator(nchannels) |> dev # Generator For A->B
+        generator_B = NoisyUNetGenerator(nchannels) |> dev # Generator For B->A
+        discriminator_A = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain A
+        discriminator_B = PatchDiscriminator(nchannels) |> dev # Discriminator For Domain B
+
+        opt_gen = ADAM(hparams.lr, (0.5, 0.999))
+        opt_dis = ADAM(hparams.lr, (0.5, 0.999))
+    end
 
     fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, output_filepath)
 end
@@ -131,5 +153,5 @@ if abspath(PROGRAM_FILE) == @__FILE__
     output_filepath = joinpath(output_dir, "checkpoint_latest.bson")
     field = "moisture"
     hparams = HyperParams{Float32}()
-    train(local_dataset_path, field, hparams, output_filepath)
+    train(local_dataset_path, field, hparams, output_filepath; restart = true)
 end

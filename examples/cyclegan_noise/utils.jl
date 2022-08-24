@@ -6,7 +6,7 @@ using StatsBase
 
 FT = Float32
 
-function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size::Int=1, nsamples::Int=250, augmentation_factor::Int=4, dev=cpu, rng = Random.MersenneTwister(123))
+function get_dataloader(path; field="moisture", split_ratio=0.5, batch_size::Int=1, nsamples::Int=1000, augmentation_factor::Int=4, dev=cpu, rng = Random.MersenneTwister(123))
     fid = h5open(path, "r")
     X_lo_res = read(fid, "low_resolution/" * field)
     X_hi_res = read(fid, "high_resolution/" * field)
