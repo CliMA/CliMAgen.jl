@@ -6,9 +6,11 @@ using Flux
 using Flux: params, update!, loadmodel!
 using FluxTraining
 using HDF5
+using Logging
 using MLUtils
 using ProgressBars
 using Statistics: mean
+using Wandb
 
 using Downscaling
 using Downscaling: PatchDiscriminator2D, UNetGenerator2D
@@ -23,7 +25,7 @@ OUTDIR = PARGS["outdir"]
 RESTARTFILE = PARGS["restartfile"]
 
 # specify experiment metadata
-EXAMPLE_NAME = "turbulence_2d/dcgan"
+EXAMPLE_NAME = "turbulence_2d/cyclegan"
 TIME = Dates.format(now(), "yyyy-mm-dd-HH:MM:SS")
 
 # set up storage directory for experiment
@@ -32,6 +34,14 @@ mkpath(OUTPUT_DIR)
 
 # get access to the datasets and dataloaders
 include(joinpath(DATADIR, "utils_data.jl"))
+
+# set up logger
+if PARGS["logging"]
+    lg = WandbLogger(project="Superresolution",
+        name=joinpath(EXAMPLE_NAME, TIME),
+        config=Dict())
+    global_logger(lg)
+end
 
 # fix float type
 const FT = Float32
@@ -112,13 +122,34 @@ function fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discr
         end
         g_loss, d_loss = (g_loss, d_loss) ./ count
 
+        if PARGS["logging"]
+            @info "metrics" generator_loss = g_loss discriminator_loss = d_loss
+            a, b, noise = first(data.validation)
+            a, b, noise = (FT.(a), FT.(b), FT.(noise)) |> dev
+            b_fake = generator_A(a, noise)
+            a_fake = generator_B(b, noise)
+            b_rec = generator_A(a_fake, noise)
+            a_rec = generator_B(b_fake, noise)
+            a, b, a_fake, b_fake, a_rec, b_rec = (a, b, a_fake, b_fake, a_rec, b_rec) |> cpu
+            Wandb.log(
+                lg, 
+                Dict(
+                    "real_low_res" => Wandb.Image(a[:, :, 1, 1]),
+                    "real_high_res" => Wandb.Image(b[:, :, 1, 1]),
+                    "fake_low_res" => Wandb.Image(a_fake[:, :, 1, 1]),
+                    "fake_high_res" => Wandb.Image(b_fake[:, :, 1, 1]),
+                    "rec_low_res" => Wandb.Image(a_rec[:, :, 1, 1]),
+                    "rec_high_res" => Wandb.Image(b_rec[:, :, 1, 1]),
+                )
+            )
+        end
+
         # checkpointing
         checkpoint_path = joinpath(OUTPUT_DIR, "checkpoint_cyclegan.bson")
         model = (generator_A, generator_B, discriminator_A, discriminator_B) |> cpu
-        @save output_filepath model opt_gen opt_dis
+        @save checkpoint_path model opt_gen opt_dis
     end
 end
-
 
 function train(dataset=Turbulence2D(), hparams=HyperParams{FT}(); cuda=true, restart=false)
     # run with GPU if available
@@ -133,6 +164,13 @@ function train(dataset=Turbulence2D(), hparams=HyperParams{FT}(); cuda=true, res
 
     # training data
     data = get_dataloader(dataset, batch_size=hparams.batch_size)
+
+    if PARGS["logging"]
+        update_config!(
+            lg, 
+            Dict(propertynames(hparams) .=> getfield.(Ref(hparams), propertynames(hparams)))
+    )
+    end
 
     # make models
     nchannels = 1
@@ -174,4 +212,8 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     train()
+end
+
+if PARGS["logging"]
+    close(lg)
 end
