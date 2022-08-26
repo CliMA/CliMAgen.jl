@@ -17,6 +17,9 @@ function parse_commandline()
             arg_type = String
             default = ""
             required = false
+        "--logging"
+            help = "logging to WandB"
+            action = :store_true
     end
 
     return parse_args(s)
