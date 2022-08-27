@@ -21,6 +21,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 Wandb = "ad70616a-06c9-5745-b1f1-6a5f42545108"
 
 [compat]
+Wandb = "0.4"
 julia = "1.7"
 
 [extras]
