@@ -156,12 +156,12 @@ end
     train(dataset=Turbulence2D(), hparams = HyperParams{FT}(); cuda=true, restart=false)
 
 Train the model either from  scratch (with a fresh set of hyper parameters `hparams`), or
-restarted from a previous checkpoint (model+optimizers).
+restarted from a previous checkpoint (model+optimizers+hyperparameters).
 
 Note that in the case of a restart, the parameters stored in hparams.optimizer will *not*
-be used, as the previously saved optimizers are read in and used.
+be used, as the previously saved optimizers and other hyperparams are read in and used.
 """
-function train(dataset=Turbulence2D(), trainparams = TrainingParams(), optimizerparams = OptimizerHyperParams{FT}(), lossparams = LossHyperParams{FT}();cuda=true, restart=false)
+function train(dataset=Turbulence2D(), trainparams = TrainingParams(), optimizerparams = OptimizerHyperParams{FT}(), lossparams = LossHyperParams{FT}();cuda=true, restart=true)
     # run with GPU if available
     if cuda && CUDA.has_cuda()
         dev = gpu
@@ -209,18 +209,18 @@ function train(dataset=Turbulence2D(), trainparams = TrainingParams(), optimizer
         opt_gen = create_optimizer(optimizerparams)
         opt_dis =  create_optimizer(optimizerparams)
 
-        hparams = (; train => trainparams, loss => lossparams, optimizer => optimizerparams)
+        hparams = (; :train => trainparams, :loss => lossparams, :optimizer => optimizerparams)
     end
     # training data
-    data = get_dataloader(dataset, batch_size=hparams.batch_size)
+    data = get_dataloader(dataset, batch_size=hparams.train.batch_size)
 
     if PARGS["logging"]
         update_config!(
             lg, 
-        Dict((propertynames(hparams.loss) .=> getfield.(Ref(hparams.loss), propertynames(hparams.loss))))...,
-             (propertynames(hparams.optimizer) .=> getfield.(Ref(hparams.optimizer), propertynames(hparams.optimizer)))...,
-             (propertynames(hparams.train) .=> getfield.(Ref(hparams.train), propertynames(hparams.train)))...)
-        )
+            Dict(propertynames(hparams.loss)... .=> getfield.(Ref(hparams.loss), propertynames(hparams.loss))...,
+                 propertynames(hparams.optimizer)... .=> getfield.(Ref(hparams.optimizer), propertynames(hparams.optimizer))...,
+                 propertynames(hparams.train)... .=> getfield.(Ref(hparams.train), propertynames(hparams.train))...)
+               )
     end
     fit!(opt_gen, opt_dis, generator_A, generator_B, discriminator_A, discriminator_B, data, hparams, dev)
 end

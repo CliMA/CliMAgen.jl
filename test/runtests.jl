@@ -177,7 +177,7 @@ FT = Float32
         end
         @test length(unique(grads)) == 1
         @test unique(grads)[1] == FT(1.0)
-        @test default_warmup.current[p] == nsteps
+        @test default_warmup.current == nsteps
 
         n_warmup_steps = 100
         linear_warmup = WarmupSchedule{FT}(n_warmup_steps)
@@ -188,7 +188,7 @@ FT = Float32
             Flux.Optimise.apply!(linear_warmup, p, grad)
             push!(grads, grad[1])
         end
-        @test linear_warmup.current[p] == nsteps
+        @test linear_warmup.current == nsteps
         @test grads ≈ [min(FT(1.0), FT(n/n_warmup_steps)) for n in 1:nsteps]
         
         
