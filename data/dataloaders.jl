@@ -46,7 +46,7 @@ function get_dataloader_ks(path; split_ratio=0.8, batch_size::Int=4, nsamples::I
     return (training=loader_training, validation=loader_validation,)
 end
 
-function get_dataloader_turbulence_2d(path; split_ratio=0.5, batch_size::Int=1, nsamples::Int=1000, augmentation_factor::Int=4, rng=Random.MersenneTwister(123))
+function get_dataloader_turbulence_2d(path; split_ratio=0.5, batch_size::Int=1, nsamples::Int=10, augmentation_factor::Int=1, rng=Random.MersenneTwister(123))
     fid = h5open(path, "r")
     X_lo_res = read(fid, "low_resolution/moisture/")
     X_hi_res = read(fid, "high_resolution/moisture/")
