@@ -5,6 +5,7 @@
 output/
 wandb/
 
+*~
 *.png
 *.jpg
 *.jpeg
