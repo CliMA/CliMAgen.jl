@@ -83,13 +83,13 @@ function train(; kws...)
         BSON.@load model_path, model, args
     else
         net = DiffusionModels.NoiseConditionalScoreNetwork()
-        model = DiffusionModels.VarianceExplodingSDE(σ_max=378.0f0, net=net)
+        model = DiffusionModels.VarianceExplodingSDE(net=net)
     end
     model = model |> device
 
     # exp moving avg model for storage
     net_ema = DiffusionModels.NoiseConditionalScoreNetwork()
-    model_ema = DiffusionModels.VarianceExplodingSDE(σ_max=378.0f0, net=net_ema)
+    model_ema = DiffusionModels.VarianceExplodingSDE(net=net_ema)
     model_ema = model_ema |> device
 
     # loss
@@ -128,8 +128,8 @@ function train(; kws...)
 
         if args.checkpointing
             model_path = joinpath(args.save_path, "checkpoint_model.bson")
-            let model_ema = cpu(model_ema), args = struct2dict(args)
-                BSON.@save model_path model_ema args
+            let model = cpu(model), args = struct2dict(args)
+                BSON.@save model_path model args
                 @info "Model saved: $(model_path)"
             end
         end
