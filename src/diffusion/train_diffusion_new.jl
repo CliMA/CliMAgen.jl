@@ -82,18 +82,14 @@ function train(; kws...)
         model_path = joinpath(args.save_path, "checkpoint_model.bson")
         BSON.@load model_path, model, args
     else
-        model = DiffusionModels.VarianceExplodingSDE(
-            σ_max=378.0f0, 
-            score=DiffusionModels.NCSN()
-        )
+        net = DiffusionModels.NoiseConditionalScoreNetwork()
+        model = DiffusionModels.VarianceExplodingSDE(σ_max=378.0f0, net=net)
     end
     model = model |> device
 
-    # EMA model for storage
-    model_ema = DiffusionModels.VarianceExplodingSDE(
-        σ_max=378.0f0, 
-        score=DiffusionModels.NCSN()
-    )
+    # exp moving avg model for storage
+    net_ema = DiffusionModels.NoiseConditionalScoreNetwork()
+    model_ema = DiffusionModels.VarianceExplodingSDE(σ_max=378.0f0, net=net_ema)
     model_ema = model_ema |> device
 
     # loss
@@ -103,8 +99,8 @@ function train(; kws...)
     opt = ADAM(args.η)
 
     # parameters
-    ps = Flux.params(model.score)
-    ps_ema = Flux.params(model_ema.score)
+    ps = Flux.params(model)
+    ps_ema = Flux.params(model_ema)
 
     # fit the model
     loss_train, loss_test = Inf, Inf

@@ -13,7 +13,6 @@ using Random
 using Statistics
 
 include("utils_models.jl")
-include("utils_fluxtrain.jl")
 
 include("models.jl")
 include("losses.jl")
@@ -23,6 +22,6 @@ export AbstractDiffusionModel
 export VarianceExplodingSDE
 export drift, sigma, diffusion, score
 export score_matching_loss
-export NCSN
+export NoiseConditionalScoreNetwork
 
 end # module

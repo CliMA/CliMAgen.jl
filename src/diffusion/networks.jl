@@ -1,5 +1,5 @@
 """
-    ClimaGen.NCSN\n
+    ClimaGen.NoiseConditionalScoreNetwork\n
 
 # Notes
 Images stored in (spatial..., channels, batch) order. \n
@@ -7,15 +7,15 @@ Images stored in (spatial..., channels, batch) order. \n
 # References
 https://arxiv.org/abs/1505.04597
 """
-struct NCSN
+struct NoiseConditionalScoreNetwork
     layers::NamedTuple
 end
 
 """
-User Facing API for NCSN architecture.
+User Facing API for NoiseConditionalScoreNetwork architecture.
 """
-function NCSN(; inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
-    return NCSN((
+function NoiseConditionalScoreNetwork(; inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+    return NoiseConditionalScoreNetwork((
         gaussfourierproj=GaussianFourierProjection(embed_dim, scale),
         linear=Dense(embed_dim, embed_dim, swish),
 
@@ -47,9 +47,9 @@ function NCSN(; inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=
     ))
 end
 
-@functor NCSN
+@functor NoiseConditionalScoreNetwork
 
-function (net::NCSN)(x, t)
+function (net::NoiseConditionalScoreNetwork)(x, t)
     # Embedding
     embed = net.layers.gaussfourierproj(t)
     embed = net.layers.linear(embed)
