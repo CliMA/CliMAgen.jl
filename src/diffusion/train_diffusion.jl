@@ -19,10 +19,6 @@ using TensorBoardLogger: TBLogger, tb_overwrite
 using Random
 using Statistics
 
-using Downscaling
-include("../../data/utils_data.jl")
-FT = Float32
-
 """
 Projection of Gaussian Noise onto a time vector.
 
@@ -81,20 +77,16 @@ function UNet(channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
         linear=Dense(embed_dim, embed_dim, swish),
 
         # Encoding
-        #conv1=Conv((3, 3), 1 => channels[1], stride=1, bias=false),
-        conv1=Conv((3, 3), 1 => channels[1], stride=1, pad=1, bias=false),
+        conv1=Conv((3, 3), 1 => channels[1], stride=1, bias=false),
         dense1=Dense(embed_dim, channels[1]),
         gnorm1=GroupNorm(channels[1], 4, swish),
-        #conv2=Conv((3, 3), channels[1] => channels[2], stride=2, bias=false),
-        conv2=Conv((3, 3), channels[1] => channels[2], stride=2, pad=1, bias=false),
+        conv2=Conv((3, 3), channels[1] => channels[2], stride=2, bias=false),
         dense2=Dense(embed_dim, channels[2]),
         gnorm2=GroupNorm(channels[2], 32, swish),
-        #conv3=Conv((3, 3), channels[2] => channels[3], stride=2, bias=false),
-        conv3=Conv((3, 3), channels[2] => channels[3], stride=2, pad=1, bias=false),
+        conv3=Conv((3, 3), channels[2] => channels[3], stride=2, bias=false),
         dense3=Dense(embed_dim, channels[3]),
         gnorm3=GroupNorm(channels[3], 32, swish),
-        #conv4=Conv((3, 3), channels[3] => channels[4], stride=2, bias=false),
-        conv4=Conv((3, 3), channels[3] => channels[4], stride=2, pad=1, bias=false),
+        conv4=Conv((3, 3), channels[3] => channels[4], stride=2, bias=false),
         dense4=Dense(embed_dim, channels[4]),
         gnorm4=GroupNorm(channels[4], 32, swish),
 
@@ -102,12 +94,10 @@ function UNet(channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
         tconv4=ConvTranspose((3, 3), channels[4] => channels[3], stride=2, bias=false),
         dense5=Dense(embed_dim, channels[3]),
         tgnorm4=GroupNorm(channels[3], 32, swish),
-        tconv3=ConvTranspose((3, 3), channels[3] + channels[3] => channels[2], pad=SamePad(), stride=2, bias=false),
-        #tconv3=ConvTranspose((3, 3), channels[3] + channels[3] => channels[2], pad=(0, -1, 0, -1), stride=2, bias=false),
+        tconv3=ConvTranspose((3, 3), channels[3] + channels[3] => channels[2], pad=(0, -1, 0, -1), stride=2, bias=false),
         dense6=Dense(embed_dim, channels[2]),
         tgnorm3=GroupNorm(channels[2], 32, swish),
-        #tconv2=ConvTranspose((3, 3), channels[2] + channels[2] => channels[1], pad=(0, -1, 0, -1), stride=2, bias=false),
-        tconv2=ConvTranspose((3, 3), channels[2] + channels[2] => channels[1], pad=SamePad(), stride=2, bias=false),
+        tconv2=ConvTranspose((3, 3), channels[2] + channels[2] => channels[1], pad=(0, -1, 0, -1), stride=2, bias=false),
         dense7=Dense(embed_dim, channels[1]),
         tgnorm2=GroupNorm(channels[1], 32, swish),
         tconv1=ConvTranspose((3, 3), channels[1] + channels[1] => 1, stride=1, bias=false),
@@ -158,8 +148,6 @@ function (unet::UNet)(x, t)
     h = unet.layers.tconv1(cat(h, h1, dims=3))
     # Scaling Factor
     h ./ expand_dims(marginal_prob_std(t), 3)
-    #h
-    #cat(h, h3; dims=3)
 end
 
 """
@@ -211,9 +199,6 @@ function get_data(batch_size)
     xtrain, ytrain = MLDatasets.MNIST(:train)[:]
     xtrain = reshape(xtrain, 28, 28, 1, :)
     return DataLoader((xtrain, ytrain), batchsize=batch_size, shuffle=true)
-
-    # dl_train, _ = get_dataloader(Turbulence2DComplete(), xwidth=28*5, ywidth=28*5, xstride=28*5, ystride=28*5, batch_size=batch_size, split_ratio=0.8)
-    # return dl_train
 end
 
 """
@@ -227,7 +212,7 @@ struct2dict(s) = struct2dict(Dict, s)
 # arguments for the `train` function 
 @with_kw mutable struct Args
     η = 1e-4                                        # learning rate
-    batch_size = 1                                 # batch size
+    batch_size = 32                                 # batch size
     epochs = 50                                     # number of epochs
     seed = 1                                        # random seed
     cuda = false                                    # use CPU
@@ -278,9 +263,7 @@ function train(; kws...)
 
         for (x, _) in loader
         # for x in loader
-        #     x = device(FT.(x))
             x = device(x)
-            print(x |> size)
             loss, grad = Flux.withgradient(ps) do
                 model_loss(unet, x)
             end

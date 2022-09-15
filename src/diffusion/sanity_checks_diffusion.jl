@@ -1,24 +1,10 @@
-include("train_diffusion.jl")
+include("train_diffusion_new.jl")
 
 using Images
 using ProgressMeter
 using DifferentialEquations
 using Plots
 using Statistics: mean
-
-BIGK = 0.0f0
-METRIC = :var
-split_mask(x) = begin
-    nx, ny = size(x)
-    nx_half = div(nx, 2)
-    ny_half = div(ny, 2)
-    x[nx_half+1:nx, ny_half+1:ny, :, :] .*= -1
-
-    return x
-end
-MASKER=identity
-EXPFAC = 5
-NSAMPLE = 5
 
 """
 Helper function yielding the diffusion coefficient from a SDE.
@@ -74,25 +60,14 @@ Sample from a diffusion model using the Euler-Maruyama method.
 # References
 https://yang-song.github.io/blog/2021/score/#how-to-solve-the-reverse-sde
 """
-function Euler_Maruyama_sampler(model, init_x, time_steps, Δt, k=BIGK, ex=METRIC, masker=MASKER)
+function Euler_Maruyama_sampler(model::DiffusionModels.AbstractDiffusionModel, init_x, time_steps, Δt)
     x = mean_x = init_x
-
-    # extreme guidance step
-    nx = size(init_x)[1]
-    mask = zero(init_x) .+ 1
-    mask = mask ./ (nx * nx)
-    mask = masker(mask)
 
     @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
-        g = diffusion_coeff(batch_time_step)
+        g = diffusion(model, batch_time_step)
 
-        if ex == :mean
-            guide = k .* mask
-        elseif ex == :var
-            guide = 2k .* (x  .- mean(x)) .* mask
-        end
-        score = model(x, batch_time_step) .+ guide
+        score = score(model, x, batch_time_step)
         
         mean_x = x .+ expand_dims(g, 3) .^ 2 .* score .* Δt
         x = mean_x .+ sqrt(Δt) .* expand_dims(g, 3) .* randn(Float32, size(x))

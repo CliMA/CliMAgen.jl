@@ -4,14 +4,11 @@ using Flux
 using Test
 
 @testset begin "Models"
-    m = DiffusionModels.VarianceExplodingSDE()
+    m = DiffusionModels.VarianceExplodingSDE(score=(x,t)->x)
 
     # test constructor
     @test m.σ_min == 0.01f0
     @test m.σ_max == 50.0f0
-
-    # test t_end
-    @test DiffusionModels.t_end(m) == 1
 
     # test drift
     t = rand(3, 10)
@@ -45,16 +42,16 @@ using Test
 end
 
 @testset begin "Losses"
-    m = DiffusionModels.VarianceExplodingSDE()
+    m = DiffusionModels.VarianceExplodingSDE(score=(x,t)->x)
     x = rand(3, 7, 8, 3, 25)
     @test DiffusionModels.score_matching_loss(m, x) isa Real
 end
 
 @testset begin "Networks"
-    net = DiffusionModels.NCNN()
+    net = DiffusionModels.NCSN(inchannels=3)
     ps = Flux.params(net)
-    for k in 1:2:5
-        x = rand(Float32, k*28, k*28, 1, 11)
+    for k in 5:6
+        x = rand(Float32, 2^k, 2^k, 3, 11)
         t = rand(Float32)
 
         # forward pass

@@ -10,16 +10,19 @@ module DiffusionModels
 using Flux
 using Functors
 using Random
-using Statistics: mean
+using Statistics
 
-include("utils.jl")
+include("utils_models.jl")
+include("utils_fluxtrain.jl")
+
 include("models.jl")
 include("losses.jl")
 include("networks.jl")
 
+export AbstractDiffusionModel
 export VarianceExplodingSDE
 export drift, sigma, diffusion, score
 export score_matching_loss
-export NCNN
+export NCSN
 
 end # module

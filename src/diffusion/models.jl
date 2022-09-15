@@ -49,21 +49,18 @@ end
 struct VarianceExplodingSDE{FT,S} <: AbstractDiffusionModel
     σ_min::FT
     σ_max::FT
-    score::Function
+    score::S
 end
+
 """
     ClimaGen.VarianceExplodingSDE
 """
 function VarianceExplodingSDE(;
     σ_min::FT=0.01f0,
     σ_max::FT=50.0f0,
-    score::S=identity
-) where {FT,S<:Function}
-    return VarianceExplodingSDE{FT,S}(σ_min, σ_max, (x, t) -> score(x))
-end
-
-function t_end(::VarianceExplodingSDE{FT}) where {FT}
-    return one(FT)
+    score::S
+) where {FT,S}
+    return VarianceExplodingSDE{FT,S}(σ_min, σ_max, score)
 end
 
 function drift(::VarianceExplodingSDE{FT}, t) where {FT}
@@ -81,3 +78,6 @@ end
 function score(m::VarianceExplodingSDE, x, t)
     return m.score(x, t)
 end
+
+Flux.gpu(m::VarianceExplodingSDE) = VarianceExplodingSDE(σ_min=m.σ_min, σ_max=m.σ_max, score=gpu(m.score))
+Flux.cpu(m::VarianceExplodingSDE) = VarianceExplodingSDE(σ_min=m.σ_min, σ_max=m.σ_max, score=cpu(m.score))

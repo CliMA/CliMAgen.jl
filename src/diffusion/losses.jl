@@ -39,7 +39,7 @@ function score_matching_loss(model::AbstractDiffusionModel, x, ϵ=1.0f-5)
     # Assume that λ(t) = σ(t)² and pull it into L₂-norm
     loss = @. (x_0 + s_t)^2 # squared deviations from real score
     loss = sum(loss, dims=1:(ndims(x)-1)) # L₂-norm
-    loss = mean(loss) # mean over samples/batches
+    loss = Statistics.mean(loss) # mean over samples/batches
 
     return loss
 end
