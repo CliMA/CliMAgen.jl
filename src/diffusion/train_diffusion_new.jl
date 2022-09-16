@@ -46,9 +46,9 @@ struct2dict(s) = struct2dict(Dict, s)
 # arguments for the `train` function 
 @with_kw struct Args
     η = 1e-4                                        # learning rate
-    batch_size = 128                                # batch size
-    nepochs = 50                                    # number of epochs
-    ema_rate = 0.999                                # exponential moving average rate
+    batch_size = 64                                 # batch size
+    nepochs = 100                                   # number of epochs
+    ema_rate = 0                                    # exponential moving average rate
     seed = 1                                        # random seed
     cuda = true                                     # use GPU
     compute_losses = true                           # compute losses   
@@ -115,7 +115,7 @@ function train(; kws...)
             Flux.Optimise.update!(opt, ps, grad)
 
             # exp moving avg update
-            ps_ema = @. ps_ema * args.ema_rate + (1 - args.ema_rate) * ps
+            # ps_ema .= @. ps_ema * args.ema_rate + (1 - args.ema_rate) * ps
 
             next!(progress)
         end
@@ -128,8 +128,8 @@ function train(; kws...)
 
         if args.checkpointing
             model_path = joinpath(args.save_path, "checkpoint_model.bson")
-            let model = cpu(model), args = struct2dict(args)
-                BSON.@save model_path model args
+            let model_ema = cpu(model_ema), args = struct2dict(args)
+                BSON.@save model_path model_ema args
                 @info "Model saved: $(model_path)"
             end
         end

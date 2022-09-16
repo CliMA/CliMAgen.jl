@@ -77,15 +77,15 @@ function drift(::VarianceExplodingSDE{FT}, t) where {FT}
 end
 
 function diffusion(m::VarianceExplodingSDE, t)
-    #std = @. m.σ_max^t
-    std = @. m.σ_min * (m.σ_max / m.σ_min)^t
-    std = @. std * sqrt(2 * (log(m.σ_max) - log(m.σ_min))) 
+    std = @. m.σ_max^t
+    #std = @. m.σ_min * (m.σ_max / m.σ_min)^t
+    #std = @. std * sqrt(2 * (log(m.σ_max) - log(m.σ_min))) 
     return std
 end
 
 function marginal_prob(m::VarianceExplodingSDE, x_0, t)
     μ_t = x_0
-    #σ_t = @. sqrt((m.σ_max^(2*t)-1)/2/log(m.σ_max))#
-    σ_t = @.  m.σ_min * (m.σ_max / m.σ_min)^t
+    σ_t = @. sqrt((m.σ_max^(2*t)-1)/2/log(m.σ_max))
+    #σ_t = @. m.σ_min * (m.σ_max / m.σ_min)^t
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end
