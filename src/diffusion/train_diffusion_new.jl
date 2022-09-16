@@ -128,8 +128,8 @@ function train(; kws...)
 
         if args.checkpointing
             model_path = joinpath(args.save_path, "checkpoint_model.bson")
-            let model_ema = cpu(model_ema), args = struct2dict(args)
-                BSON.@save model_path model_ema args
+            let model = cpu(model), args = struct2dict(args)
+                BSON.@save model_path model args
                 @info "Model saved: $(model_path)"
             end
         end
