@@ -6,7 +6,7 @@ using Plots
 using Statistics: mean
 
 # our training file
-include("train_diffusion_new.jl")
+include("train_diffusion.jl")
 
 """
 Sample from a diffusion model using the Euler-Maruyama method.
@@ -14,16 +14,16 @@ Sample from a diffusion model using the Euler-Maruyama method.
 # References
 https://arxiv.org/abs/1505.04597
 """
-function Euler_Maruyama_sampler(model::Downscaling.AbstractDiffusionModel, init_x, time_steps, Δt)
+function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, time_steps, Δt)
     x = mean_x = init_x
 
     @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
-        g = Downscaling.diffusion(model, batch_time_step)
-        score = Downscaling.score(model, x, batch_time_step)
+        g = CliMAgen.diffusion(model, batch_time_step)
+        score = CliMAgen.score(model, x, batch_time_step)
 
-        mean_x = x .+ Downscaling.expand_dims(g, 3) .^ 2 .* score .* Δt
-        x = mean_x .+ sqrt(Δt) .* Downscaling.expand_dims(g, 3) .* randn(Float32, size(x))
+        mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
+        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn(Float32, size(x))
     end
     return mean_x
 end
@@ -34,14 +34,14 @@ Sample from a diffusion model using the Predictor-Corrector method.
 # References
 https://yang-song.github.io/blog/2021/score/#how-to-solve-the-reverse-sde
 """
-function predictor_corrector_sampler(model::Downscaling.AbstractDiffusionModel,  init_x, time_steps, Δt, snr=0.16f0)
+function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel,  init_x, time_steps, Δt, snr=0.16f0)
     x = mean_x = init_x
 
     @showprogress "Predictor Corrector Sampling" for time_step in time_steps
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
 
         # Corrector step (Langevin MCMC)
-        grad = Downscaling.score(model, x, batch_time_step)
+        grad = CliMAgen.score(model, x, batch_time_step)
 
         num_pixels = prod(size(grad)[1:end-1])
         grad_batch_vector = reshape(grad, (size(grad)[end], num_pixels))
@@ -53,11 +53,11 @@ function predictor_corrector_sampler(model::Downscaling.AbstractDiffusionModel, 
             sqrt(2 * langevin_step_size) .* randn(Float32, size(x))
         )
         # Predictor step (Euler-Maruyama)
-        g = Downscaling.diffusion(model, batch_time_step)
-        grad = Downscaling.score(model, x, batch_time_step)
+        g = CliMAgen.diffusion(model, batch_time_step)
+        grad = CliMAgen.score(model, x, batch_time_step)
 
-        mean_x = x .+ Downscaling.expand_dims((g .^ 2), 3) .* grad .* Δt
-        x = mean_x + sqrt.(Downscaling.expand_dims((g .^ 2), 3) .* Δt) .* randn(Float32, size(x))
+        mean_x = x .+ CliMAgen.expand_dims((g .^ 2), 3) .* grad .* Δt
+        x = mean_x + sqrt.(CliMAgen.expand_dims((g .^ 2), 3) .* Δt) .* randn(Float32, size(x))
     end
     return mean_x
 end
@@ -116,10 +116,10 @@ end
 """
 Helper function that generates inputs to a sampler.
 """
-function setup_sampler(model::Downscaling.AbstractDiffusionModel, device; num_images=5, num_steps=500, ϵ=1.0f-3)
+function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device; num_images=5, num_steps=500, ϵ=1.0f-3)
     t = ones(Float32, num_images) |> device
     init_z = randn(Float32, (32, 32, 1, num_images))
-    _, σ_T = Downscaling.marginal_prob(model, zero(init_z), t)
+    _, σ_T = CliMAgen.marginal_prob(model, zero(init_z), t)
     init_x = (σ_T .* init_z) |> device
     time_steps = LinRange(1.0f0, ϵ, num_steps)
     Δt = time_steps[1] - time_steps[2]

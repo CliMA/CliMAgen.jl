@@ -1,11 +1,11 @@
 """
-    ClimaGen.Downscaling
+    ClimaGen.CliMAgen
 Conventions:
 - bla
 - blup
 Cool story about what we are doing.
 """
-module Downscaling
+module CliMAgen
 
 using Flux
 using Functors

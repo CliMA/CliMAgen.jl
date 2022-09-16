@@ -13,7 +13,7 @@ using Random
 using Statistics: mean
 
 # our package
-using Downscaling
+using CliMAgen
 
 """
 Helper function that loads MNIST images and returns loaders.
@@ -80,18 +80,18 @@ function train(; kws...)
         model_path = joinpath(args.save_path, "checkpoint_model.bson")
         BSON.@load model_path, model, args
     else
-        net = Downscaling.NoiseConditionalScoreNetwork()
-        model = Downscaling.VarianceExplodingSDE(net=net)
+        net = CliMAgen.NoiseConditionalScoreNetwork()
+        model = CliMAgen.VarianceExplodingSDE(net=net)
     end
     model = model |> device
 
     # exp moving avg model for storage
-    net_ema = Downscaling.NoiseConditionalScoreNetwork()
-    model_ema = Downscaling.VarianceExplodingSDE(net=net_ema)
+    net_ema = CliMAgen.NoiseConditionalScoreNetwork()
+    model_ema = CliMAgen.VarianceExplodingSDE(net=net_ema)
     model_ema = model_ema |> device
 
     # loss
-    lossfn(x) = Downscaling.score_matching_loss(model, x)
+    lossfn(x) = CliMAgen.score_matching_loss(model, x)
 
     # optimizer
     opt = ADAM(args.η)
