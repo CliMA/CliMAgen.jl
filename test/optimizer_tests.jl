@@ -1,4 +1,4 @@
-using Downscaling
+using CliMAgen
 using Flux
 using Test
 using Random
@@ -55,7 +55,7 @@ end
 
 @testset "create_optimizer" begin
     FT = Float32
-    hparams = OptimizerHyperParams{FT}(gradclip = FT(1.0))
+    hparams = AdamOptimizerParams{FT}(gradclip = FT(1.0))
     opt = create_optimizer(hparams)
     @test opt[1].thresh == hparams.gradclip
     @test opt[2].n_warmup_steps == hparams.n_warmup_steps
@@ -65,7 +65,7 @@ end
     @test opt[3].epsilon ≈ hparams.ϵ
     
     #no gradient clipping here
-    hparams = OptimizerHyperParams{FT}()
+    hparams = AdamOptimizerParams{FT}()
     opt = create_optimizer(hparams)
     @test opt[1].n_warmup_steps == hparams.n_warmup_steps
     @test opt[2].eta ≈ hparams.lr

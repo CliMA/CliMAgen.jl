@@ -5,12 +5,12 @@ function parse_commandline()
         "--outdir"
             help = "output directory for checkpoint files and artifacts"
             arg_type = String
-            default = joinpath(pkgdir(Downscaling), "output/")
+            default = joinpath(pkgdir(CliMAgen), "output/")
             required = false
         "--datadir"
             help = "directory containing the dataloader utils"
             arg_type = String
-            default = joinpath(pkgdir(Downscaling), "data/")
+            default = joinpath(pkgdir(CliMAgen), "data/")
             required = false
         "--restartfile"
             help = "restart from this checkpoint file"

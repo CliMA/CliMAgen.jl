@@ -50,6 +50,10 @@ function reverse_ode(m::AbstractDiffusionModel)
     return f
 end
 
+Base.@kwdef struct VarianceExplodingSDEParams{FT} <: AbstractModelParams{FT}
+    σ_max::FT = 10.0
+end
+
 struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
     σ_max::FT
     net::N
@@ -62,10 +66,10 @@ Flux.params(m::AbstractDiffusionModel) = Flux.params(m.net)
     ClimaGen.VarianceExplodingSDE
 """
 function VarianceExplodingSDE(;
-    σ_max::FT=10.0f0,
+    hpmodel::VarianceExplodingSDEParams{FT},
     net::N
 ) where {FT,N}
-    return VarianceExplodingSDE{FT,N}(σ_max, net)
+    return VarianceExplodingSDE{FT,N}(hpmodel.σ_max, net)
 end
 
 @functor VarianceExplodingSDE

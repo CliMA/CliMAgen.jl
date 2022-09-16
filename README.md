@@ -1,3 +1,3 @@
-# Downscaling
+# CliMAgen
 
-This repository containns CliMA's superesolution/downscaling tools and technologies.
+This repository contains CliMA's superesolution/downscaling tools and technologies.

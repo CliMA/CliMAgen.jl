@@ -62,10 +62,7 @@ function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel,  in
     return mean_x
 end
 
-function plot_result(model, args)
-    args = Args(; args...)
-    args.seed > 0 && Random.seed!(args.seed)
-    device = args.cuda && CUDA.has_cuda() ? gpu : cpu
+function plot_result(model, save_path)
     device = cpu
     @info "Using device: $device"
     model = model |> device
@@ -74,14 +71,14 @@ function plot_result(model, args)
     # Euler-Maruyama
     euler_maruyama = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
     sampled_noise = convert_to_image(init_x, size(init_x)[end])
-    save(joinpath(args.save_path, "sampled_noise.jpeg"), sampled_noise)
+    save(joinpath(save_path, "sampled_noise.jpeg"), sampled_noise)
     em_images = convert_to_image(euler_maruyama, size(euler_maruyama)[end])
-    save(joinpath(args.save_path, "em_images.jpeg"), em_images)
+    save(joinpath(save_path, "em_images.jpeg"), em_images)
 
     # Predictor Corrector
     pc = predictor_corrector_sampler(model, init_x, time_steps, Δt)
     pc_images = convert_to_image(pc, size(pc)[end])
-    save(joinpath(args.save_path, "pc_images.jpeg"), pc_images)
+    save(joinpath(save_path, "pc_images.jpeg"), pc_images)
 end
 
 """
@@ -127,14 +124,16 @@ function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device; num_image
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
+    save_path = "examples/mnist/output"
+    checkpoint_path = joinpath(save_path, "checkpoint_model.bson")
     ############################################################################
     # Issue loading function closures with BSON:
     # https://github.com/JuliaIO/BSON.jl/issues/69
     #
-    BSON.@load "output/checkpoint_model.bson" model args
+    BSON.@load checkpoint_path model
     #
     # BSON.@load does not work if defined inside plot_result(⋅) because
     # it contains a function closure, GaussFourierProject(⋅), containing W.
     ###########################################################################
-    plot_result(model, args)
+    plot_result(model, save_path)
 end
