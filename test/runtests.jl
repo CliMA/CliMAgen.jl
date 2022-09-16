@@ -212,7 +212,7 @@ FT = Float32
 
     @testset "create_optimizer" begin
         FT = Float32
-        hparams = OptimizerHyperParams{FT}()
+        hparams = OptimizerHyperParams{FT}(gradclip = FT(1.0))
         opt = create_optimizer(hparams)
         @test opt[1].thresh == hparams.gradclip
         @test opt[2].n_warmup_steps == hparams.n_warmup_steps
@@ -222,7 +222,7 @@ FT = Float32
         @test opt[3].epsilon ≈ hparams.ϵ
 
         #no gradient clipping here
-        hparams = OptimizerHyperParams{FT}(gradclip = FT(0.0))
+        hparams = OptimizerHyperParams{FT}()
         opt = create_optimizer(hparams)
         @test opt[1].n_warmup_steps == hparams.n_warmup_steps
         @test opt[2].eta ≈ hparams.lr
