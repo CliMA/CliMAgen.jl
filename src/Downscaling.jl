@@ -1,30 +1,29 @@
+"""
+    ClimaGen.Downscaling
+Conventions:
+- bla
+- blup
+Cool story about what we are doing.
+"""
 module Downscaling
 
 using Flux
-using Flux.Optimise: update!
+using Functors
 import Flux.Optimise: apply!
-using Functors: @functor
+using Random
 using Statistics
 
-include("generators_2d.jl")
-include("discriminators_2d.jl")
-include("generators_1d.jl")
-include("discriminators_1d.jl")
+include("utils_models.jl")
+
+include("models.jl")
+include("losses.jl")
+include("networks.jl")
 include("optimizers.jl")
 
-export ConvBlock1D
-export ResidualBlock1D
-export PatchBlock1D
-export PatchDiscriminator1D
-export UNetGenerator1D
-
-export ConvBlock2D
-export ResidualBlock2D
-export PatchBlock2D
-export PatchDiscriminator2D
-export UNetGenerator2D
-export NoisyUNetGenerator1D
-export NoisyUNetGenerator2D
-
+export AbstractDiffusionModel
+export VarianceExplodingSDE
+export drift, sigma, diffusion, score
+export score_matching_loss
+export NoiseConditionalScoreNetwork
 export WarmupSchedule, create_optimizer, OptimizerHyperParams
-end
+end # module

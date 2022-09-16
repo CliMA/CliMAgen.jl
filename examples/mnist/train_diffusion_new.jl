@@ -3,7 +3,6 @@ using CUDA
 using DataLoaders: DataLoader
 using Flux
 using Flux: params
-using FluxTraining
 using Images
 using Logging: with_logger
 using MLDatasets
@@ -12,10 +11,9 @@ using Parameters: @with_kw
 using ProgressMeter: Progress, next!
 using Random
 using Statistics: mean
-using TensorBoardLogger: TBLogger, tb_overwrite
 
 # our package
-include("DiffusionModels.jl")
+using Downscaling
 
 """
 Helper function that loads MNIST images and returns loaders.
@@ -82,18 +80,18 @@ function train(; kws...)
         model_path = joinpath(args.save_path, "checkpoint_model.bson")
         BSON.@load model_path, model, args
     else
-        net = DiffusionModels.NoiseConditionalScoreNetwork()
-        model = DiffusionModels.VarianceExplodingSDE(net=net)
+        net = Downscaling.NoiseConditionalScoreNetwork()
+        model = Downscaling.VarianceExplodingSDE(net=net)
     end
     model = model |> device
 
     # exp moving avg model for storage
-    net_ema = DiffusionModels.NoiseConditionalScoreNetwork()
-    model_ema = DiffusionModels.VarianceExplodingSDE(net=net_ema)
+    net_ema = Downscaling.NoiseConditionalScoreNetwork()
+    model_ema = Downscaling.VarianceExplodingSDE(net=net_ema)
     model_ema = model_ema |> device
 
     # loss
-    lossfn(x) = DiffusionModels.score_matching_loss(model, x)
+    lossfn(x) = Downscaling.score_matching_loss(model, x)
 
     # optimizer
     opt = ADAM(args.η)

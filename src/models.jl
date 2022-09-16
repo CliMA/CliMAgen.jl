@@ -51,7 +51,6 @@ function reverse_ode(m::AbstractDiffusionModel)
 end
 
 struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
-    σ_min::FT
     σ_max::FT
     net::N
 end
@@ -63,11 +62,10 @@ Flux.params(m::AbstractDiffusionModel) = Flux.params(m.net)
     ClimaGen.VarianceExplodingSDE
 """
 function VarianceExplodingSDE(;
-    σ_min::FT=0.01f0,
     σ_max::FT=10.0f0,
     net::N
 ) where {FT,N}
-    return VarianceExplodingSDE{FT,N}(σ_min, σ_max, net)
+    return VarianceExplodingSDE{FT,N}(σ_max, net)
 end
 
 @functor VarianceExplodingSDE
@@ -77,15 +75,11 @@ function drift(::VarianceExplodingSDE{FT}, t) where {FT}
 end
 
 function diffusion(m::VarianceExplodingSDE, t)
-    std = @. m.σ_max^t
-    #std = @. m.σ_min * (m.σ_max / m.σ_min)^t
-    #std = @. std * sqrt(2 * (log(m.σ_max) - log(m.σ_min))) 
-    return std
+    return @. m.σ_max^t
 end
 
 function marginal_prob(m::VarianceExplodingSDE, x_0, t)
     μ_t = x_0
     σ_t = @. sqrt((m.σ_max^(2*t)-1)/2/log(m.σ_max))
-    #σ_t = @. m.σ_min * (m.σ_max / m.σ_min)^t
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end
