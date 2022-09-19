@@ -7,7 +7,6 @@ using Images
 using Logging: with_logger
 using MLDatasets
 using MLUtils: shuffleobs, splitobs
-using Parameters: @with_kw
 using ProgressMeter: Progress, next!
 using Random
 using Statistics: mean
@@ -15,10 +14,21 @@ using Statistics: mean
 # our package
 using CliMAgen
 
+
+"""
+Helper function from DrWatson.jl to convert a struct to a dict
+"""
+function struct2dict(::Type{DT}, s) where {DT<:AbstractDict}
+    DT(x => getfield(s, x) for x in fieldnames(typeof(s)))
+end
+struct2dict(s) = struct2dict(Dict, s)
+
+
 """
 Helper function that loads MNIST images and returns loaders.
 """
-function get_data(batch_size, size=32)
+function get_data(hptrain, size=32)
+    batch_size = hptrain.batch_size
     xtrain, _ = MLDatasets.MNIST(:train)[:]
     xtrain = Images.imresize(xtrain, (size, size))
     xtrain = reshape(xtrain, size, size, 1, :)
@@ -33,36 +43,48 @@ function get_data(batch_size, size=32)
     return loader_train, loader_test
 end
 
-"""
-Helper function from DrWatson.jl to convert a struct to a dict
-"""
-function struct2dict(::Type{DT}, s) where {DT<:AbstractDict}
-    DT(x => getfield(s, x) for x in fieldnames(typeof(s)))
-end
-struct2dict(s) = struct2dict(Dict, s)
-
-# arguments for the `train` function 
-@with_kw struct Args
-    η = 1e-4                                        # learning rate
-    batch_size = 64                                 # batch size
-    nepochs = 100                                   # number of epochs
-    ema_rate = 0                                    # exponential moving average rate
-    seed = 1                                        # random seed
-    cuda = true                                     # use GPU
-    compute_losses = true                           # compute losses   
-    checkpointing = true                            # use checkpointing
-    save_path = "output"                            # results path
-    restart_training = false                        # restart training
+function reinitialize(save_path)
+    model_path = joinpath(save_path, "checkpoint_model.bson")
+    BSON.@load model_path, model, opt, hp
+    return (; opt = opt, model = model, hp = hp)
 end
 
-function train(; kws...)
-    # load hyperparamters
-    args = Args(; kws...)
+function initialize(hpmodel, hpopt)
+    net = CliMAgen.NoiseConditionalScoreNetwork()
+    model = CliMAgen.VarianceExplodingSDE(;hpmodel = hpmodel, net=net)
+    opt = create_optimizer(hpopt)
+    return (; opt = opt, model = model)
+end
+
+function update_step!(ps, data_loader, lossfn, opt, device)
+    progress = Progress(length(data_loader); showspeed=true)
+    for batch in data_loader
+        grad = Flux.gradient(() -> lossfn(device(batch)), ps)
+        Flux.Optimise.update!(opt, ps, grad)
+        next!(progress)
+    end
+end
+
+function compute_losses(loader_train, loader_test, lossfn, device)
+        loss_train = mean(map(lossfn ∘ device, loader_train))
+        loss_test = mean(map(lossfn ∘ device, loader_test))
+        @info "Train loss: $(loss_train), Test loss: $(loss_test)"
+end
+
+function checkpoint_step(model, opt, hp, save_path)
+        model_path = joinpath(save_path, "checkpoint_model.bson")
+        let model = cpu(model)
+            BSON.@save model_path model opt hp
+            @info "Model saved: $(model_path)"
+        end
+end
+
+function train(args, hp)
     args.seed > 0 && Random.seed!(args.seed)
-
+    
     # directory structure
     !ispath(args.save_path) && mkpath(args.save_path)
-
+    
     # device config
     if args.cuda && CUDA.has_cuda()
         device = gpu
@@ -72,68 +94,58 @@ function train(; kws...)
         @info "Training on CPU"
     end
 
-    # load data
-    loader_train, loader_test = get_data(args.batch_size)
 
-    # model
+    # Load data
+    loader_train, loader_test = get_data(hp.data)
+
+    # Load or initialize models and optimizer
     if args.restart_training
-        model_path = joinpath(args.save_path, "checkpoint_model.bson")
-        BSON.@load model_path, model, args
+        @info "Initializing the model, optimizer, and hp from checkpoint."
+        @info "Overwriting passed hyper parameters with checkpoint values."
+        (; opt, model, hp)  = reinitialize(args.save_path)
     else
-        net = CliMAgen.NoiseConditionalScoreNetwork()
-        model = CliMAgen.VarianceExplodingSDE(net=net)
+        (; opt, model)  = initialize(hp.model, hp.opt)
     end
+
+    # push model to device
     model = model |> device
-
-    # exp moving avg model for storage
-    net_ema = CliMAgen.NoiseConditionalScoreNetwork()
-    model_ema = CliMAgen.VarianceExplodingSDE(net=net_ema)
-    model_ema = model_ema |> device
-
-    # loss
-    lossfn(x) = CliMAgen.score_matching_loss(model, x)
-
-    # optimizer
-    opt = ADAM(args.η)
-
-    # parameters
+    
+    # create parameters of model
     ps = Flux.params(model)
-    ps_ema = Flux.params(model_ema)
 
-    # fit the model
+    # create the loss function for the model
+    lossfn(x) = CliMAgen.score_matching_loss(model, x) 
+
+    # Run training and checkpointing
     loss_train, loss_test = Inf, Inf
-    @info "Start Training, total $(args.nepochs) epochs"
-    for epoch = 1:args.nepochs
+    @info "Start Training, total $(hp.train.nepochs) epochs"
+    for epoch = 1:hp.train.nepochs
         @info "Epoch $(epoch)"
-        progress = Progress(length(loader_train); showspeed=true)
 
-        for batch in loader_train
-            # gradient step
-            grad = Flux.gradient(() -> lossfn(device(batch)), ps)
-            Flux.Optimise.update!(opt, ps, grad)
-
-            # exp moving avg update
-            # ps_ema .= @. ps_ema * args.ema_rate + (1 - args.ema_rate) * ps
-
-            next!(progress)
-        end
-
+        update_step!(ps, loader_train, lossfn, opt, device)
+        
         if args.compute_losses
-            loss_train = mean(map(lossfn ∘ device, loader_train))
-            loss_test = mean(map(lossfn ∘ device, loader_test))
-            @info "Train loss: $(loss_train), Test loss: $(loss_test)"
+            compute_losses(loader_train, loader_test, lossfn, device)
         end
-
+        
         if args.checkpointing
-            model_path = joinpath(args.save_path, "checkpoint_model.bson")
-            let model = cpu(model), args = struct2dict(args)
-                BSON.@save model_path model args
-                @info "Model saved: $(model_path)"
-            end
+            checkpoint_step(model, opt, hp, args.save_path)
         end
     end
 end
 
+
 if abspath(PROGRAM_FILE) == @__FILE__
-    train()
+    # set arguments for run
+    args = Args()
+    # Make hyperparameters structs
+    FT = args.FT
+    hpdata = DataParams{FT}(batch_size = 64)
+    hptrain = TrainParams{FT}(nepochs = 30)
+    hpopt = AdamOptimizerParams{FT}()
+    hpmodel = VarianceExplodingSDEParams{FT}()
+    hp = Parameters{FT}(; data = hpdata, train = hptrain, opt = hpopt, model = hpmodel)
+
+    
+    train(args, hp)
 end

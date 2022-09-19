@@ -4,6 +4,7 @@ env:
   OPENMPI_VERSION: "4.1.1"
   CUDA_VERSION: "11.2"
   OPENBLAS_NUM_THREADS: 1
+  DATADEPS_ALWAYS_ACCEPT: true
 
 steps:
   - label: "init :computer:"
@@ -16,6 +17,12 @@ steps:
 
       - echo "--- Instantiate status"
       - "julia --project -e 'using Pkg; Pkg.status()'"
+
+      - "julia --project=examples -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=examples -e 'using Pkg; Pkg.precompile(;strict=true)'"
+
+      - echo "--- Instantiate status"
+      - "julia --project=examples -e 'using Pkg; Pkg.status()'"
     agents:
       config: cpu
       queue: central
@@ -32,11 +39,15 @@ steps:
       - "julia --project -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project -e 'using Pkg; Pkg.precompile(;strict=true)'"
 
+      - "julia --project=examples -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=examples -e 'using Pkg; Pkg.precompile(;strict=true)'"
+
       # force the initialization of the CUDA runtime as it is lazily loaded by default
       - "julia --project -e 'using CUDA; CUDA.precompile_runtime()'"
       - "julia --project -e 'using CUDA; CUDA.versioninfo()'"
 
       - "julia --project -e 'using Pkg; Pkg.status()'"
+      - "julia --project=examples -e 'using Pkg; Pkg.status()'"
     agents:
       config: gpu
       queue: central
@@ -63,6 +74,20 @@ steps:
     command:
       - "export CUDA_HOME=/usr/local/cuda-$$CUDA_VERSION"
       - "julia --color=yes --check-bounds=yes --project test/runtests.jl CUDA"
+    agents:
+      config: gpu
+      queue: central
+      slurm_ntasks: 1
+      slurm_gres: "gpu:1"
+
+  - label: ":flower_playing_cards: MNIST"
+    key: "gpu_mnist"
+    command:
+      - "export CUDA_HOME=/usr/local/cuda-$$CUDA_VERSION"
+      - "julia --color=yes --check-bounds=yes --project=examples examples/mnist/train_diffusion.jl CUDA"
+      
+      - "julia --color=yes --check-bounds=yes --project=examples examples/mnist/sanity_checks_diffusion.jl CUDA"
+    artifact_paths: "examples/mnist/output/*.jpeg"
     agents:
       config: gpu
       queue: central

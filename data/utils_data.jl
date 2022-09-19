@@ -1,5 +1,5 @@
 using Pkg.Artifacts
-using Downscaling
+using CliMAgen
 using Flux
 using HDF5
 using MLUtils
@@ -12,7 +12,7 @@ include("dataloaders.jl")
 
 
 function obtain_local_dataset_path(ds::ArtifactMetaData)
-    data_dir = joinpath(pkgdir(Downscaling), "data")
+    data_dir = joinpath(pkgdir(CliMAgen), "data")
     return obtain_local_dataset_path(data_dir, ds.dataname, ds.url, ds.filename)
 end
 
