@@ -52,7 +52,7 @@ end
 
 Base.@kwdef struct VarianceExplodingSDEParams{FT} <: AbstractModelParams{FT}
     σ_max::FT = 4.7
-    σ_min::FT = 0.47
+    σ_min::FT = 0.01
 end
 
 struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
