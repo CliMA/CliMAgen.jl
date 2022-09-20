@@ -27,17 +27,17 @@ struct2dict(s) = struct2dict(Dict, s)
 """
 Helper function that loads MNIST images and returns loaders.
 """
-function get_data(hptrain, size=32)
-    batch_size = hptrain.batch_size
+function get_data(hpdata, size=32)
+    batch_size = hpdata.batch_size
     xtrain, _ = MLDatasets.MNIST(:train)[:]
     xtrain = Images.imresize(xtrain, (size, size))
-    xtrain = reshape(xtrain, size, size, 1, :)
+    xtrain = reshape(xtrain, size, size, hpdata.inchannels, :)
     xtrain = shuffleobs(xtrain)
     loader_train = DataLoader(xtrain, batch_size)
 
     xtest, _ = MLDatasets.MNIST(:test)[:]
     xtest = Images.imresize(xtest, (size, size))
-    xtest = reshape(xtest, size, size, 1, :)
+    xtest = reshape(xtest, size, size, hpdata.inchannels, :)
     loader_test = DataLoader(xtest, batch_size)
 
     return loader_train, loader_test
@@ -49,8 +49,8 @@ function reinitialize(save_path)
     return (; opt = opt, model = model, hp = hp)
 end
 
-function initialize(hpmodel, hpopt)
-    net = CliMAgen.NoiseConditionalScoreNetwork()
+function initialize(hpmodel, hpopt, inchannels)
+    net = CliMAgen.NoiseConditionalScoreNetwork(;inchannels = inchannels)
     model = CliMAgen.VarianceExplodingSDE(;hpmodel = hpmodel, net=net)
     opt = create_optimizer(hpopt)
     return (; opt = opt, model = model)
@@ -104,7 +104,7 @@ function train(args, hp)
         @info "Overwriting passed hyper parameters with checkpoint values."
         (; opt, model, hp)  = reinitialize(args.save_path)
     else
-        (; opt, model)  = initialize(hp.model, hp.opt)
+        (; opt, model)  = initialize(hp.model, hp.opt, hp.data.inchannels)
     end
 
     # push model to device
@@ -140,7 +140,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     args = Args()
     # Make hyperparameters structs
     FT = args.FT
-    hpdata = DataParams{FT}(batch_size = 64)
+    hpdata = DataParams{FT}(batch_size = 64, inchannels = 1)
     hptrain = TrainParams{FT}(nepochs = 30)
     hpopt = AdamOptimizerParams{FT}()
     hpmodel = VarianceExplodingSDEParams{FT}()

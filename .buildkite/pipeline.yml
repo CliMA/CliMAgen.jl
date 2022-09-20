@@ -93,3 +93,17 @@ steps:
       queue: central
       slurm_ntasks: 1
       slurm_gres: "gpu:1"
+
+  - label: ":flower_playing_cards: CIFAR10"
+    key: "gpu_mnist"
+    command:
+      - "export CUDA_HOME=/usr/local/cuda-$$CUDA_VERSION"
+      - "julia --color=yes --check-bounds=yes --project=examples examples/cifar10/train_diffusion.jl CUDA"
+      
+      - "julia --color=yes --check-bounds=yes --project=examples examples/cifar10/sanity_checks_diffusion.jl CUDA"
+    artifact_paths: "examples/cifar10/output/*.jpeg"
+    agents:
+      config: gpu
+      queue: central
+      slurm_ntasks: 1
+      slurm_gres: "gpu:1"

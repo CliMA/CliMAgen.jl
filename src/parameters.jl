@@ -8,6 +8,8 @@ abstract type AbstractOptimizerParams{FT} <: AbstractParams{FT} end
 Base.@kwdef struct DataParams{FT} <: AbstractParams{FT}
     "The batch size"
     batch_size::Int = 64
+    "Number of channels"
+    inchannels::Int = 1
 end
 
 """

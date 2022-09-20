@@ -62,11 +62,11 @@ function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel,  in
     return mean_x
 end
 
-function plot_result(model, save_path)
+function plot_result(model, save_path, hpdata)
     device = cpu
     @info "Using device: $device"
     model = model |> device
-    time_steps, Δt, init_x = setup_sampler(model, device)
+    time_steps, Δt, init_x = setup_sampler(model, device, hpdata)
 
     # Euler-Maruyama
     euler_maruyama = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
@@ -113,9 +113,9 @@ end
 """
 Helper function that generates inputs to a sampler.
 """
-function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device; num_images=5, num_steps=500, ϵ=1.0f-3)
+function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device, hpdata; num_images=5, num_steps=500, ϵ=1.0f-3)
     t = ones(Float32, num_images) |> device
-    init_z = randn(Float32, (32, 32, 1, num_images))
+    init_z = randn(Float32, (32, 32, hpdata.inchannels, num_images))
     _, σ_T = CliMAgen.marginal_prob(model, zero(init_z), t)
     init_x = (σ_T .* init_z) |> device
     time_steps = LinRange(1.0f0, ϵ, num_steps)
@@ -130,10 +130,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Issue loading function closures with BSON:
     # https://github.com/JuliaIO/BSON.jl/issues/69
     #
-    BSON.@load checkpoint_path model
+    BSON.@load checkpoint_path model hp
     #
     # BSON.@load does not work if defined inside plot_result(⋅) because
     # it contains a function closure, GaussFourierProject(⋅), containing W.
     ###########################################################################
-    plot_result(model, save_path)
+    plot_result(model, save_path, hp.data)
 end

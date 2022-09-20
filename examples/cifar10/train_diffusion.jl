@@ -27,18 +27,18 @@ struct2dict(s) = struct2dict(Dict, s)
 """
 Helper function that loads CIFAR10 images and returns loaders.
 """
-function get_data(hptrain, size=32)
-    batch_size = hptrain.batch_size
+function get_data(hpdata, size=32)
+    batch_size = hpdata.batch_size
     xtrain, _ = MLDatasets.CIFAR10(:train)[:]
     xtrain = Images.imresize(xtrain, (size, size))
-    xtrain = reshape(xtrain, size, size, 1, :)
+    xtrain = reshape(xtrain, size, size, hpdata.inchannels, :)
     xtrain = shuffleobs(xtrain)
     loader_train = DataLoader(xtrain, batch_size)
     # note Song does a "random flip"
     # https://github.com/yang-song/score_sde/blob/main/configs/default_cifar10_configs.py#L44
     xtest, _ = MLDatasets.CIFAR10(:test)[:]
     xtest = Images.imresize(xtest, (size, size))
-    xtest = reshape(xtest, size, size, 1, :)
+    xtest = reshape(xtest, size, size, hpdata.inchannels, :)
     loader_test = DataLoader(xtest, batch_size)
 
     return loader_train, loader_test
@@ -138,11 +138,11 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     # set arguments for run
-    args = Args()
+    args = Args(;save_path = "examples/cifar10/output")
     # Make hyperparameters structs
     FT = args.FT
-    hpdata = DataParams{FT}(batch_size = 10)
-    hptrain = TrainParams{FT}(nepochs = 1)
+    hpdata = DataParams{FT}(batch_size = 128, inchannels = 3)
+    hptrain = TrainParams{FT}(nepochs = 50)
     hpopt = AdamOptimizerParams{FT}(lr = 2e-4, gradclip = 1.0, n_warmup_steps = 5000)
     hpmodel = VarianceExplodingSDEParams{FT}()
     hp = Parameters{FT}(; data = hpdata, train = hptrain, opt = hpopt, model = hpmodel)
