@@ -51,7 +51,7 @@ function reverse_ode(m::AbstractDiffusionModel)
 end
 
 Base.@kwdef struct VarianceExplodingSDEParams{FT} <: AbstractModelParams{FT}
-    σ_max::FT = 4.7
+    σ_max::FT = 1.0
     σ_min::FT = 0.01
 end
 
