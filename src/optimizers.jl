@@ -17,55 +17,11 @@ mutable struct WarmupSchedule{FT} <: Flux.Optimise.AbstractOptimiser
     current::Int
 end
 
-WarmupSchedule{FT}(n_warmup_steps = 1) where{FT} =
-  WarmupSchedule(FT(1.0), n_warmup_steps, 0)
+WarmupSchedule{FT}(n_warmup_steps=1) where {FT} =
+    WarmupSchedule(FT(1.0), n_warmup_steps, 0)
 
-function Flux.Optimise.apply!(o::WarmupSchedule{FT}, x, Δ) where{FT}
+function Flux.Optimise.apply!(o::WarmupSchedule{FT}, x, Δ) where {FT}
     η, n_warmup_steps = o.η, o.n_warmup_steps
-    current_step = o.current = o.current+1
-    Δ .*= min(η * FT(current_step/n_warmup_steps), η)
+    current_step = o.current = o.current + 1
+    Δ .*= min(η * FT(current_step / n_warmup_steps), η)
 end
-
-"""
-    struct AdamOptimizerParams{FT}
-
-All hyperparameters needed for constructing an Adam optimizer,
-optionally with gradient clipping and with a warmup schedule.
-
-If gradclip is positive, the gradient clip is applied via the L2
-norm using a value of `gradclip`. If gradclip is 0 or negative,
-no clipping is applied.
-
-If n_warmup_steps is 1, no warmup schedule is implemented.
-
-The defaults are *no* clipping and *no* warmup.
-"""
-Base.@kwdef struct AdamOptimizerParams{FT} <: AbstractOptimizerParams{FT}
-    lr = FT(0.0002)
-    ϵ = FT(1e-8)
-    gradclip = FT(0.0)
-    β1 = FT(0.9)
-    β2 = FT(0.999)
-    n_warmup_steps::Int = 1
-end
-"""
-    create_optimizer(hparams::AdamOptimizerParams{FT}) where {FT}
-
-Create and return the optimizer desired by composing (1) gradient clipping, (2)
-a warmup schedule for the learning rate multiplier, and (3) the Adam optimizer,
-based on the hyperparams `hpopt` passed.
-"""
-function create_optimizer(hpopt::AdamOptimizerParams{FT}) where {FT}
-    if hpopt.gradclip >eps(FT)
-        opt = Flux.Optimise.Optimiser(Flux.Optimise.ClipNorm(hpopt.gradclip),
-                                      WarmupSchedule{FT}(hpopt.n_warmup_steps),
-                                      Flux.Optimise.Adam(hpopt.lr, (hpopt.β1, hpopt.β2), hpopt.ϵ))
-    else
-        opt = Flux.Optimise.Optimiser(WarmupSchedule{FT}(hpopt.n_warmup_steps),
-                                      Flux.Optimise.Adam(hpopt.lr, (hpopt.β1, hpopt.β2), hpopt.ϵ))
-    end
-    
-    return opt
-end
-
-

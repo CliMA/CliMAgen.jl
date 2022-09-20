@@ -1,12 +1,6 @@
-using CliMAgen
-using Flux
-using Test
-using Random
-using Statistics:mean 
-FT = Float32
-
 @testset "WarmupSchedule" begin
     FT = Float32
+
     default_warmup = WarmupSchedule{FT}()
     p = [0.0]
     nsteps = 120
@@ -34,7 +28,6 @@ FT = Float32
     @test linear_warmup.current == nsteps
     @test grads ≈ [min(FT(1.0), FT(n/n_warmup_steps)) for n in 1:nsteps]
     
-    
     opt = WarmupSchedule{FT}(n_warmup_steps)
     p = [FT(1.0)]
     x = FT.(randn(100))
@@ -50,26 +43,4 @@ FT = Float32
     end
     @test (p_array[1:end-1] .- p_array[2:end]) ≈ actual_grad.(p_array[1:end-1], Ref(x),1:nsteps)
     
-end
-
-
-@testset "create_optimizer" begin
-    FT = Float32
-    hparams = AdamOptimizerParams{FT}(gradclip = FT(1.0))
-    opt = create_optimizer(hparams)
-    @test opt[1].thresh == hparams.gradclip
-    @test opt[2].n_warmup_steps == hparams.n_warmup_steps
-    @test opt[3].eta ≈ hparams.lr
-    @test opt[3].beta[1] ≈ hparams.β1
-    @test opt[3].beta[2] ≈ hparams.β2
-    @test opt[3].epsilon ≈ hparams.ϵ
-    
-    #no gradient clipping here
-    hparams = AdamOptimizerParams{FT}()
-    opt = create_optimizer(hparams)
-    @test opt[1].n_warmup_steps == hparams.n_warmup_steps
-    @test opt[2].eta ≈ hparams.lr
-    @test opt[2].beta[1] ≈ hparams.β1
-    @test opt[2].beta[2] ≈ hparams.β2
-    @test opt[2].epsilon ≈ hparams.ϵ
 end

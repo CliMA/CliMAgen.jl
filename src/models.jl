@@ -50,28 +50,19 @@ function reverse_ode(m::AbstractDiffusionModel)
     return f
 end
 
-Base.@kwdef struct VarianceExplodingSDEParams{FT} <: AbstractModelParams{FT}
-    σ_max::FT = 4.66
-    σ_min::FT = 0.466
-end
+# only the neural network is trainable within the diffusion model
+Flux.params(m::AbstractDiffusionModel) = Flux.params(m.net)
 
-struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
+Base.@kwdef struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
     σ_max::FT
     σ_min::FT
     net::N
 end
-
-# only the neural network is trainable within the diffusion model
-Flux.params(m::AbstractDiffusionModel) = Flux.params(m.net)
-
 """
     ClimaGen.VarianceExplodingSDE
 """
-function VarianceExplodingSDE(;
-    hpmodel::VarianceExplodingSDEParams{FT},
-    net::N
-) where {FT,N}
-    return VarianceExplodingSDE{FT,N}(hpmodel.σ_max,hpmodel.σ_min, net)
+function VarianceExplodingSDE(hpmodel::NamedTuple; net)
+    return VarianceExplodingSDE(hpmodel.σ_max, hpmodel.σ_min, net)
 end
 
 @functor VarianceExplodingSDE
