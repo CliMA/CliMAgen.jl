@@ -86,6 +86,6 @@ end
 
 function marginal_prob(m::VarianceExplodingSDE, x_0, t)
     μ_t = x_0
-    σ_t = @. sqrt(m.σ_min^2 * (m.σ_max/m.σ_min)^(2*t) - m.σ_min^(2*t))
+    σ_t = @. sqrt(m.σ_min^2 * (m.σ_max/m.σ_min)^(2*t) - m.σ_min^2)
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end
