@@ -95,7 +95,7 @@ steps:
       slurm_gres: "gpu:1"
 
   - label: ":flower_playing_cards: CIFAR10"
-    key: "gpu_mnist"
+    key: "gpu_cifar10"
     command:
       - "export CUDA_HOME=/usr/local/cuda-$$CUDA_VERSION"
       - "julia --color=yes --check-bounds=yes --project=examples examples/cifar10/train_diffusion.jl CUDA"
