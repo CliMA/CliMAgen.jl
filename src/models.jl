@@ -51,8 +51,8 @@ function reverse_ode(m::AbstractDiffusionModel)
 end
 
 Base.@kwdef struct VarianceExplodingSDEParams{FT} <: AbstractModelParams{FT}
-    σ_max::FT = 1.0
-    σ_min::FT = 0.01
+    σ_max::FT = 4.66
+    σ_min::FT = 0.466
 end
 
 struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
@@ -86,6 +86,6 @@ end
 
 function marginal_prob(m::VarianceExplodingSDE, x_0, t)
     μ_t = x_0
-    σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^t
+    σ_t = @. sqrt(m.σ_min^2 * (m.σ_max/m.σ_min)^(2*t) - σ_min^(2*t))
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end

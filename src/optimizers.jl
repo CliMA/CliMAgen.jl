@@ -41,7 +41,7 @@ If n_warmup_steps is 1, no warmup schedule is implemented.
 The defaults are *no* clipping and *no* warmup.
 """
 Base.@kwdef struct AdamOptimizerParams{FT} <: AbstractOptimizerParams{FT}
-    lr = FT(0.001)
+    lr = FT(0.0002)
     ϵ = FT(1e-8)
     gradclip = FT(0.0)
     β1 = FT(0.9)
