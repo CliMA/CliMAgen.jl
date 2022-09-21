@@ -4,11 +4,12 @@ using Flux
 using Test
 
 @testset "Models" begin
-    hpmodel = VarianceExplodingSDEParams{Float32}(10.0)
+    hpmodel = VarianceExplodingSDEParams{Float32}(σ_max = 10.0, σ_min = 1.0)
     m = CliMAgen.VarianceExplodingSDE(;hpmodel=hpmodel, net=(x, t) -> x)
 
     # test constructor
     @test m.σ_max == 10.0f0
+    @test m.σ_min == 1.0f0
 
     # test drift
     t = rand(3, 10)
@@ -17,13 +18,13 @@ using Test
     # test diffusion
     t = rand(3, 10)
 
-    @test CliMAgen.diffusion(m, t) == @. m.σ_max^t 
+    @test CliMAgen.diffusion(m, t) == @. m.σ_min * (m.σ_max/m.σ_min)^t*sqrt(2*log(m.σ_max/m.σ_min))
 
     # test marginal_prob
     x, t = rand(3, 10), rand(10)
     μ, σ = CliMAgen.marginal_prob(m, x, t)
     @test μ == x
-    @test σ == CliMAgen.expand_dims(sqrt.((m.σ_max.^(2 .*t).-1) ./(2*log(m.σ_max))), ndims(x) - 1)
+    @test σ == CliMAgen.expand_dims(sqrt.(m.σ_min^2 .* (m.σ_max/m.σ_min).^(2 .*t) .- m.σ_min^2), ndims(x) -1 )
   
     # test dummy score
     x, t = rand(3, 3), rand()

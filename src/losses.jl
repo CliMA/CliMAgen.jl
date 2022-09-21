@@ -21,7 +21,7 @@ s₀(𝘹(𝘵), 𝘵) is estimated by a U-Net architecture.
 https://arxiv.org/abs/2011.13456
 https://arxiv.org/abs/1907.05600
 """
-function score_matching_loss(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
+function score_matching_loss(model::AbstractDiffusionModel, x_0, ϵ=5.0f-5)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 
