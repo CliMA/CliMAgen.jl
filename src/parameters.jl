@@ -1,64 +1,49 @@
-abstract type AbstractParams{FT <: AbstractFloat} end
+abstract type AbstractParams end
 
-abstract type AbstractModelParams{FT} <: AbstractParams{FT} end
-abstract type AbstractOptimizerParams{FT} <: AbstractParams{FT} end
 """
-     DataParams{FT} <: AbstractParams{FT}
+    ClimaGen.HyperParameters
 """
-Base.@kwdef struct DataParams{FT} <: AbstractParams{FT}
-    "The batch size"
-    batch_size::Int = 64
+Base.@kwdef struct HyperParameters <: AbstractParams
+    data::NamedTuple
+    model::NamedTuple
+    optimizer::NamedTuple
+    training::NamedTuple
 end
 
 """
-     TrainParams{FT} <: AbstractParams{FT}
+    CliMAgen.parse_commandline
 """
-Base.@kwdef struct TrainParams{FT} <: AbstractParams{FT}
-    "The number of passes, or epochs, over the data to carry out in training"
-    nepochs::Int = 100
-end
-"""
-    Parameters{FT,D,O,T,M} <: AbstractParams{FT}
+function parse_commandline()
+    s = ArgParse.ArgParseSettings()
 
-"""
-struct Parameters{FT,D,O,T,M} <: AbstractParams{FT}
-    "The data hyperparameters"
-    data::D
-    "The optimizer hyperparameters"
-    opt::O
-    "The training hyperparameters"
-    train::T
-    "The model hyperparameters"
-    model::M
-end
+    ArgParse.@add_arg_table! s begin
+        "--project"
+        help = "Wandb project name"
+        arg_type = String
+        default = "CliMAgen.jl"
+        required = false
+        "--restartfile"
+        help = "Restart from this checkpoint file"
+        arg_type = String
+        default = nothing
+        required = false
+        "--savedir"
+        help = "Output directory for checkpoint files and artifacts"
+        arg_type = String
+        default = "./output/"
+        required = false
+        "--seed"
+        help = "Random seed"
+        arg_type = Int
+        default = 123
+        required = false
+        "--logging"
+        help = "Toggle logging"
+        action = :store_true
+        "--nogpu"
+        help = "Toggle GPU usage"
+        action = :store_true
+    end
 
-function Parameters{FT}(; data::AbstractParams,
-                        train::TrainParams{FT},
-                        model::AbstractModelParams{FT},
-                        opt::AbstractOptimizerParams{FT}
-                        ) where {FT}
-    param_args = (data, opt, train, model)
-    return Parameters{FT, typeof.(param_args)...}(param_args...)
+    return ArgParse.parse_args(s) # returns a dictionary
 end
-
-"""
-    Args
-
-"""
-Base.@kwdef struct Args
-    "Type to be used for all computations involving floats"
-    FT = Float32
-    "Random seed"
-    seed = 1
-    "A boolean to indicate whether to use GPU or not"
-    cuda = true
-    "A boolean to indicate whether to compute losses at each epoch"
-    compute_losses = true
-    "A boolean to indicate whether to checkpoint the model at each epoch"
-    checkpointing = true
-    "The path to save to and read from if checkpoint or restarting"
-    save_path = "examples/mnist/output"
-    "A boolean to indicate whether to restart from a checkpoint at `save_path`"
-    restart_training = false
-end
-                    

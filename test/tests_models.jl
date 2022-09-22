@@ -1,15 +1,10 @@
-using CliMAgen
-
-using Flux
-using Test
-
 @testset "Models" begin
-    hpmodel = VarianceExplodingSDEParams{Float32}(σ_max = 10.0, σ_min = 1.0)
-    m = CliMAgen.VarianceExplodingSDE(;hpmodel=hpmodel, net=(x, t) -> x)
+    hpmodel = (; σ_max = 4.66f0, σ_min = 0.466f0)
+    m = CliMAgen.VarianceExplodingSDE(hpmodel; net=(x, t)->x)
 
     # test constructor
-    @test m.σ_max == 10.0f0
-    @test m.σ_min == 1.0f0
+    @test m.σ_max == 4.66f0
+    @test m.σ_min == 0.466f0
 
     # test drift
     t = rand(3, 10)
@@ -56,8 +51,8 @@ using Test
 end
 
 @testset "Losses" begin
-    hpmodel = VarianceExplodingSDEParams{Float32}()
-    m = CliMAgen.VarianceExplodingSDE(;hpmodel = hpmodel, net=(x, t) -> x)
+    hpmodel = (; σ_max = 4.66f0, σ_min = 0.466f0)
+    m = CliMAgen.VarianceExplodingSDE(hpmodel; net=(x, t)->x)
     x = rand(3, 7, 8, 3, 25)
     @test CliMAgen.score_matching_loss(m, x) isa Real
 end
