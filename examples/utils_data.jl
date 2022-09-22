@@ -1,3 +1,5 @@
+using MLDatasets, MLUtils, Images, DataLoaders
+
 """
 Helper function that loads MNIST images and returns loaders.
 """
