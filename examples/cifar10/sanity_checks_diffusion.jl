@@ -11,7 +11,7 @@ include("../utils_data.jl")
 include("../utils_plotting.jl")
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    savedir = "examples/mnist/output"
+    savedir = "./output"
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     ############################################################################
     # Issue loading function closures with BSON:
@@ -22,5 +22,5 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # BSON.@load does not work if defined inside plot_result(⋅) because
     # it contains a function closure, GaussFourierProject(⋅), containing W.
     ###########################################################################
-    plot_result(model_smooth, savedir, hparams.data; num_steps=1000)
+    plot_result(model_smooth, savedir, hparams.data, num_steps=1000)
 end

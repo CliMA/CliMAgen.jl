@@ -84,7 +84,7 @@ steps:
     key: "gpu_mnist"
     command:
       - "export CUDA_HOME=/usr/local/cuda-$$CUDA_VERSION"
-      - "julia --color=yes --check-bounds=yes --project=examples examples/mnist/train_diffusion.jl"
+      - "julia --color=yes --check-bounds=yes --project=examples examples/mnist/train_diffusion.jl --savedir=examples/mnist/output"
       
       - "julia --color=yes --check-bounds=yes --project=examples examples/mnist/sanity_checks_diffusion.jl"
     artifact_paths: "examples/mnist/output/*.jpeg"

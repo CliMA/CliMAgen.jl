@@ -26,16 +26,17 @@ function run(args, hparams; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_mnist(hparams.data, FT=FT)
+    dataloaders = get_data_cifar10(hparams.data, FT=FT)
 
     # set up model & optimizer
     if args.restartfile isa Nothing
-        net = NoiseConditionalScoreNetwork(; inchannels = hparams.data.inchannels)
+        net = NoiseConditionalScoreNetwork(; inchannels  = hparams.data.inchannels)
         model = VarianceExplodingSDE(hparams.model; net=net)
         opt = Flux.Optimise.Optimiser(
             WarmupSchedule{FT}(
                 hparams.optimizer.nwarmup
-            ),
+            ), 
+            Flux.Optimise.ClipNorm(hparams.optimizer.gradclip),
             Flux.Optimise.Adam(
                 hparams.optimizer.lr, 
                 (hparams.optimizer.β1, hparams.optimizer.β2), 
@@ -77,29 +78,31 @@ function main(FT=Float32)
     # hyperparameters
     hparams = HyperParameters(
         data = (;
-                nbatch  = 64,
-                inchannels = 1,
+                nbatch  = 128,
+                inchannels = 3,
                 ),
         model = (; 
-                 σ_max   = FT(4.66),
-                 σ_min   = FT(0.466),
+                 σ_max   = FT(50),
+                 σ_min   = FT(0.01),
                  ),
         optimizer = (;     
-            lr      = FT(0.0002),
-            ϵ       = FT(1e-8),
-            β1      = FT(0.9),
-            β2      = FT(0.999),
-            nwarmup = 1,
-            ema_rate = FT(0.999),
-        ),
+                     lr      = FT(0.0002),
+                     ϵ       = FT(1e-8),
+                     β1      = FT(0.9),
+                     β2      = FT(0.999),
+                     nwarmup = 5000,
+                     gradclip = FT(1.0),
+                     ema_rate = FT(0.999),
+                     ),
         training = (; 
-            nepochs = 30,
-        )
+                    nepochs = 4000, 
+                    )
     )
-
+    
     run(args, hparams; FT=FT, logger=nothing)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
+
