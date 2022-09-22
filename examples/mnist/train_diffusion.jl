@@ -2,16 +2,17 @@ using CUDA
 using Dates
 using Flux
 using Random
-using Wandb
 
 using CliMAgen
-using CliMAgen: parse_commandline, get_data_mnist, dict2nt
+using CliMAgen: parse_commandline, dict2nt
 using CliMAgen: HyperParameters, VarianceExplodingSDE, NoiseConditionalScoreNetwork
 using CliMAgen: score_matching_loss
 using CliMAgen: WarmupSchedule
 using CliMAgen: train!, load_model_and_optimizer
 
-function run(args, hparams; FT=Float32)
+include("../utils_data.jl")
+
+function run(args, hparams; FT=Float32, logger=nothing)
     # set up rng
     args.seed > 0 && Random.seed!(args.seed)
 
@@ -26,17 +27,6 @@ function run(args, hparams; FT=Float32)
 
     # set up directory structure
     !ispath(args.savedir) && mkpath(args.savedir)
-
-    # set up logger
-    if args.logging
-        logger = Wandb.WandbLogger(
-            project=args.project,
-            name="mnist_32x32-$(Dates.now())",
-            config=Dict(),
-        )
-    else
-        logger = nothing
-    end
 
     # set up dataset
     dataloaders = get_data_mnist(hparams.data, FT=FT)
@@ -76,11 +66,6 @@ function run(args, hparams; FT=Float32)
         device, 
         logger
     )
-
-    # must close the logger to flush the logs to server if applicable
-    if args.logging 
-        close(logger) 
-    end
 end
 
 function main(FT=Float32)
@@ -109,7 +94,7 @@ function main(FT=Float32)
         )
     )
 
-    run(args, hparams; FT=FT)
+    run(args, hparams; FT=FT, logger=nothing)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

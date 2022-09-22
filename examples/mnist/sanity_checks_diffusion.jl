@@ -115,7 +115,7 @@ end
 """
 Helper function that generates inputs to a sampler.
 """
-function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device; num_images=5, num_steps=500, ϵ=1.0f-3)
+function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device; num_images=10, num_steps=500, ϵ=1.0f-3)
     t = ones(Float32, num_images) |> device
     init_z = randn(Float32, (32, 32, 1, num_images))
     _, σ_T = CliMAgen.marginal_prob(model, zero(init_z), t)

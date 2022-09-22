@@ -7,8 +7,8 @@ function train!(model, lossfn, dataloaders, opt, hparams::HyperParameters, args:
     savepath = joinpath(args.savedir, "checkpoint.bson")
 
     # update the logger config with hyperparms
-    if logger isa Wandb.WandbLogger
-        Wandb.update_config!(logger, CliMAgen.struct2dict(hparams))
+    if logger isa AbstractLogger
+        log_config(logger, CliMAgen.struct2dict(hparams))
     end
 
     # model parameters
@@ -29,19 +29,14 @@ function train!(model, lossfn, dataloaders, opt, hparams::HyperParameters, args:
         CliMAgen.save_model_and_optimizer(Flux.cpu(model), opt, hparams, savepath)
 
         # log training and testing loss
-        if logger isa Wandb.WandbLogger
-            Wandb.log(
-                logger,
-                Dict("Training/Loss" => loss_train, "Testing/Loss" => loss_test),
-            )
+        if logger isa AbstractLogger
+            log_dict(logger, Dict("Training/Loss" => loss_train, "Testing/Loss" => loss_test))
         end
     end
 
     # after training is complete, log last model checkpoint
-    if logger isa Wandb.WandbLogger
-        artifact = Wandb.WandbArtifact("checkpoint", type="BSON-file")
-        Wandb.add_file(artifact, savepath)
-        Wandb.log(logger, artifact)
+    if logger isa AbstractLogger
+        log_artifact(logger, savepath)
     end
 end
 
@@ -70,4 +65,20 @@ function compute_losses(lossfn, dataloaders, device::Function)
     loss_test = Statistics.mean(map(lossfn ∘ device, loader_test))
 
     return loss_train, loss_test
+end
+
+"""
+    ClimaGen.save_model_and_optimizer
+"""
+function save_model_and_optimizer(model, opt, hparams::HyperParameters, path::String)
+    BSON.@save path model opt hparams
+    @info "Model saved at $(path)."
+end
+
+"""
+    ClimaGen.load_model_and_optimizer
+"""
+function load_model_and_optimizer(path::String)
+    BSON.@load path model opt hparams
+    return (; model=model, opt=opt, hparams=hparams)
 end
