@@ -30,7 +30,7 @@ export VarianceExplodingSDE
 export drift, diffusion, marginal_prob, score
 export score_matching_loss
 export NoiseConditionalScoreNetwork
-export WarmupSchedule
+export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 
 end # module

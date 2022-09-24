@@ -7,7 +7,7 @@ using CliMAgen
 using CliMAgen: parse_commandline, dict2nt
 using CliMAgen: HyperParameters, VarianceExplodingSDE, NoiseConditionalScoreNetwork
 using CliMAgen: score_matching_loss
-using CliMAgen: WarmupSchedule
+using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
 
 include("../utils_data.jl")
@@ -24,9 +24,6 @@ function run(args, hparams; FT=Float32, logger=nothing)
         device = Flux.cpu
         @info "Training on CPU"
     end
-
-    # set up directory structure
-    !ispath(args.savedir) && mkpath(args.savedir)
 
     # set up dataset
     dataloaders = get_data_mnist(hparams.data, FT=FT)
@@ -52,6 +49,9 @@ function run(args, hparams; FT=Float32, logger=nothing)
     end
     model = device(model)
 
+    # set up moving average for model parameters
+    opt_smooth = ExponentialMovingAverage(hparams.optimizer.ema_rate)
+
     # set up loss function
     lossfn = x->score_matching_loss(model, x)
 
@@ -60,10 +60,11 @@ function run(args, hparams; FT=Float32, logger=nothing)
         model, 
         lossfn, 
         dataloaders, 
-        opt, 
-        hparams, 
-        args, 
-        device, 
+        opt,
+        opt_smooth,
+        hparams,
+        device,
+        args.savedir,
         logger
     )
 end
@@ -88,9 +89,10 @@ function main(FT=Float32)
             β1      = FT(0.9),
             β2      = FT(0.999),
             nwarmup = 1,
+            ema_rate = FT(0.999),
         ),
         training = (; 
-            nepochs = 30, 
+            nepochs = 30,
         )
     )
 

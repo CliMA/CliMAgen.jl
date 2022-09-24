@@ -1,18 +1,24 @@
 """
     ClimaGen.train!
 """
-function train!(model, lossfn, dataloaders, opt, hparams::HyperParameters, args::NamedTuple, device::Function, logger=nothing)
-    # unpack the relevant parameters
-    nepochs, = hparams.training
-    savepath = joinpath(args.savedir, "checkpoint.bson")
-
-    # update the logger config with hyperparms
+function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParameters, device::Function, savedir="./output/", logger=nothing)
     if logger isa AbstractLogger
         log_config(logger, CliMAgen.struct2dict(hparams))
     end
 
+    # set up directory structure
+    !ispath(savedir) && mkpath(savedir)
+    savepath = joinpath(savedir, "checkpoint.bson")
+
+    # unpack the relevant parameters
+    nepochs, = hparams.training
+
     # model parameters
     ps = Flux.params(model)
+
+    # setup smoothed parameters & model
+    model_smooth = deepcopy(model)
+    ps_smooth = Flux.params(model_smooth)
 
     # training loop
     loss_train, loss_test = Inf, Inf
@@ -21,37 +27,42 @@ function train!(model, lossfn, dataloaders, opt, hparams::HyperParameters, args:
         @info "Epoch $(epoch)"
 
         # update the params and compute losses
-        CliMAgen.update_step!(ps, lossfn, dataloaders.loader_train, opt, device)
+        CliMAgen.update_step!(ps, ps_smooth, opt, opt_smooth, dataloaders.loader_train, lossfn, device)
         loss_train, loss_test = CliMAgen.compute_losses(lossfn, dataloaders, device)
         @info "Train loss: $(loss_train), Test loss: $(loss_test)"
 
         # store model checkpoint on disk
-        CliMAgen.save_model_and_optimizer(Flux.cpu(model), opt, hparams, savepath)
+        CliMAgen.save_model_and_optimizer(Flux.cpu(model), Flux.cpu(model_smooth), opt, opt_smooth, hparams, savepath)
+        @info "Checkpoint saved to $(savepath)."
 
-        # log training and testing loss
         if logger isa AbstractLogger
-            log_dict(logger, Dict("Training/Loss" => loss_train, "Testing/Loss" => loss_test))
+            log_dict(logger, Dict(
+                "Training/Loss" => loss_train, 
+                "Testing/Loss" => loss_test
+                ))
         end
     end
 
-    # after training is complete, log last model checkpoint
     if logger isa AbstractLogger
-        log_artifact(logger, savepath)
+        log_checkpoint(logger, savepath)
     end
 end
 
 """
     ClimaGen.update_step!
 """
-function update_step!(ps, lossfn, loader_train, opt, device::Function)
-    # set up progress bafr
+function update_step!(ps, ps_smooth, opt, opt_smooth, loader_train, lossfn::Function, device::Function)
     progress = ProgressMeter.Progress(length(loader_train); showspeed=true)
 
     # epoch loop
     for batch in loader_train
         batch = device(batch)
+        
         grad = Flux.gradient(() -> lossfn(batch), ps)
+
         Flux.Optimise.update!(opt, ps, grad)
+        Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
+
         ProgressMeter.next!(progress)
     end
 end
@@ -70,8 +81,8 @@ end
 """
     ClimaGen.save_model_and_optimizer
 """
-function save_model_and_optimizer(model, opt, hparams::HyperParameters, path::String)
-    BSON.@save path model opt hparams
+function save_model_and_optimizer(model, model_smooth, opt, opt_smooth, hparams::HyperParameters, path::String)
+    BSON.@save path model model_smooth opt opt_smooth hparams
     @info "Model saved at $(path)."
 end
 
@@ -79,6 +90,6 @@ end
     ClimaGen.load_model_and_optimizer
 """
 function load_model_and_optimizer(path::String)
-    BSON.@load path model opt hparams
-    return (; model=model, opt=opt, hparams=hparams)
+    BSON.@load path model model_smooth opt opt_smooth hparams
+    return (; model=model, model_smooth=model_smooth, opt=opt, opt_smooth=opt_smooth, hparams=hparams)
 end

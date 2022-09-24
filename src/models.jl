@@ -53,14 +53,17 @@ end
 # only the neural network is trainable within the diffusion model
 Flux.params(m::AbstractDiffusionModel) = Flux.params(m.net)
 
+Base.deepcopy(m::M) where {M <: AbstractDiffusionModel} = 
+    M((deepcopy(getfield(m, f)) for f in fieldnames(M))...)
+
+"""
+    ClimaGen.VarianceExplodingSDE
+"""
 Base.@kwdef struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
     σ_max::FT
     σ_min::FT
     net::N
 end
-"""
-    ClimaGen.VarianceExplodingSDE
-"""
 function VarianceExplodingSDE(hpmodel::NamedTuple; net)
     return VarianceExplodingSDE(hpmodel.σ_max, hpmodel.σ_min, net)
 end
