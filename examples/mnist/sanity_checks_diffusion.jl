@@ -132,10 +132,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Issue loading function closures with BSON:
     # https://github.com/JuliaIO/BSON.jl/issues/69
     #
-    BSON.@load checkpoint_path model opt hparams
+    BSON.@load checkpoint_path model model_smooth opt opt_smooth hparams
     #
     # BSON.@load does not work if defined inside plot_result(⋅) because
     # it contains a function closure, GaussFourierProject(⋅), containing W.
     ###########################################################################
-    plot_result(model, savedir)
+    plot_result(model_smooth, savedir)
 end

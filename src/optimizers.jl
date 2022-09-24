@@ -25,3 +25,19 @@ function Flux.Optimise.apply!(o::WarmupSchedule{FT}, x, Δ) where {FT}
     current_step = o.current = o.current + 1
     Δ .*= min(η * FT(current_step / n_warmup_steps), η)
 end
+
+"""
+    ExponentialMovingAverage{FT} <: Flux.Optimisers.AbstractOptimiser
+
+A Flux.Optimisers Optimiser for an exponential moving average accumulation of
+parameters during training. The 'rate' parameter is the exponential decay rate.
+"""
+mutable struct ExponentialMovingAverage{FT} <: Flux.Optimise.AbstractOptimiser
+    rate::FT
+end
+
+function Flux.update!(opt::ExponentialMovingAverage, ps_smooth::Flux.Params, ps::Flux.Params)
+    for (xs, x) in zip(ps_smooth, ps)
+        @. xs = opt.rate * xs + (1 - opt.rate) * x
+    end
+end
