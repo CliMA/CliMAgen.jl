@@ -23,6 +23,7 @@ include("networks.jl")
 include("losses.jl")
 include("optimizers.jl")
 include("training.jl")
+include("sampling.jl")
 
 export struct2dict, dict2nt, parse_commandline
 export HyperParameters
@@ -32,5 +33,6 @@ export score_matching_loss
 export NoiseConditionalScoreNetwork
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
+export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler
 
 end # module
