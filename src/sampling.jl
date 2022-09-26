@@ -13,9 +13,9 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, 
         score = CliMAgen.score(model, x, batch_time_step)
 
         mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
-        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn(Float32, size(x))
+        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
     end
-    return mean_x
+    return @. (mean_x + 1) / 2
 end
 
 """
@@ -40,16 +40,16 @@ function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, ini
         langevin_step_size = 2 * (snr * noise_norm / grad_norm)^2
         x += (
             langevin_step_size .* grad .+
-            sqrt(2 * langevin_step_size) .* randn(Float32, size(x))
+            sqrt(2 * langevin_step_size) .* randn!(similar(x))
         )
         # Predictor step (Euler-Maruyama)
         g = CliMAgen.diffusion(model, batch_time_step)
         grad = CliMAgen.score(model, x, batch_time_step)
 
         mean_x = x .+ CliMAgen.expand_dims((g .^ 2), 3) .* grad .* Δt
-        x = mean_x + sqrt.(CliMAgen.expand_dims((g .^ 2), 3) .* Δt) .* randn(Float32, size(x))
+        x = mean_x + sqrt.(CliMAgen.expand_dims((g .^ 2), 3) .* Δt) .* randn!(similar(x))
     end
-    return mean_x
+    return @. (mean_x + 1) / 2
 end
 
 """
@@ -57,9 +57,9 @@ Helper function that generates inputs to a sampler.
 """
 function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device, hpdata; num_images=5, num_steps=500, ϵ=1.0f-3)
     t = ones(Float32, num_images) |> device
-    init_z = randn(Float32, (32, 32, hpdata.inchannels, num_images))
+    init_z = randn(Float32, (32, 32, hpdata.inchannels, num_images)) |> device
     _, σ_T = CliMAgen.marginal_prob(model, zero(init_z), t)
-    init_x = (σ_T .* init_z) |> device
+    init_x = (σ_T .* init_z)
     time_steps = LinRange(1.0f0, ϵ, num_steps)
     Δt = time_steps[1] - time_steps[2]
     return time_steps, Δt, init_x

@@ -4,6 +4,7 @@ using Flux
 using Images
 using ProgressMeter
 using Plots
+using Random
 using Statistics
 
 using CliMAgen
