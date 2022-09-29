@@ -31,6 +31,7 @@ function run(args, hparams; FT=Float32, logger=nothing)
     # set up model & optimizer
     if args.restartfile isa Nothing
         net = NoiseConditionalScoreNetwork(; inchannels = hparams.data.inchannels)
+        #net = CliMAgen.ConvMixer(1, 256, 8, ks=3, ps=4)
         model = VarianceExplodingSDE(hparams.model; net=net)
         opt = Flux.Optimise.Optimiser(
             WarmupSchedule{FT}(
@@ -77,7 +78,7 @@ function main(FT=Float32)
     # hyperparameters
     hparams = HyperParameters(
         data = (;
-                nbatch  = 64,
+                nbatch  = 128,
                 inchannels = 1,
                 ),
         model = (; 

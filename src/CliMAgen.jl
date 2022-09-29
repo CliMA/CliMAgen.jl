@@ -35,4 +35,7 @@ export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler
 
+include("networks_new.jl")
+export ConvMixer
+
 end # module
