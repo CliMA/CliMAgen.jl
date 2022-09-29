@@ -12,6 +12,7 @@ using Logging
 using ProgressMeter
 using Random
 using Statistics
+using Tullio
 
 using CliMAgen
 
@@ -30,7 +31,7 @@ export HyperParameters
 export VarianceExplodingSDE
 export drift, diffusion, marginal_prob, score
 export score_matching_loss
-export NoiseConditionalScoreNetwork
+export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler

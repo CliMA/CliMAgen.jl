@@ -20,11 +20,11 @@ function convert_to_animation(x, hpdata)
     return animation
 end
 
-function plot_result(model, save_path, hpdata; num_steps=500)
-    device = cpu
+function plot_result(model, save_path, hpdata; num_images=25, num_steps=500)
+    device = gpu
     @info "Using device: $device"
     model = model |> device
-    time_steps, Δt, init_x = setup_sampler(model, device, hpdata; num_steps = num_steps)
+    time_steps, Δt, init_x = setup_sampler(model, device, hpdata; num_images = num_images, num_steps = num_steps)
     # Euler-Maruyama
     euler_maruyama = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
     sampled_noise = convert_to_image(init_x, hpdata.inchannels)

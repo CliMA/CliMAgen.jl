@@ -56,21 +56,3 @@ end
     x = rand(3, 7, 8, 3, 25)
     @test CliMAgen.score_matching_loss(m, x) isa Real
 end
-
-@testset "Networks" begin
-    net = CliMAgen.NoiseConditionalScoreNetwork(inchannels=3)
-    ps = Flux.params(net)
-    for k in 5:6
-        x = rand(Float32, 2^k, 2^k, 3, 11)
-        t = rand(Float32)
-
-        # forward pass
-        @test net(x, t) |> size == size(x)
-
-        # backward pass of dummy loss
-        loss, grad = Flux.withgradient(ps) do
-            sum(net(x, t) .^ 2)
-        end
-        @test loss isa Real
-    end
-end

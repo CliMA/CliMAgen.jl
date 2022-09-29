@@ -5,11 +5,12 @@ using Random
 
 using CliMAgen
 using CliMAgen: parse_commandline, dict2nt
-using CliMAgen: HyperParameters, VarianceExplodingSDE, NoiseConditionalScoreNetwork
+using CliMAgen: HyperParameters, VarianceExplodingSDE, DenoisingDiffusionNetwork
 using CliMAgen: score_matching_loss
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
 
+CUDA.allowscalar(false)
 include("../utils_data.jl")
 
 function run(args, hparams; FT=Float32, logger=nothing)
@@ -30,7 +31,8 @@ function run(args, hparams; FT=Float32, logger=nothing)
 
     # set up model & optimizer
     if args.restartfile isa Nothing
-        net = NoiseConditionalScoreNetwork(; inchannels  = hparams.data.inchannels)
+        #net = NoiseConditionalScoreNetwork(; inchannels = hparams.data.inchannels)
+        net = DenoisingDiffusionNetwork(; inchannels = hparams.data.inchannels)
         model = VarianceExplodingSDE(hparams.model; net=net)
         opt = Flux.Optimise.Optimiser(
             WarmupSchedule{FT}(
@@ -78,15 +80,17 @@ function main(FT=Float32)
     # hyperparameters
     hparams = HyperParameters(
         data = (;
-                nbatch  = 128,
+                nbatch  = 64,
                 inchannels = 3,
                 ),
         model = (; 
-                 σ_max   = FT(50),
-                 σ_min   = FT(0.01),
+                #  σ_max   = FT(50),
+                #  σ_min   = FT(0.01),
+                 σ_max   = FT(4.66),
+                 σ_min   = FT(0.466),
                  ),
         optimizer = (;     
-                     lr      = FT(0.0002),
+                     lr      = FT(2e-4),
                      ϵ       = FT(1e-8),
                      β1      = FT(0.9),
                      β2      = FT(0.999),

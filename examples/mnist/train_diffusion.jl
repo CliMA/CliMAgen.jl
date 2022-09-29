@@ -5,7 +5,7 @@ using Random
 
 using CliMAgen
 using CliMAgen: parse_commandline, dict2nt
-using CliMAgen: HyperParameters, VarianceExplodingSDE, NoiseConditionalScoreNetwork
+using CliMAgen: HyperParameters, VarianceExplodingSDE, NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork
 using CliMAgen: score_matching_loss
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
@@ -30,7 +30,8 @@ function run(args, hparams; FT=Float32, logger=nothing)
 
     # set up model & optimizer
     if args.restartfile isa Nothing
-        net = NoiseConditionalScoreNetwork(; inchannels = hparams.data.inchannels)
+        #net = NoiseConditionalScoreNetwork(; inchannels = hparams.data.inchannels)
+        net = DenoisingDiffusionNetwork(; inchannels = hparams.data.inchannels)
         model = VarianceExplodingSDE(hparams.model; net=net)
         opt = Flux.Optimise.Optimiser(
             WarmupSchedule{FT}(
