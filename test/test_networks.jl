@@ -84,3 +84,19 @@ end
         @test loss isa Real
     end
 end
+
+@testset "NCSN Variant Network" begin
+    net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=3)
+    ps = Flux.params(net)
+    k = 5
+    x = rand(Float32, 2^k, 2^k, 3, 11)
+    t = rand(Float32)
+    # forward pass
+    @test net(x, t) |> size == size(x)
+
+    # backward pass of dummy loss
+    loss, grad = Flux.withgradient(ps) do
+        sum(net(x, t) .^ 2)
+    end
+    @test loss isa Real
+end
