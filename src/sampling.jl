@@ -15,7 +15,7 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, 
         mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
         x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
     end
-    return @. (mean_x + 1) / 2
+    return x
 end
 
 """
@@ -49,7 +49,7 @@ function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, ini
         mean_x = x .+ CliMAgen.expand_dims((g .^ 2), 3) .* grad .* Δt
         x = mean_x + sqrt.(CliMAgen.expand_dims((g .^ 2), 3) .* Δt) .* randn!(similar(x))
     end
-    return @. (mean_x + 1) / 2
+    return x
 end
 
 """

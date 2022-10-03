@@ -26,7 +26,13 @@ function run(args, hparams; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_mnist(hparams.data, FT=FT)
+    tile_size = 32
+    dataloaders = get_data_2dturbulence(
+        hparams.data; 
+        width=(tile_size, tile_size), 
+        stride=(tile_size, tile_size), 
+        FT=FT
+    )
 
     # set up model & optimizer
     if args.restartfile isa Nothing
@@ -79,7 +85,7 @@ function main(FT=Float32)
     hparams = HyperParameters(
         data = (;
                 nbatch  = 64,
-                inchannels = 1,
+                inchannels = 2,
                 ),
         model = (; 
                  σ_max   = FT(4.66),
