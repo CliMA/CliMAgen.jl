@@ -14,13 +14,13 @@ end
 """
 User Facing API for NoiseConditionalScoreNetwork architecture.
 """
-function NoiseConditionalScoreNetwork(; nspatial=2, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+function NoiseConditionalScoreNetwork(; inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
     return NoiseConditionalScoreNetwork((
         gaussfourierproj=GaussianFourierProjection(embed_dim, scale),
         linear=Dense(embed_dim, embed_dim, swish),
 
         # Lifting
-        conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad()),
+        conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad(), bias=false),
         dense1=Dense(embed_dim, channels[1]),
         gnorm1=GroupNorm(channels[1], 4, swish),
 
