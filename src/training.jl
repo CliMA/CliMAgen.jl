@@ -1,8 +1,8 @@
 """
     ClimaGen.train!
 """
-function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParameters, device::Function, savedir="./output/", logger=nothing)
-    if logger isa AbstractLogger
+function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParameters, device::Function, savedir="./output/", logger=nothing, freq_chckpt=Inf)
+    if !(logger isa Nothing)
         log_config(logger, CliMAgen.struct2dict(hparams))
     end
 
@@ -11,7 +11,7 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParam
     savepath = joinpath(savedir, "checkpoint.bson")
 
     # unpack the relevant parameters
-    nepochs, = hparams.training
+    nepochs, freq_chckpt = hparams.training
 
     # model parameters
     ps = Flux.params(model)
@@ -29,22 +29,29 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParam
         # update the params and compute losses
         CliMAgen.update_step!(ps, ps_smooth, opt, opt_smooth, dataloaders.loader_train, lossfn, device)
         loss_train, loss_test = CliMAgen.compute_losses(lossfn, dataloaders, device)
-        @info "Train loss: $(loss_train), Test loss: $(loss_test)"
+        for (ltrain, ltest) in zip(loss_train, loss_test)
+            @info "Loss: $(ltrain) (train) | $(ltest) (test)"
+        end
 
         # store model checkpoint on disk
         CliMAgen.save_model_and_optimizer(Flux.cpu(model), Flux.cpu(model_smooth), opt, opt_smooth, hparams, savepath)
         @info "Checkpoint saved to $(savepath)."
-
-        if logger isa AbstractLogger
-            log_dict(logger, Dict(
-                "Training/Loss" => loss_train, 
-                "Testing/Loss" => loss_test
-                ))
+        if !(logger isa Nothing)
+            log_dict(
+                logger, 
+                Dict(
+                    ["Training/Loss$i" => l for (i,l) in enumerate(loss_train)]...,
+                    ["Testing/Loss$i" => l for (i,l) in enumerate(loss_test)]...,
+                )
+            ) 
         end
-    end
 
-    if logger isa AbstractLogger
-        log_checkpoint(logger, savepath)
+        if epoch % freq_chckpt == 0
+            if !(logger isa Nothing)
+                log_checkpoint(logger, savepath; name="checkpoint-$(epoch)", type="BSON-file")
+                # TODO: log the model analysis stuff...
+            end
+        end
     end
 end
 
@@ -58,7 +65,7 @@ function update_step!(ps, ps_smooth, opt, opt_smooth, loader_train, lossfn::Func
     for batch in loader_train
         batch = device(batch)
         
-        grad = Flux.gradient(() -> lossfn(batch), ps)
+        grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
 
         Flux.Optimise.update!(opt, ps, grad)
         Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
