@@ -30,7 +30,7 @@ export struct2dict, dict2nt, parse_commandline
 export HyperParameters
 export VarianceExplodingSDE
 export drift, diffusion, marginal_prob, score
-export score_matching_loss
+export score_matching_loss, score_matching_loss_variant
 export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock, NoiseConditionalScoreNetworkVariant
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer

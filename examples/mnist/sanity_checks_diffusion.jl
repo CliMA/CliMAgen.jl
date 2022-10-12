@@ -9,10 +9,11 @@ using Statistics
 
 using CliMAgen
 include("../utils_data.jl")
-include("../utils_plotting.jl")
+include("../utils_analysis.jl")
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    savedir = "output"
+    FT = Float32
+    savedir = "examples/mnist/output"
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     ############################################################################
     # Issue loading function closures with BSON:
@@ -23,5 +24,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # BSON.@load does not work if defined inside plot_result(⋅) because
     # it contains a function closure, GaussFourierProject(⋅), containing W.
     ###########################################################################
-    plot_result(model_smooth, savedir, hparams.data; num_steps=1000)
+    
+    device = Flux.cpu
+    num_samples = 100
+    num_images = 25
+
+    dl, _ = get_data_mnist(hparams.data; FT=FT)
+    xtrain = cat([x for x in dl]..., dims=4)
+    xtrain = xtrain[:, :, :, 1:num_samples]
+
+    samples = generate_samples(model_smooth, hparams.data, device, num_samples, ; num_steps = 500)
+    img_plot(samples.em[:,:,:,1:num_images], savedir, "em_images.png", hparams.data)
+    img_plot(samples.pc[:,:,:,1:num_images], savedir, "pc_images.png", hparams.data)
+    img_plot(xtrain[:,:,:,1:num_images], savedir, "train_images.png", hparams.data)
+
+    qq_plot(xtrain, samples.pc, savedir, "qq_plot.png")
 end

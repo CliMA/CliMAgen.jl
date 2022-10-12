@@ -80,6 +80,7 @@ function main(FT=Float32)
         data = (;
                 nbatch  = 64,
                 inchannels = 1,
+                size = 32,
                 ),
         model = (; 
                  σ_max   = FT(4.66),

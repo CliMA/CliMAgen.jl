@@ -86,13 +86,35 @@ end
 end
 
 @testset "NCSN Variant Network" begin
-    net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=3)
+    net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2)
     ps = Flux.params(net)
     k = 5
-    x = rand(Float32, 2^k, 2^k, 3, 11)
+    x = rand(Float32, 2^k, 2^k, 2, 11)
     t = rand(Float32)
     # forward pass
     @test net(x, t) |> size == size(x)
+
+    # backward pass of dummy loss
+    loss, grad = Flux.withgradient(ps) do
+        sum(net(x, t) .^ 2)
+    end
+    @test loss isa Real
+
+    shift_input_net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, shift_input=true)
+    Flux.loadmodel!(shift_input_net, net)
+    @test net(x.-mean(x, dims = (1,2)), t) ≈ shift_input_net(x, t)
+
+    shift_output_net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, shift_output=true)
+    Flux.loadmodel!(shift_output_net, net)
+    @test (net(x, t) .-mean(net(x,t), dims = (1,2))) ≈ shift_output_net(x, t)
+
+    mean_bypass_net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, shift_input=true, shift_output=true, mean_bypass=true)
+    ps = Flux.params(net)
+    k = 5
+    x = rand(Float32, 2^k, 2^k, 2, 11)
+    t = rand(Float32)
+    # forward pass
+    @test  mean_bypass_net(x, t) |> size == size(x)
 
     # backward pass of dummy loss
     loss, grad = Flux.withgradient(ps) do
