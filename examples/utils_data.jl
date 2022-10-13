@@ -4,9 +4,7 @@ using CliMADatasets
 """
 Helper function that loads MNIST images and returns loaders.
 """
-function get_data_mnist(hptrain; size=32, FT=Float32)
-    batchsize, = hptrain
-
+function get_data_mnist(batchsize; size=32, FT=Float32)
     xtrain, _ = MLDatasets.MNIST(:train; Tx=FT)[:]
     xtrain = Images.imresize(xtrain, (size, size))
     xtrain = reshape(xtrain, size, size, 1, :)
@@ -26,9 +24,7 @@ end
 """
 Helper function that loads CIFAR10 images and returns loaders.
 """
-function get_data_cifar10(hptrain; size=32, FT=Float32)
-    batchsize, = hptrain
-
+function get_data_cifar10(batchsize; size=32, FT=Float32)
     xtrain, _ = MLDatasets.CIFAR10(:train; Tx=FT)[:]
     xtrain = Images.imresize(xtrain, (size, size))
     xtrain = reshape(xtrain, size, size, 3, :)
@@ -49,9 +45,7 @@ end
 """
 Helper function that loads 2d turbulence images and returns loaders.
 """
-function get_data_2dturbulence(hptrain; width=(32, 32), stride=(32, 32), FT=Float32)
-    batchsize, = hptrain
-
+function get_data_2dturbulence(batchsize; width=(32, 32), stride=(32, 32), FT=Float32)
     xtrain = CliMADatasets.Turbulence2D(:train; resolution=:high, Tx=FT)[:]
     xtrain = tile_array(xtrain, width[1], width[2], stride[1], stride[2])
 

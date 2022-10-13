@@ -4,6 +4,7 @@
 
 output/
 wandb/
+experiments/
 
 *~
 *.png

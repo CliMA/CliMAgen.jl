@@ -64,9 +64,6 @@ Base.@kwdef struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
     σ_min::FT
     net::N
 end
-function VarianceExplodingSDE(hpmodel::NamedTuple; net)
-    return VarianceExplodingSDE(hpmodel.σ_max, hpmodel.σ_min, net)
-end
 
 @functor VarianceExplodingSDE
 

@@ -59,42 +59,20 @@ function model_scale(model, x_0, ϵ=1.0f-5)
     return t, scale[:]
 end
 
-
-"""
-Helper function to generate samples from a model.
-"""
-function generate_samples(model, hpdata, num_samples; num_steps=1000, ϵ = 1.0f-5)
-    if CUDA.has_cuda_gpu()
-        device = Flux.gpu
-    else
-        device = Flux.cpu
-    end
-    @info "Using device: $device"
-    model = model |> device
-    time_steps, Δt, init_x = setup_sampler(model, device, hpdata; num_images=num_samples, num_steps=num_steps, ϵ = ϵ)
-
-    # Euler-Maruyama
-    euler_maruyama = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
-    # Predictor Corrector
-    pc = predictor_corrector_sampler(model, init_x, time_steps, Δt)
-
-    return (em=euler_maruyama, pc=pc)
-end
-
 """
 Helper function to make an image plot.
 """
-function img_plot(samples, save_path, plotname, hpdata)
+function img_plot(samples, save_path, plotname, tilesize, nchannels)
     # clip samples to [-1, 1] range
-   @. samples = max(-1, samples)
-   @. samples = min(1, samples)
-   @. samples = (samples + 1) / 2
+    @. samples = max(-1, samples)
+    @. samples = min(1, samples)
+    @. samples = (samples + 1) / 2
 
     # resscale for testing
     # maxsamples = maximum(samples, dims=(1, 2))
     # minsamples = minimum(samples, dims=(1, 2))
     # samples = @. (samples - minsamples) / (maxsamples - minsamples)
-    samples = convert_to_image(samples |> cpu, hpdata.inchannels, hpdata.size)
+    samples = convert_to_image(samples |> cpu, nchannels, tilesize)
     Images.save(joinpath(save_path, plotname), samples)
 
 end
@@ -123,7 +101,6 @@ function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32)
     Plots.savefig(joinpath(savepath, plotname))
     
 end
-
 
 """
 Helper function to make a Q-Q plot.
