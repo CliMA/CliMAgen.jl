@@ -113,7 +113,8 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
     if mean_bypass
         mean_bypass_layers = (mean_skip_1 = Conv((1, 1), inchannels => embed_dim, groups=inchannels),
                               mean_skip_2 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
-                              mean_dense = Dense(embed_dim, embed_dim)
+                              mean_gnorm = GroupNorm(embed_dim, 32),
+                              mean_dense = Dense(embed_dim, embed_dim),
                               )
     else
         mean_bypass_layers = ()
@@ -173,62 +174,61 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
     embed = net.layers.linear(embed)
 
     # Encoder
-    if net.shift_input
-        h1 = x .- mean(x, dims=(1,2)) # remove mean before input
-    else
-        h1 = x
-    end
+    # if net.shift_input
+    #     h1 = x .- mean(x, dims=(1,2)) # remove mean before input
+    # else
+    #     h1 = x
+    # end
     
-    h1 = net.layers.conv1(h1)
-    h1 = h1 .+ expand_dims(net.layers.dense1(embed), 2)
-    h1 = net.layers.gnorm1(h1)
-    h2 = net.layers.conv2(h1)
-    h2 = h2 .+ expand_dims(net.layers.dense2(embed), 2)
-    h2 = net.layers.gnorm2(h2)
-    h3 = net.layers.conv3(h2)
-    h3 = h3 .+ expand_dims(net.layers.dense3(embed), 2)
-    h3 = net.layers.gnorm3(h3)
-    h4 = net.layers.conv4(h3)
-    h4 = h4 .+ expand_dims(net.layers.dense4(embed), 2)
+    # h1 = net.layers.conv1(h1)
+    # h1 = h1 .+ expand_dims(net.layers.dense1(embed), 2)
+    # h1 = net.layers.gnorm1(h1)
+    # h2 = net.layers.conv2(h1)
+    # h2 = h2 .+ expand_dims(net.layers.dense2(embed), 2)
+    # h2 = net.layers.gnorm2(h2)
+    # h3 = net.layers.conv3(h2)
+    # h3 = h3 .+ expand_dims(net.layers.dense3(embed), 2)
+    # h3 = net.layers.gnorm3(h3)
+    # h4 = net.layers.conv4(h3)
+    # h4 = h4 .+ expand_dims(net.layers.dense4(embed), 2)
 
-    # middle
-    h = h4
-    for block in net.layers.resnet_blocks
-        h = block(h, embed)
-    end
+    # # middle
+    # h = h4
+    # for block in net.layers.resnet_blocks
+    #     h = block(h, embed)
+    # end
 
-    # Decoder
-    h = net.layers.gnorm4(h)
-    h = net.layers.tconv4(h)
-    h = h .+ expand_dims(net.layers.denset4(embed), 2)
-    h = net.layers.tgnorm4(h)
-    h = net.layers.tconv3(cat(h, h3; dims=3))
-    h = h .+ expand_dims(net.layers.denset3(embed), 2)
-    h = net.layers.tgnorm3(h)
-    h = net.layers.tconv2(cat(h, h2, dims=3))
-    h = h .+ expand_dims(net.layers.denset2(embed), 2)
-    h = net.layers.tgnorm2(h)
-    h = net.layers.tconv1(cat(h, h1, dims=3))
-    if net.shift_output
-        h = h .- mean(h, dims=(1,2)) # remove mean after output
-    end
+    # # Decoder
+    # h = net.layers.gnorm4(h)
+    # h = net.layers.tconv4(h)
+    # h = h .+ expand_dims(net.layers.denset4(embed), 2)
+    # h = net.layers.tgnorm4(h)
+    # h = net.layers.tconv3(cat(h, h3; dims=3))
+    # h = h .+ expand_dims(net.layers.denset3(embed), 2)
+    # h = net.layers.tgnorm3(h)
+    # h = net.layers.tconv2(cat(h, h2, dims=3))
+    # h = h .+ expand_dims(net.layers.denset2(embed), 2)
+    # h = net.layers.tgnorm2(h)
+    # h = net.layers.tconv1(cat(h, h1, dims=3))
+    # if net.shift_output
+    #     h = h .- mean(h, dims=(1,2)) # remove mean after output
+    # end
 
     # Mean processing
     if net.mean_bypass
         hm = net.layers.mean_skip_1(mean(x, dims=(1,2)))
         hm = hm .+ expand_dims(net.layers.mean_dense(embed), 2)
+        hm = net.layers.mean_gnorm(hm)
         hm = net.layers.mean_skip_2(hm)
         if net.scale_mean_bypass
             scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
             hm = hm ./ scale
         end
-        return h .+ hm
+        return hm
     else
-        return h
+        error("must use mean bypass!")
     end
 end
-
-
 
 """
 Projection of Gaussian Noise onto a time vector
@@ -547,9 +547,6 @@ function (net::AttentionBlock)(x::AbstractArray{FT}) where {FT}
 
     return h .+ net.bypass(x)
 end
-
-
-
 
 """
     CliMAgen.compute_attention_weights(keys, queries, Val{nspatialdims})

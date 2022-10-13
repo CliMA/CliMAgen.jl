@@ -32,10 +32,10 @@ function run_analysis(params; FT=Float32)
 
     # set up device
     if !nogpu && CUDA.has_cuda()
-        device = Flux.gpu
+        dev = Flux.gpu
         @info "Sampling on GPU"
     else
-        device = Flux.cpu
+        dev = Flux.cpu
         @info "Sampling on CPU"
     end
 
@@ -52,13 +52,13 @@ function run_analysis(params; FT=Float32)
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
-    model = device(model)
+    model = dev(model)
 
     # sample from the trained model
     time_steps, Δt, init_x = setup_sampler(
         model,
-        device,
-        tilesize_sampling,
+        dev,
+        1,
         inchannels;
         num_images=nsamples,
         num_steps=nsteps,
@@ -70,17 +70,17 @@ function run_analysis(params; FT=Float32)
     end
 
     # create plots with num_images images of sampled data and training data
-    img_plot(samples[:, :, :, 1:nimages], savedir, "$(sampler)_images.png", tilesize_sampling, inchannels)
-    img_plot(xtrain[:, :, :, 1:nimages], savedir, "train_images.png", tilesize_sampling, inchannels)
+    # img_plot(samples[:, :, :, 1:nimages], savedir, "$(sampler)_images.png", tilesize_sampling, inchannels)
+    # img_plot(xtrain[:, :, :, 1:nimages], savedir, "train_images.png", tilesize_sampling, inchannels)
 
     # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
 
-    # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png")
+    # # create q-q plot for cumulants of pre-specified scalar statistics
+    # qq_plot(xtrain, samples, savedir, "qq_plot.png")
 
-    # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png")
+    # # create plots for comparison of real vs. generated spectra
+    # spectrum_plot(xtrain, samples, savedir, "mean_spectra.png")
 
     # create a plot showing how the network as optimized over different SDE times
     # t, loss = timewise_score_matching_loss(model, xtrain)

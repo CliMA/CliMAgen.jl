@@ -1,4 +1,4 @@
-using MLDatasets, MLUtils, Images, DataLoaders
+using MLDatasets, MLUtils, Images, DataLoaders, Statistics
 using CliMADatasets
 
 """
@@ -55,7 +55,6 @@ function get_data_2dturbulence(batchsize; width=(32, 32), stride=(32, 32), FT=Fl
     xtrain = @. 2(xtrain - mintrain) / (maxtrain - mintrain) - 1
 
     xtrain = MLUtils.shuffleobs(xtrain)
-    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
 
     xtest = CliMADatasets.Turbulence2D(:test; resolution=:high, Tx=FT)[:]
     xtest = tile_array(xtest, width[1], width[2], stride[1], stride[2])
@@ -63,6 +62,10 @@ function get_data_2dturbulence(batchsize; width=(32, 32), stride=(32, 32), FT=Fl
     # apply the same rescaler as on training set
     xtest = @. 2(xtest - mintrain) / (maxtrain - mintrain) - 1
 
+    xtrain = Statistics.mean(xtrain, dims=(1,2))
+    xtest = Statistics.mean(xtest, dims=(1,2))
+
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
     return (; loader_train, loader_test)
