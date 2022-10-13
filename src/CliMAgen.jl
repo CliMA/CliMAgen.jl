@@ -18,7 +18,6 @@ using CliMAgen
 
 include("utils.jl")
 include("logging.jl")
-include("parameters.jl")
 include("models.jl")
 include("networks.jl")
 include("losses.jl")
@@ -26,8 +25,7 @@ include("optimizers.jl")
 include("training.jl")
 include("sampling.jl")
 
-export struct2dict, dict2nt, parse_commandline
-export HyperParameters
+export struct2dict, dict2nt
 export VarianceExplodingSDE
 export drift, diffusion, marginal_prob, score
 export score_matching_loss, score_matching_loss_variant

@@ -55,12 +55,13 @@ end
 """
 Helper function that generates inputs to a sampler.
 """
-function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device, hpdata; num_images=5, num_steps=500, ϵ=1.0f-3)
+function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device, tilesize, inchannels; num_images=5, num_steps=500, ϵ=1.0f-3)
     t = ones(Float32, num_images) |> device
-    init_z = randn(Float32, (hpdata.size, hpdata.size, hpdata.inchannels, num_images)) |> device
+    init_z = randn(Float32, (tilesize, tilesize, inchannels, num_images)) |> device
     _, σ_T = CliMAgen.marginal_prob(model, zero(init_z), t)
     init_x = (σ_T .* init_z)
     time_steps = LinRange(1.0f0, ϵ, num_steps)
     Δt = time_steps[1] - time_steps[2]
+    
     return time_steps, Δt, init_x
 end

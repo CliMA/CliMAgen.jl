@@ -1,18 +1,7 @@
 """
     ClimaGen.train!
 """
-function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParameters, device::Function, savedir="./output/", logger=nothing, freq_chckpt=Inf)
-    if !(logger isa Nothing)
-        log_config(logger, CliMAgen.struct2dict(hparams))
-    end
-
-    # set up directory structure
-    !ispath(savedir) && mkpath(savedir)
-    savepath = joinpath(savedir, "checkpoint.bson")
-
-    # unpack the relevant parameters
-    nepochs, freq_chckpt = hparams.training
-
+function train!(model, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Function; savedir="./output/", logger=nothing, freq_chckpt=Inf)
     # model parameters
     ps = Flux.params(model)
 
@@ -34,7 +23,8 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParam
         end
 
         # store model checkpoint on disk
-        CliMAgen.save_model_and_optimizer(Flux.cpu(model), Flux.cpu(model_smooth), opt, opt_smooth, hparams, savepath)
+        savepath = joinpath(savedir, "checkpoint.bson")
+        CliMAgen.save_model_and_optimizer(Flux.cpu(model), Flux.cpu(model_smooth), opt, opt_smooth, savepath)
         @info "Checkpoint saved to $(savepath)."
         if !(logger isa Nothing)
             log_dict(
@@ -46,6 +36,7 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, hparams::HyperParam
             ) 
         end
 
+        # every so often, we upload a checkpoint to the cloud if applicable
         if epoch % freq_chckpt == 0
             if !(logger isa Nothing)
                 log_checkpoint(logger, savepath; name="checkpoint-$(epoch)", type="BSON-file")
@@ -88,8 +79,8 @@ end
 """
     ClimaGen.save_model_and_optimizer
 """
-function save_model_and_optimizer(model, model_smooth, opt, opt_smooth, hparams::HyperParameters, path::String)
-    BSON.@save path model model_smooth opt opt_smooth hparams
+function save_model_and_optimizer(model, model_smooth, opt, opt_smooth, path::String)
+    BSON.@save path model model_smooth opt opt_smooth
     @info "Model saved at $(path)."
 end
 
@@ -97,6 +88,6 @@ end
     ClimaGen.load_model_and_optimizer
 """
 function load_model_and_optimizer(path::String)
-    BSON.@load path model model_smooth opt opt_smooth hparams
-    return (; model=model, model_smooth=model_smooth, opt=opt, opt_smooth=opt_smooth, hparams=hparams)
+    BSON.@load path model model_smooth opt opt_smooth
+    return (; model=model, model_smooth=model_smooth, opt=opt, opt_smooth=opt_smooth)
 end

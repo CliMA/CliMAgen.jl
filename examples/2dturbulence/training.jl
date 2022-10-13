@@ -2,23 +2,47 @@ using CUDA
 using Dates
 using Flux
 using Random
+using TOML
 
 using CliMAgen
-using CliMAgen: parse_commandline, dict2nt
-using CliMAgen: HyperParameters, VarianceExplodingSDE, NoiseConditionalScoreNetwork, NoiseConditionalScoreNetworkVariant, DenoisingDiffusionNetwork
-using CliMAgen: score_matching_loss, score_matching_loss_variant
+using CliMAgen: dict2nt
+using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetworkVariant
+using CliMAgen: score_matching_loss_variant
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
     
-include("../utils_wandb.jl")
-include("../utils_data.jl")
+include("../utils_wandb.jl") # for wandb logging, needs correct Python install
+include("../utils_data.jl") # for data loading
 
-function run(args, hparams; FT=Float32, logger=nothing)
+function run_training(params; FT=Float32, logger=nothing)
+    # unpack params
+    savedir = params.experiment.savedir
+    rngseed = params.experiment.rngseed
+    nogpu = params.experiment.nogpu
+    batchsize = params.data.batchsize
+    tilesize = params.data.tilesize
+    sigma_min::FT = params.model.sigma_min
+    sigma_max::FT = params.model.sigma_max
+    inchannels = params.model.inchannels
+    shift_input = params.model.shift_input
+    shift_output = params.model.shift_output
+    mean_bypass = params.model.mean_bypass
+    scale_mean_bypass = params.model.scale_mean_bypass
+    nwarmup = params.optimizer.nwarmup
+    gradnorm::FT = params.optimizer.gradnorm
+    learning_rate::FT = params.optimizer.learning_rate
+    beta_1::FT = params.optimizer.beta_1
+    beta_2::FT = params.optimizer.beta_2
+    epsilon::FT = params.optimizer.epsilon
+    ema_rate::FT = params.optimizer.ema_rate
+    nepochs = params.training.nepochs
+    freq_chckpt = params.training.freq_chckpt
+
     # set up rng
-    args.seed > 0 && Random.seed!(args.seed)
+    rngseed > 0 && Random.seed!(rngseed)
 
     # set up device
-    if !args.nogpu && CUDA.has_cuda()
+    if !nogpu && CUDA.has_cuda()
         device = Flux.gpu
         @info "Training on GPU"
     else
@@ -27,48 +51,40 @@ function run(args, hparams; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    tile_size = hparams.data.size
     dataloaders = get_data_2dturbulence(
-        hparams.data;
-        width=(tile_size, tile_size),
-        stride=(tile_size, tile_size),
+        batchsize;
+        width=(tilesize, tilesize),
+        stride=(tilesize, tilesize),
         FT=FT
     )
 
-    # set up model & optimizer
-    if args.restartfile isa Nothing
-        net = NoiseConditionalScoreNetworkVariant(; 
-            inchannels=hparams.data.inchannels,
-            shift_input=hparams.model.shift_input,
-            shift_output=hparams.model.shift_output,
-            mean_bypass=hparams.model.mean_bypass,
-            scale_mean_bypass=hparams.model.scale_mean_bypass,
-        )
-
-        model = VarianceExplodingSDE(hparams.model; net=net)
-        opt = Flux.Optimise.Optimiser(
-            WarmupSchedule{FT}(
-                hparams.optimizer.nwarmup
-            ),
-            Flux.Optimise.ClipNorm(hparams.optimizer.gradnorm),
-            Flux.Optimise.Adam(
-                hparams.optimizer.lr,
-                (hparams.optimizer.β1, hparams.optimizer.β2),
-                hparams.optimizer.ϵ
-            )
-        )
-    else
-        @info "Initializing the model, optimizer, and hyperparams from checkpoint."
-        @info "Overwriting passed hyperparameters with checkpoint values."
-        (; opt, model, hparams) = load_model_and_optimizer(args.restartfile)
-    end
+    # set up model
+    net = NoiseConditionalScoreNetworkVariant(; 
+        inchannels = inchannels,
+        shift_input = shift_input,
+        shift_output = shift_output,
+        mean_bypass = mean_bypass,
+        scale_mean_bypass = scale_mean_bypass,
+    )
+    model = VarianceExplodingSDE(sigma_max, sigma_min, net)
     model = device(model)
 
-    # set up moving average for model parameters
-    opt_smooth = ExponentialMovingAverage(hparams.optimizer.ema_rate)
+    # set up optimizers
+    opt = Flux.Optimise.Optimiser(
+        WarmupSchedule{FT}(
+            nwarmup 
+         ),
+        Flux.Optimise.ClipNorm(gradnorm),
+        Flux.Optimise.Adam(
+            learning_rate,
+            (beta_1, beta_2),
+            epsilon
+        )
+    )
+    opt_smooth = ExponentialMovingAverage(ema_rate)
 
     # set up loss function
-    lossfn = x -> score_matching_loss(model, x)
+    lossfn = x -> score_matching_loss_variant(model, x)
 
     # train the model
     train!(
@@ -77,61 +93,43 @@ function run(args, hparams; FT=Float32, logger=nothing)
         dataloaders,
         opt,
         opt_smooth,
-        hparams,
-        device,
-        joinpath(args.savedir, "$(Dates.now())"),
-        logger,
-        hparams.training.freq_chckpt,
+        nepochs,
+        device;
+        savedir = savedir,
+        logger = logger,
+        freq_chckpt = freq_chckpt,
     )
 end
 
-function main(FT=Float32)
-    args = parse_commandline() # returns a dictionary which is converted to a NamedTuple
-    args = dict2nt(args)
+function main(; experiment_toml="Experiment.toml")
+    FT = Float32
 
-    # hyperparameters
-    hparams = HyperParameters(
-        data=(;
-            nbatch=16,
-            inchannels=2,
-            size=256,
-        ),
-        model=(;
-            σ_max=FT(180.0),
-            σ_min=FT(0.01),
-            mean_bypass=false,
-            shift_input=false, 
-            shift_output=false,
-            scale_mean_bypass=false,
-        ),
-        optimizer=(;
-            lr=FT(0.0002),
-            ϵ=FT(1e-8),
-            β1=FT(0.9),
-            β2=FT(0.999),
-            nwarmup=5000,
-            gradnorm=FT(1),
-            ema_rate=FT(0.999),
-        ),
-        training=(;
-            nepochs=240,
-            freq_chckpt=80,
-        )
-    )
+    # read experiment parameters from file
+    params = TOML.parsefile(experiment_toml)
+    params = CliMAgen.dict2nt(params)
 
-    if args.logging 
+    # set up directory for saving checkpoints
+    !ispath(params.experiment.savedir) && mkpath(params.experiment.savedir)
+
+    # start logging if applicable
+    if params.experiment.logging
         logger = Wandb.WandbLogger(
-        project="CliMAgen.jl",
-        name="2dturbulence_nx$(hparams.data.size)_nbatch$(hparams.data.nbatch)-all-off-vanilla-loss-$(Dates.now())",
-        config=Dict(),
-    )
+            project=params.experiment.project,
+            name="$(params.experiment.name)-$(Dates.now())",
+            config=struct2dict(params), # need this otherwise wandb doesn't log the config
+        )
     else
         logger = nothing
     end
 
-    run(args, hparams; FT=FT, logger=logger)
+    run_training(params; FT=FT, logger=logger)
+
+    # close the logger after the run to avoid hanging logger
+    if params.experiment.logging
+        close(logger)
+    end
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main()
+    main(experiment_toml = ARGS[1])
 end
