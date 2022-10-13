@@ -28,6 +28,7 @@ function run_training(params; FT=Float32, logger=nothing)
     shift_output = params.model.shift_output
     mean_bypass = params.model.mean_bypass
     scale_mean_bypass = params.model.scale_mean_bypass
+    gnorm = params.model.gnorm
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
     learning_rate::FT = params.optimizer.learning_rate
@@ -65,6 +66,7 @@ function run_training(params; FT=Float32, logger=nothing)
         shift_output = shift_output,
         mean_bypass = mean_bypass,
         scale_mean_bypass = scale_mean_bypass,
+        gnorm = gnorm,
     )
     model = VarianceExplodingSDE(sigma_max, sigma_min, net)
     model = device(model)
