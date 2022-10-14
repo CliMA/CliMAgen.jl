@@ -41,7 +41,6 @@ function get_data_cifar10(batchsize; size=32, FT=Float32)
     return (; loader_train, loader_test)
 end
 
-
 """
 Helper function that loads 2d turbulence images and returns loaders.
 """
@@ -64,6 +63,11 @@ function get_data_2dturbulence(batchsize; width=(32, 32), stride=(32, 32), FT=Fl
 
     xtrain = Statistics.mean(xtrain, dims=(1,2))
     xtest = Statistics.mean(xtest, dims=(1,2))
+
+    # mu = Statistics.mean(xtrain, dims=4)
+    # sigma = Statistics.std(xtrain, dims=4)
+    # xtrain = @. (xtrain - mu) / sigma
+    # xtest = @. (xtest - mu) / sigma
 
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)

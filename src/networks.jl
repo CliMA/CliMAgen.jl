@@ -112,9 +112,12 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
     # Mean processing as indicated by boolean mean_bypass
     if mean_bypass
         mean_bypass_layers = (mean_skip_1 = Conv((1, 1), inchannels => embed_dim, groups=inchannels),
-                              mean_skip_2 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
-                              mean_gnorm = GroupNorm(embed_dim, 32),
-                              mean_dense = Dense(embed_dim, embed_dim),
+                              mean_skip_2 = Conv((1, 1), embed_dim => embed_dim, groups=inchannels),
+                              mean_skip_3 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
+                              mean_gnorm_1 = GroupNorm(embed_dim, 32, swish),
+                              mean_gnorm_2 = GroupNorm(embed_dim, 32, swish),
+                              mean_dense_1 = Dense(embed_dim, embed_dim),
+                              mean_dense_2 = Dense(embed_dim, embed_dim),
                               )
     else
         mean_bypass_layers = ()
@@ -217,9 +220,12 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
     # Mean processing
     if net.mean_bypass
         hm = net.layers.mean_skip_1(mean(x, dims=(1,2)))
-        hm = hm .+ expand_dims(net.layers.mean_dense(embed), 2)
-        hm = net.layers.mean_gnorm(hm)
+        hm = hm .+ expand_dims(net.layers.mean_dense_1(embed), 2)
+        hm = net.layers.mean_gnorm_1(hm)
         hm = net.layers.mean_skip_2(hm)
+        hm = hm .+ expand_dims(net.layers.mean_dense_2(embed), 2)
+        hm = net.layers.mean_gnorm_2(hm)
+        hm = net.layers.mean_skip_3(hm)
         if net.scale_mean_bypass
             scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
             hm = hm ./ scale

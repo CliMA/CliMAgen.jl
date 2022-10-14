@@ -7,12 +7,12 @@ logging           = false
 nogpu             = false
 
 [data]
-batchsize         = 64
-tilesize          = 128
+batchsize         = 4
+tilesize          = 512
 
 [model]
 inchannels        = 2
-sigma_max         = 88.8
+sigma_max         = 0.67
 sigma_min         = 1e-2
 mean_bypass       = true
 shift_input       = true
