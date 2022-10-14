@@ -87,8 +87,8 @@ function run_analysis(params; FT=Float32)
 
     # create plots with num_images images of sampled data and training data
     # Rescale now using mintrain and maxtrain
-    xtrain = @. 2(xtrain - mintrain) / (maxtrain - mintrain) - 1
-    samples = @. 2(samples - mintrain) / (maxtrain - mintrain) - 1
+    xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
+    samples = @. (samples - mintrain) / (maxtrain - mintrain)
 
     img_plot(samples[:, :, :, 1:nimages], savedir, "$(sampler)_images.png", tilesize_sampling, inchannels)
     img_plot(xtrain[:, :, :, 1:nimages], savedir, "train_images.png", tilesize_sampling, inchannels)

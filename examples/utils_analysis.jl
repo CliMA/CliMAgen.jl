@@ -63,15 +63,10 @@ end
 Helper function to make an image plot.
 """
 function img_plot(samples, save_path, plotname, tilesize, nchannels)
-    # clip samples to [-1, 1] range
-    @. samples = max(-1, samples)
+    # clip samples to [0, 1] range
+    @. samples = max(0, samples)
     @. samples = min(1, samples)
-    @. samples = (samples + 1) / 2
 
-    # resscale for testing
-    # maxsamples = maximum(samples, dims=(1, 2))
-    # minsamples = minimum(samples, dims=(1, 2))
-    # samples = @. (samples - minsamples) / (maxsamples - minsamples)
     samples = convert_to_image(samples |> cpu, nchannels, tilesize)
     Images.save(joinpath(save_path, plotname), samples)
 
