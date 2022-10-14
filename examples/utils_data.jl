@@ -76,13 +76,13 @@ function get_data_2dturbulence_variant(batchsize; width=(32, 32), stride=(32, 32
     x̄ = mean(xtrain, dims=(1, 2))
     μ̄ = mean(x̄, dims=4)
     σ̄ = std(x̄, dims=4)
-    x' = x .- x̄
-    μ' = mean(x', dims=(4))
-    σ' = std(x', dims=(4))
+    xp = x .- x̄
+    μp = mean(xp, dims=(4))
+    σp = std(xp, dims=(4))
     x̄̃ = @. (x̄ - μ̄) / σ̄
-    x̃' = @. (x' - μ') / σ'
+    x̃p = @. (xp - μp) / σp
 
-    xtrain = x̄̃ .+ x̃'
+    xtrain = x̄̃ .+ x̃p
     xtrain = MLUtils.shuffleobs(xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
 
@@ -91,11 +91,11 @@ function get_data_2dturbulence_variant(batchsize; width=(32, 32), stride=(32, 32
 
     # apply the same rescaler as on training set
     x̄ = mean(xtest, dims=(1, 2))
-    x' = x .- x̄
+    xp = x .- x̄
     x̄̃ = @. (x̄ - μ̄) / σ̄
-    x̃' = @. (x' - μ') / σ'
+    x̃p = @. (xp - μ') / σp
 
-    xtest = x̄̃ .+ x̃'
+    xtest = x̄̃ .+ x̃p
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
     return (; loader_train, loader_test)
