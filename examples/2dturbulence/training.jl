@@ -10,9 +10,10 @@ using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetworkVariant
 using CliMAgen: score_matching_loss_variant
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
-    
-include("../utils_wandb.jl") # for wandb logging, needs correct Python install
-include("../utils_data.jl") # for data loading
+
+package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
+include(joinpath(package_dir,"examples/utils_wandb.jl")) # for wandb logging, needs correct Python install
 
 function run_training(params; FT=Float32, logger=nothing)
     # unpack params
@@ -52,7 +53,7 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_2dturbulence(
+    dataloaders = get_data_2dturbulence_variant(
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
