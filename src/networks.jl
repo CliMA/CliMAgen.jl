@@ -99,22 +99,41 @@ struct NoiseConditionalScoreNetworkVariant
     scale_mean_bypass::Bool
     shift_input::Bool
     shift_output::Bool
+    gnorm::Bool
 end
 
 """
 User Facing API for NoiseConditionalScoreNetwork architecture.
 """
-function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_bypass=false, shift_input=false, shift_output=false, nspatial=2, num_residual=8, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_bypass=false, shift_input=false, shift_output=false, gnorm=false, nspatial=2, num_residual=8, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
     if scale_mean_bypass & !mean_bypass
         @error("Attempting to scale the mean bypass term without adding in a mean bypass connection.")
+    end
+    if gnorm & !mean_bypass
+        @error("Attempting to gnorm without adding in a mean bypass connection.")
     end
 
     # Mean processing as indicated by boolean mean_bypass
     if mean_bypass
-        mean_bypass_layers = (mean_skip_1 = Conv((1, 1), inchannels => embed_dim, groups=inchannels),
-                              mean_skip_2 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
-                              mean_dense = Dense(embed_dim, embed_dim)
-                              )
+        if gnorm
+            mean_bypass_layers = (
+                mean_skip_1 = Conv((1, 1), inchannels => embed_dim, groups=inchannels),
+                mean_skip_2 = Conv((1, 1), embed_dim => embed_dim, groups=inchannels),
+                mean_skip_3 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
+                mean_gnorm_1 = GroupNorm(embed_dim, 32, swish),
+                mean_gnorm_2 = GroupNorm(embed_dim, 32, swish),
+                mean_dense_1 = Dense(embed_dim, embed_dim),
+                mean_dense_2 = Dense(embed_dim, embed_dim),
+            )
+        else
+            mean_bypass_layers = (
+                mean_skip_1 = Conv((1, 1), inchannels => embed_dim, groups=inchannels),
+                mean_skip_2 = Conv((1, 1), embed_dim => embed_dim, groups=inchannels),
+                mean_skip_3 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
+                mean_dense_1 = Dense(embed_dim, embed_dim),
+                mean_dense_2 = Dense(embed_dim, embed_dim),
+            )
+        end
     else
         mean_bypass_layers = ()
     end
@@ -162,7 +181,7 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
               mean_bypass_layers...
               )
     
-    return NoiseConditionalScoreNetworkVariant(layers, mean_bypass, scale_mean_bypass, shift_input, shift_output)
+    return NoiseConditionalScoreNetworkVariant(layers, mean_bypass, scale_mean_bypass, shift_input, shift_output, gnorm)
 end
 
 @functor NoiseConditionalScoreNetworkVariant
@@ -216,8 +235,16 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
     # Mean processing
     if net.mean_bypass
         hm = net.layers.mean_skip_1(mean(x, dims=(1,2)))
-        hm = hm .+ expand_dims(net.layers.mean_dense(embed), 2)
+        hm = hm .+ expand_dims(net.layers.mean_dense_1(embed), 2)
+        if net.gnorm
+            hm = net.layers.mean_gnorm_1(hm)
+        end
         hm = net.layers.mean_skip_2(hm)
+        hm = hm .+ expand_dims(net.layers.mean_dense_2(embed), 2)
+        if net.gnorm
+            hm = net.layers.mean_gnorm_2(hm)
+        end
+        hm = net.layers.mean_skip_3(hm)
         if net.scale_mean_bypass
             scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
             hm = hm ./ scale
@@ -227,8 +254,6 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
         return h
     end
 end
-
-
 
 """
 Projection of Gaussian Noise onto a time vector
