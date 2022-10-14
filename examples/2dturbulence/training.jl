@@ -51,7 +51,7 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_2dturbulence(
+    dataloaders = get_data_2dturbulence_variant(
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
