@@ -183,6 +183,7 @@ end
 Helper to make an image from an array.
 """
 function convert_to_image(x::AbstractArray{T,N}, inchannels, datasize; n_horizontal=10) where {T,N}
+    # edit here
     ysize = min(size(x)[end], n_horizontal)
     num_in_plot = size(x)[end] < n_horizontal ? size(x)[end] : div(size(x)[end], n_horizontal)*n_horizontal
     x = x[:,:,:,1:num_in_plot]
