@@ -3,7 +3,7 @@ project           = "CliMAgen.jl"
 name              = "2dturbulence_test"
 savedir           = "output"
 rngseed           = 123
-logging           = false
+logging           = true
 nogpu             = false
 
 [data]
@@ -30,7 +30,7 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 240
+nepochs           = 1
 freq_chckpt       = 80
 
 [sampling]

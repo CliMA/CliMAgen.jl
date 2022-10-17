@@ -3,66 +3,14 @@ using StatsBase
 using Statistics
 using CliMAgen
 using CUDA
+using Images
 using Random
 using FFTW
 
 """
-    timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
-
-Compute the loss term for a single realization of data
-as a function of time. This is different from the true loss 
-term optimized by the network, which takes the expectation of this
-quantity over time, training data x(0), and samples from P(x(t)|x(0)).
-"""
-function timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
-    # sample times
-    t = LinRange(0.0f0,1.0f0,size(x_0)[end])
-
-    # sample from normal marginal
-    z = randn!(similar(x_0))
-    μ_t, σ_t = CliMAgen.marginal_prob(model, x_0, t)
-    x_t = @. μ_t + σ_t * z
-
-    # evaluate model score s₀(𝘹(𝘵), 𝘵)
-    s_t = CliMAgen.score(model, x_t, t)
-
-    # Assume that λ(t) = σ(t)² and pull it into L₂-norm
-    # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
-    loss = @. (z + σ_t * s_t)^2 # squared deviations from real score
-    loss = sum(loss, dims=1:(ndims(x_0)-1)) # L₂-norm
-
-    return t, loss[:]
-end
-"""
-    model_scale(model, x_0, ϵ=1.0f-5)
-
-Compute the scaled score for a single realization of data
-as a function of time. 
-"""
-function model_scale(model, x_0, ϵ=1.0f-5)
-    # sample times
-    t = LinRange(0.0f0, 1.0f0, size(xtrain)[end])
-
-    # sample from normal marginal
-    z = randn!(similar(x_0))
-    μ_t, σ_t = CliMAgen.marginal_prob(model, x_0, t)
-    x_t = @. μ_t + σ_t * z
-
-    # evaluate model score s₀(𝘹(𝘵), 𝘵)
-    s_t = CliMAgen.score(model, x_t, t)
-
-    # Assume that λ(t) = σ(t)² and pull it into L₂-norm
-    # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
-    scale = @. (σ_t * s_t)^2 # squared deviations from real score
-    scale = sum(scale, dims=1:(ndims(x_0)-1)) # L₂-norm
-
-    return t, scale[:]
-end
-
-"""
 Helper function to make an image plot.
 """
-function img_plot(samples, save_path, plotname)
+function img_plot(samples, save_path, plotname; FT=Float32, logger=nothing)
     # clip samples to [0, 1] range
     @. samples = max(0, samples)
     @. samples = min(1, samples)
@@ -70,12 +18,16 @@ function img_plot(samples, save_path, plotname)
     samples = image_grid(samples)
     Images.save(joinpath(save_path, plotname), samples)
 
+    if !(logger isa Nothing)
+        img = Images.load(joinpath(savepath, plotname))
+        CliMAgen.log_image(logger, FT.(img), plotname)
+    end
 end
 
 """
 Helper function to make analyze the means of the samples.
 """
-function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32)
+function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
     inchannels = size(data)[end-1]
 
     gen = gen |> Flux.cpu
@@ -94,13 +46,16 @@ function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32)
     
     plot(plot_array..., layout=(1, inchannels))
     Plots.savefig(joinpath(savepath, plotname))
-    
+
+    if !(logger isa Nothing)
+        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
+    end
 end
 
 """
 Helper function to make a Q-Q plot.
 """
-function qq_plot(data, gen, savepath, plotname; FT=Float32)
+function qq_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
     statistics = (Statistics.var, x -> StatsBase.cumulant(x[:], 3), x -> StatsBase.cumulant(x[:], 4))
     statistic_names = ["σ²", "κ₃", "κ₄"]
     inchannels = size(data)[end-1]
@@ -132,12 +87,16 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32)
 
     plot(plot_array..., layout=(inchannels, length(statistics)), aspect_ratio=:equal)
     Plots.savefig(joinpath(savepath, plotname))
+
+    if !(logger isa Nothing)
+        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
+    end
 end
 
 """
 Helper function to make a spectrum plot.
 """
-function spectrum_plot(data, gen, savepath, plotname; FT=Float32)
+function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing) 
     L = FT(1) # Eventually a physical size
     statistics = x -> hcat(power_spectrum2d(x, L)...)
     inchannels = size(data)[end-1]
@@ -172,6 +131,10 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32)
 
     plot(plot_array..., layout=(inchannels, 1))
     Plots.savefig(joinpath(savepath, plotname))
+
+    if !(logger isa Nothing)
+        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
+    end
 end
 
 """
@@ -295,4 +258,57 @@ function power_spectrum2d(img, L)
     spectrum = spectrum .* 2 .* pi .* k .^ 2 ./ (contribution .* dx .^ 2)
 
     return spectrum, k
+end
+
+"""
+    timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
+
+Compute the loss term for a single realization of data
+as a function of time. This is different from the true loss 
+term optimized by the network, which takes the expectation of this
+quantity over time, training data x(0), and samples from P(x(t)|x(0)).
+"""
+function timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
+    # sample times
+    t = LinRange(0.0f0,1.0f0,size(x_0)[end])
+
+    # sample from normal marginal
+    z = randn!(similar(x_0))
+    μ_t, σ_t = CliMAgen.marginal_prob(model, x_0, t)
+    x_t = @. μ_t + σ_t * z
+
+    # evaluate model score s₀(𝘹(𝘵), 𝘵)
+    s_t = CliMAgen.score(model, x_t, t)
+
+    # Assume that λ(t) = σ(t)² and pull it into L₂-norm
+    # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
+    loss = @. (z + σ_t * s_t)^2 # squared deviations from real score
+    loss = sum(loss, dims=1:(ndims(x_0)-1)) # L₂-norm
+
+    return t, loss[:]
+end
+"""
+    model_scale(model, x_0, ϵ=1.0f-5)
+
+Compute the scaled score for a single realization of data
+as a function of time. 
+"""
+function model_scale(model, x_0, ϵ=1.0f-5)
+    # sample times
+    t = LinRange(0.0f0, 1.0f0, size(xtrain)[end])
+
+    # sample from normal marginal
+    z = randn!(similar(x_0))
+    μ_t, σ_t = CliMAgen.marginal_prob(model, x_0, t)
+    x_t = @. μ_t + σ_t * z
+
+    # evaluate model score s₀(𝘹(𝘵), 𝘵)
+    s_t = CliMAgen.score(model, x_t, t)
+
+    # Assume that λ(t) = σ(t)² and pull it into L₂-norm
+    # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
+    scale = @. (σ_t * s_t)^2 # squared deviations from real score
+    scale = sum(scale, dims=1:(ndims(x_0)-1)) # L₂-norm
+
+    return t, scale[:]
 end

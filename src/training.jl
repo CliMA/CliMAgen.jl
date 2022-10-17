@@ -39,8 +39,7 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Fu
         # every so often, we upload a checkpoint to the cloud if applicable
         if epoch % freq_chckpt == 0
             if !(logger isa Nothing)
-                log_checkpoint(logger, savepath; name="checkpoint-$(epoch)", type="BSON-file")
-                # TODO: log the model analysis stuff...
+                log_artifact(logger, savepath; name="checkpoint-$(epoch)", type="BSON-file")
             end
         end
     end
