@@ -3,7 +3,7 @@ project           = "CliMAgen.jl"
 name              = "2dturbulence_test"
 savedir           = "output"
 rngseed           = 123
-logging           = true
+logging           = false
 nogpu             = false
 
 [data]
@@ -14,10 +14,11 @@ tilesize          = 128
 inchannels        = 2
 sigma_max         = 90.0
 sigma_min         = 1e-2
-mean_bypass       = false
-shift_input       = false
-shift_output      = false
-scale_mean_bypass = false
+mean_bypass       = true
+shift_input       = true
+shift_output      = true
+scale_mean_bypass = true
+gnorm             = true
 
 [optimizer]
 learning_rate     = 2e-4

@@ -10,9 +10,10 @@ using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetworkVariant
 using CliMAgen: score_matching_loss_variant
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
-    
-include("../utils_wandb.jl") # for wandb logging, needs correct Python install
-include("../utils_data.jl") # for data loading
+
+package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
+include(joinpath(package_dir,"examples/utils_wandb.jl")) # for wandb logging, needs correct Python install
 
 function run_training(params; FT=Float32, logger=nothing)
     # unpack params
@@ -28,6 +29,7 @@ function run_training(params; FT=Float32, logger=nothing)
     shift_output = params.model.shift_output
     mean_bypass = params.model.mean_bypass
     scale_mean_bypass = params.model.scale_mean_bypass
+    gnorm = params.model.gnorm
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
     learning_rate::FT = params.optimizer.learning_rate
@@ -65,6 +67,7 @@ function run_training(params; FT=Float32, logger=nothing)
         shift_output = shift_output,
         mean_bypass = mean_bypass,
         scale_mean_bypass = scale_mean_bypass,
+        gnorm = gnorm,
     )
     model = VarianceExplodingSDE(sigma_max, sigma_min, net)
     model = device(model)

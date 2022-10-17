@@ -9,9 +9,9 @@ using Statistics
 using TOML
 
 using CliMAgen
-
-include("../utils_data.jl")
-include("../utils_analysis.jl")
+package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/utils_data.jl"))
+include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
 function run_analysis(params; FT=Float32)
     # unpack params
@@ -40,7 +40,7 @@ function run_analysis(params; FT=Float32)
     end
 
     # set up dataset
-    dl, _ = get_data_2dturbulence(
+    dl, _ = get_data_2dturbulence_variant(
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
@@ -75,6 +75,7 @@ function run_analysis(params; FT=Float32)
     elseif sampler == "pc"
         samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
     end
+    samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
@@ -90,9 +91,10 @@ function run_analysis(params; FT=Float32)
     xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     samples = @. (samples - mintrain) / (maxtrain - mintrain)
 
-    img_plot(samples[:, :, :, 1:nimages], savedir, "$(sampler)_images.png", tilesize_sampling, inchannels)
-    img_plot(xtrain[:, :, :, 1:nimages], savedir, "train_images.png", tilesize_sampling, inchannels)
-
+    img_plot(samples[:, :, 1, 1:nimages], savedir, "$(sampler)_images_ch1.png")
+    img_plot(xtrain[:, :, 1, 1:nimages], savedir, "train_images_ch1.png")
+    img_plot(samples[:, :, 2, 1:nimages], savedir, "$(sampler)_images_ch2.png")
+    img_plot(xtrain[:, :, 2, 1:nimages], savedir, "train_images_ch2.png")
 end
 
 function main(; experiment_toml="Experiment.toml")
