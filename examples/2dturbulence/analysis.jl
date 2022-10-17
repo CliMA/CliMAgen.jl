@@ -9,9 +9,9 @@ using Statistics
 using TOML
 
 using CliMAgen
-
-include("../utils_data.jl")
-include("../utils_analysis.jl")
+package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/utils_data.jl"))
+include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
 function run_analysis(params; FT=Float32)
     # unpack params
@@ -40,13 +40,20 @@ function run_analysis(params; FT=Float32)
     end
 
     # set up dataset
-    dl, _ = get_data_2dturbulence(
+    dl, _ = get_data_2dturbulence_variant(
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
         FT=FT
     )
     xtrain = cat([x for x in dl]..., dims=4)
+    # To use Images.Gray, we need the input to be between 0 and 1.
+    # Obtain max and min here using the whole data set
+    maxtrain = maximum(xtrain, dims=(1, 2, 4))
+    mintrain = minimum(xtrain, dims=(1, 2, 4))
+    
+    # To compare statistics from samples and training data,
+    # cut training data to length nsamples.
     xtrain = xtrain[:, :, :, 1:nsamples]
 
     # set up model
@@ -68,10 +75,7 @@ function run_analysis(params; FT=Float32)
     elseif sampler == "pc"
         samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
     end
-
-    # create plots with num_images images of sampled data and training data
-    img_plot(samples[:, :, :, 1:nimages], savedir, "$(sampler)_images.png", tilesize_sampling, inchannels)
-    img_plot(xtrain[:, :, :, 1:nimages], savedir, "train_images.png", tilesize_sampling, inchannels)
+    samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
@@ -82,10 +86,15 @@ function run_analysis(params; FT=Float32)
     # create plots for comparison of real vs. generated spectra
     spectrum_plot(xtrain, samples, savedir, "mean_spectra.png")
 
-    # create a plot showing how the network as optimized over different SDE times
-    # t, loss = timewise_score_matching_loss(model, xtrain)
-    # plot(t, log.(loss), xlabel="SDE time", ylabel="log(loss)", label="")
-    # savefig(joinpath(savedir, "loss.png"))
+    # create plots with nimages images of sampled data and training data
+    # Rescale now using mintrain and maxtrain
+    xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
+    samples = @. (samples - mintrain) / (maxtrain - mintrain)
+
+    img_plot(samples[:, :, 1, 1:nimages], savedir, "$(sampler)_images_ch1.png")
+    img_plot(xtrain[:, :, 1, 1:nimages], savedir, "train_images_ch1.png")
+    img_plot(samples[:, :, 2, 1:nimages], savedir, "$(sampler)_images_ch2.png")
+    img_plot(xtrain[:, :, 2, 1:nimages], savedir, "train_images_ch2.png")
 end
 
 function main(; experiment_toml="Experiment.toml")

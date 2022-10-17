@@ -62,17 +62,12 @@ end
 """
 Helper function to make an image plot.
 """
-function img_plot(samples, save_path, plotname, tilesize, nchannels)
-    # clip samples to [-1, 1] range
-    @. samples = max(-1, samples)
+function img_plot(samples, save_path, plotname)
+    # clip samples to [0, 1] range
+    @. samples = max(0, samples)
     @. samples = min(1, samples)
-    @. samples = (samples + 1) / 2
 
-    # resscale for testing
-    # maxsamples = maximum(samples, dims=(1, 2))
-    # minsamples = minimum(samples, dims=(1, 2))
-    # samples = @. (samples - minsamples) / (maxsamples - minsamples)
-    samples = convert_to_image(samples |> cpu, nchannels, tilesize)
+    samples = image_grid(samples)
     Images.save(joinpath(save_path, plotname), samples)
 
 end
@@ -180,20 +175,28 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32)
 end
 
 """
-Helper to make an image from an array.
+Helper to make a conglomerate image from an batch of images.
 """
-function convert_to_image(x::AbstractArray{T,N}, inchannels, datasize; n_horizontal=10) where {T,N}
-    ysize = min(size(x)[end], n_horizontal)
-    num_in_plot = size(x)[end] < n_horizontal ? size(x)[end] : div(size(x)[end], n_horizontal)*n_horizontal
-    x = x[:,:,:,1:num_in_plot]
+function image_grid(x::AbstractArray{T,N}; num_columns=10) where {T,N}
+    # Number of images per row of the grid
+    num_batch = size(x)[end]
+    num_columns = min(num_batch, num_columns)
+    # We want either an even number of images per row
+    num_images = div(num_batch, num_columns)*num_columns
+    x = x[:,:,:,1:num_images]
+    
+    # Number of pixels per spatial direction of a single image
+    num_pixels = size(x)[1]
+
+    inchannels = size(x)[end-1]
     if inchannels == 1
-        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x |> cpu, ysize), datasize, :)...), (2, 1)))
+        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x |> cpu, num_columns), num_pixels, :)...), (2, 1)))
         return x
     elseif inchannels == 2
-        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x[:, :, 1, :] |> cpu, ysize), datasize, :)...), (2, 1)))
+        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x[:, :, 1, :] |> cpu, num_columns), num_pixels, :)...), (2, 1)))
         return x
     elseif inchannels == 3
-        tmp = reshape.(Flux.chunk(permutedims(x, (3, 2, 1, 4)) |> cpu, ysize), 3, datasize, :)
+        tmp = reshape.(Flux.chunk(permutedims(x, (3, 2, 1, 4)) |> cpu, num_columns), 3, num_pixels, :)
         rgb = colorview.(Ref(RGB), tmp)
         return vcat(rgb...)
     else
@@ -211,12 +214,12 @@ function convert_to_animation(x, hpdata)
     animation = @animate for i = 1:frames+frames÷4
         if i <= frames
             heatmap(
-                convert_to_image(x[:, :, :, :, i], hpdata.inchannels, hpdata.size),
+                image_grid(x[:, :, :, :, i]),
                 title="Iteration: $i out of $frames"
             )
         else
             heatmap(
-                convert_to_image(x[:, :, :, :, end], hpdata.inchannels, hpdata.size),
+                image_grid(x[:, :, :, :, end]),
                 title="Iteration: $frames out of $frames"
             )
         end
