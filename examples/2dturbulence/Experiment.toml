@@ -39,3 +39,4 @@ nsamples          = 100
 nimages           = 25
 sampler           = "euler"
 tilesize          = 128
+denoise           = false

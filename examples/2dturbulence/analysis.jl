@@ -26,6 +26,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
+    denoise = params.sampling.denoise
 
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -71,9 +72,9 @@ function run_analysis(params; FT=Float32, logger=nothing)
         num_steps=nsteps,
     )
     if sampler == "euler"
-        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
+        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; denoise = denoise)
     elseif sampler == "pc"
-        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
+        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; denoise = denoise)
     end
     samples = cpu(samples)
 

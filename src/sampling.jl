@@ -4,7 +4,7 @@ Sample from a diffusion model using the Euler-Maruyama method.
 # References
 https://arxiv.org/abs/1505.04597
 """
-function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, time_steps, Δt)
+function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, time_steps, Δt; denoise = false)
     x = mean_x = init_x
 
     @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
@@ -15,7 +15,11 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, 
         mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
         x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
     end
-    return x
+    if denoise
+       return mean_x
+    else
+       return x
+    end
 end
 
 """
@@ -24,7 +28,7 @@ Sample from a diffusion model using the Predictor-Corrector method.
 # References
 https://yang-song.github.io/blog/2021/score/#how-to-solve-the-reverse-sde
 """
-function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, time_steps, Δt, snr=0.16f0)
+function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, time_steps, Δt, snr=0.16f0; denoise = false)
     x = mean_x = init_x
 
     @showprogress "Predictor Corrector Sampling" for time_step in time_steps
@@ -49,7 +53,11 @@ function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, ini
         mean_x = x .+ CliMAgen.expand_dims((g .^ 2), 3) .* grad .* Δt
         x = mean_x + sqrt.(CliMAgen.expand_dims((g .^ 2), 3) .* Δt) .* randn!(similar(x))
     end
-    return x
+    if denoise
+       return mean_x
+    else
+       return x
+    end
 end
 
 """
