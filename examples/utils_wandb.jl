@@ -10,8 +10,12 @@ function CliMAgen.log_dict(logger::Wandb.WandbLogger, dict::Dict)
     Wandb.log(logger, dict)
 end
 
-function CliMAgen.log_checkpoint(logger::Wandb.WandbLogger, path::String; name="checkpoint", type="BSON-file")
+function CliMAgen.log_artifact(logger::Wandb.WandbLogger, path::String; name="checkpoint", type="BSON-file")
     artifact = Wandb.WandbArtifact(name, type=type)
     Wandb.add_file(artifact, path)
     Wandb.log(logger, artifact)
+end
+
+function CliMAgen.log_image(logger::Wandb.WandbLogger, img::AbstractArray, name::String)
+    Wandb.log(logger, Dict(name => Wandb.Image(img)))
 end

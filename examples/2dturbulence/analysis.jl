@@ -13,7 +13,7 @@ package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
-function run_analysis(params; FT=Float32)
+function run_analysis(params; FT=Float32, logger=nothing)
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
@@ -78,23 +78,23 @@ function run_analysis(params; FT=Float32)
     samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
+    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png")
+    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png")
+    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
     xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     samples = @. (samples - mintrain) / (maxtrain - mintrain)
 
-    img_plot(samples[:, :, 1, 1:nimages], savedir, "$(sampler)_images_ch1.png")
-    img_plot(xtrain[:, :, 1, 1:nimages], savedir, "train_images_ch1.png")
-    img_plot(samples[:, :, 2, 1:nimages], savedir, "$(sampler)_images_ch2.png")
-    img_plot(xtrain[:, :, 2, 1:nimages], savedir, "train_images_ch2.png")
+    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
+    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
+    img_plot(samples[:, :, [2], 1:nimages], savedir, "$(sampler)_images_ch2.png")
+    img_plot(xtrain[:, :, [2], 1:nimages], savedir, "train_images_ch2.png")
 end
 
 function main(; experiment_toml="Experiment.toml")

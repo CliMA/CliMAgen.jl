@@ -14,6 +14,7 @@ using CliMAgen: train!, load_model_and_optimizer
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
 include(joinpath(package_dir,"examples/utils_wandb.jl")) # for wandb logging, needs correct Python install
+include("analysis.jl") # for analysis
 
 function run_training(params; FT=Float32, logger=nothing)
     # unpack params
@@ -126,6 +127,10 @@ function main(; experiment_toml="Experiment.toml")
     end
 
     run_training(params; FT=FT, logger=logger)
+
+    if :sampling in keys(params)
+        run_analysis(params; FT=FT, logger=logger)
+    end
 
     # close the logger after the run to avoid hanging logger
     if params.experiment.logging

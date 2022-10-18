@@ -16,4 +16,4 @@ function log_image end
 """
     ClimaGen.log_checkpoint
 """
-function log_checkpoint end
+function log_artifact end
