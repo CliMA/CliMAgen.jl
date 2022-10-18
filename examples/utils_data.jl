@@ -4,17 +4,37 @@ using CliMADatasets
 """
 Helper function that loads MNIST images and returns loaders.
 """
-function get_data_mnist(batchsize; size=32, FT=Float32)
+function get_data_mnist(batchsize; tilesize=32, FT=Float32)
     xtrain, _ = MLDatasets.MNIST(:train; Tx=FT)[:]
-    xtrain = Images.imresize(xtrain, (size, size))
-    xtrain = reshape(xtrain, size, size, 1, :)
+    xtrain = Images.imresize(xtrain, (tilesize, tilesize))
+    xtrain = reshape(xtrain, tilesize, tilesize, 1, :)
     xtrain = @. 2xtrain - 1
     xtrain = MLUtils.shuffleobs(xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
 
     xtest, _ = MLDatasets.MNIST(:test; Tx=FT)[:]
-    xtest = Images.imresize(xtest, (size, size))
-    xtest = reshape(xtest, size, size, 1, :)
+    xtest = Images.imresize(xtest, (tilesize, tilesize))
+    xtest = reshape(xtest, tilesize, tilesize, 1, :)
+    xtest = @. 2xtest - 1
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+"""
+Helper function that loads FashionMNIST images and returns loaders.
+"""
+function get_data_fashion_mnist(batchsize; tilesize=32, FT=Float32)
+    xtrain, _ = MLDatasets.FashionMNIST(:train; Tx=FT)[:]
+    xtrain = Images.imresize(xtrain, (tilesize, tilesize))
+    xtrain = reshape(xtrain, tilesize, tilesize, 1, :)
+    xtrain = @. 2xtrain - 1
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+
+    xtest, _ = MLDatasets.FashionMNIST(:test; Tx=FT)[:]
+    xtest = Images.imresize(xtest, (tilesize, tilesize))
+    xtest = reshape(xtest, tilesize, tilesize, 1, :)
     xtest = @. 2xtest - 1
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
@@ -24,17 +44,17 @@ end
 """
 Helper function that loads CIFAR10 images and returns loaders.
 """
-function get_data_cifar10(batchsize; size=32, FT=Float32)
+function get_data_cifar10(batchsize; tilesize=32, FT=Float32)
     xtrain, _ = MLDatasets.CIFAR10(:train; Tx=FT)[:]
-    xtrain = Images.imresize(xtrain, (size, size))
-    xtrain = reshape(xtrain, size, size, 3, :)
+    xtrain = Images.imresize(xtrain, (tilesize, tilesize))
+    xtrain = reshape(xtrain, tilesize, tilesize, 3, :)
     xtrain = @. 2xtrain - 1
     xtrain = MLUtils.shuffleobs(xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
 
     xtest, _ = MLDatasets.CIFAR10(:test; Tx=FT)[:]
-    xtest = Images.imresize(xtest, (size, size))
-    xtest = reshape(xtest, size, size, 3, :)
+    xtest = Images.imresize(xtest, (tilesize, tilesize))
+    xtest = reshape(xtest, tilesize, tilesize, 3, :)
     xtest = @. 2xtest - 1
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 

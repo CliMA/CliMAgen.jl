@@ -19,8 +19,7 @@ function img_plot(samples, save_path, plotname; FT=Float32, logger=nothing)
     Images.save(joinpath(save_path, plotname), samples)
 
     if !(logger isa Nothing)
-        img = Images.load(joinpath(savepath, plotname))
-        CliMAgen.log_image(logger, FT.(img), plotname)
+        CliMAgen.log_image(logger, FT.(samples), plotname)
     end
 end
 
