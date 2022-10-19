@@ -16,7 +16,10 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x, 
         x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
     end
     if denoise
-       return mean_x
+        t_end = fill!(similar(init_x, size(init_x)[end]), 1) .* time_steps[end]
+        _, σ_t = marginal_prob(model, x, t_end) # This should take x(0), but it does not affect σ_t
+        s_t = score(model, x, t_end)
+        return x .+ CliMAgen.expand_dims(σ_t, 3) .^ 2 .* s_t # x + σ_t^2 ∇ log P(x)
     else
        return x
     end
@@ -54,7 +57,10 @@ function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, ini
         x = mean_x + sqrt.(CliMAgen.expand_dims((g .^ 2), 3) .* Δt) .* randn!(similar(x))
     end
     if denoise
-       return mean_x
+        t_end = fill!(similar(init_x, size(init_x)[end]), 1) .* time_steps[end]
+        _, σ_t = marginal_prob(model, x, t_end) # This should take x(0), but it does not affect σ_t
+        s_t = score(model, x, t_end)
+        return x .+ CliMAgen.expand_dims(σ_t, 3) .^ 2 .* s_t # x + σ_t^2 ∇ log P(x)
     else
        return x
     end
