@@ -26,7 +26,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
-
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
@@ -61,6 +60,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model)
 
+    savedir = joinpath(savedir, "$(sampler)")
     # sample from the trained model
     time_steps, Δt, init_x = setup_sampler(
         model,
@@ -70,30 +70,33 @@ function run_analysis(params; FT=Float32, logger=nothing)
         num_images=nsamples,
         num_steps=nsteps,
     )
+
     if sampler == "euler"
         samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
+    elseif sampler == "exp_euler"
+        samples = exponential_Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
     elseif sampler == "pc"
         samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
     end
     samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
+    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution_$(nsteps).png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtrain, samples, savedir, "qq_plot_$(nsteps).png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
+    spectrum_plot(xtrain, samples, savedir, "mean_spectra_$(nsteps).png", logger=logger)
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
     xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     samples = @. (samples - mintrain) / (maxtrain - mintrain)
 
-    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
+    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1_$(nsteps).png")
     img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
-    img_plot(samples[:, :, [2], 1:nimages], savedir, "$(sampler)_images_ch2.png")
+    img_plot(samples[:, :, [2], 1:nimages], savedir, "$(sampler)_images_ch2_$(nsteps).png")
     img_plot(xtrain[:, :, [2], 1:nimages], savedir, "train_images_ch2.png")
 end
 
@@ -103,7 +106,6 @@ function main(; experiment_toml="Experiment.toml")
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
-
     run_analysis(params; FT=FT)
 end
 

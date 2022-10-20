@@ -13,7 +13,6 @@ using ProgressMeter
 using Random
 using Statistics
 using Tullio
-
 using CliMAgen
 
 include("utils.jl")
@@ -32,6 +31,6 @@ export score_matching_loss, score_matching_loss_variant
 export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock, NoiseConditionalScoreNetworkVariant
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
-export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler
+export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler, exponential_Euler_Maruyama_sampler
 
 end # module
