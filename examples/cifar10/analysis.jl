@@ -39,7 +39,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _ = get_data_mnist(
+    dl, _ = get_data_cifar10(
         batchsize;
         FT=FT
     )

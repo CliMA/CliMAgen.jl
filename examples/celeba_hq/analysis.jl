@@ -19,6 +19,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
+    resolution = params.data.resolution
     inchannels = params.model.inchannels
     nsamples = params.sampling.nsamples
     nimages = params.sampling.nimages
@@ -39,8 +40,9 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _ = get_data_mnist(
+    dl, _ = get_data_celeba_hq(
         batchsize;
+        resolution=resolution,
         FT=FT
     )
     xtrain = cat([x for x in dl]..., dims=4)
