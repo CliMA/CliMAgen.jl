@@ -46,7 +46,6 @@ Helper function that loads CIFAR10 images and returns loaders.
 """
 function get_data_cifar10(batchsize; tilesize=32, FT=Float32)
     xtrain, _ = MLDatasets.CIFAR10(:train; Tx=FT)[:]
-    xtrain = Images.imresize(xtrain, (tilesize, tilesize))
     xtrain = reshape(xtrain, tilesize, tilesize, 3, :)
     xtrain = @. 2xtrain - 1
     xtrain = MLUtils.shuffleobs(xtrain)
@@ -61,6 +60,25 @@ function get_data_cifar10(batchsize; tilesize=32, FT=Float32)
     return (; loader_train, loader_test)
 end
 
+"""
+Helper function that loads 2d turbulence images and returns loaders.
+"""
+function get_data_celeba_hq(batchsize; resolution=32, gender=:male, FT=Float32)
+    xtrain = CliMADatasets.CelebAHQ(:train; resolution=resolution, gender=gender, Tx=FT)[:]
+
+    # bring data to [-1, 1] range
+    xtrain = @. 2xtrain - 1
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+
+    xtest = CliMADatasets.CelebAHQ(:test; resolution=resolution, gender=gender, Tx=FT)[:]
+
+    # bring data to [-1, 1] range
+    xtrain = @. 2xtrain - 1
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
 
 """
 Helper function that loads 2d turbulence images and returns loaders.

@@ -39,7 +39,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _ = get_data_mnist(
+    dl, _ = get_data_fashion_mnist(
         batchsize;
         FT=FT
     )
@@ -88,8 +88,8 @@ function run_analysis(params; FT=Float32, logger=nothing)
     xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     samples = @. (samples - mintrain) / (maxtrain - mintrain)
 
-    img_plot(samples[:, :, :, 1:nimages], savedir, "$(sampler)_images.png")
-    img_plot(xtrain[:, :, :, 1:nimages], savedir, "train_images.png")
+    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
+    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
 end
 
 function main(; experiment_toml="Experiment.toml")

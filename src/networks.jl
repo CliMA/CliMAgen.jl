@@ -117,9 +117,9 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
     if mean_bypass
         if gnorm
             mean_bypass_layers = (
-                mean_skip_1 = Conv((1, 1), inchannels => embed_dim, groups=inchannels),
-                mean_skip_2 = Conv((1, 1), embed_dim => embed_dim, groups=inchannels),
-                mean_skip_3 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
+                mean_skip_1 = Conv((1, 1), inchannels => embed_dim),
+                mean_skip_2 = Conv((1, 1), embed_dim => embed_dim),
+                mean_skip_3 = Conv((1, 1), embed_dim => inchannels),
                 mean_gnorm_1 = GroupNorm(embed_dim, 32, swish),
                 mean_gnorm_2 = GroupNorm(embed_dim, 32, swish),
                 mean_dense_1 = Dense(embed_dim, embed_dim),
@@ -127,9 +127,9 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
             )
         else
             mean_bypass_layers = (
-                mean_skip_1 = Conv((1, 1), inchannels => embed_dim, groups=inchannels),
-                mean_skip_2 = Conv((1, 1), embed_dim => embed_dim, groups=inchannels),
-                mean_skip_3 = Conv((1, 1), embed_dim => inchannels, groups=inchannels),
+                mean_skip_1 = Conv((1, 1), inchannels => embed_dim),
+                mean_skip_2 = Conv((1, 1), embed_dim => embed_dim),
+                mean_skip_3 = Conv((1, 1), embed_dim => inchannels),
                 mean_dense_1 = Dense(embed_dim, embed_dim),
                 mean_dense_2 = Dense(embed_dim, embed_dim),
             )
@@ -572,9 +572,6 @@ function (net::AttentionBlock)(x::AbstractArray{FT}) where {FT}
 
     return h .+ net.bypass(x)
 end
-
-
-
 
 """
     CliMAgen.compute_attention_weights(keys, queries, Val{nspatialdims})

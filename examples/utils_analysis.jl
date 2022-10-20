@@ -10,16 +10,16 @@ using FFTW
 """
 Helper function to make an image plot.
 """
-function img_plot(samples, save_path, plotname; FT=Float32, logger=nothing)
+function img_plot(samples, savepath, plotname; FT=Float32, logger=nothing)
     # clip samples to [0, 1] range
     @. samples = max(0, samples)
     @. samples = min(1, samples)
 
     samples = image_grid(samples)
-    Images.save(joinpath(save_path, plotname), samples)
+    Images.save(joinpath(savepath, plotname), samples)
 
     if !(logger isa Nothing)
-        CliMAgen.log_image(logger, FT.(samples), plotname)
+        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
     end
 end
 
