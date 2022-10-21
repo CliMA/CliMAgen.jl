@@ -70,7 +70,7 @@ function setup_sampler(model::CliMAgen.VarianceExplodingSDE, device, tilesize, i
         ρ1 = 2*(σ_max-σ_min)
         ρϵ = 2*(σ_min*(σ_max/σ_min)^ϵ-σ_min)
         ρ_steps = LinRange(ρ1, ρϵ, nsteps)
-        time_steps = log.(ρ_steps ./(2*σ_min) - 1) ./ log(σ_max/σ_min)
+        time_steps = log.(ρ_steps ./(2*σ_min) .+ 1) ./ log(σ_max/σ_min)
     end
     Δt = time_steps[1] - time_steps[2]
     return time_steps, Δt, init_x

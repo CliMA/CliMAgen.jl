@@ -6,7 +6,6 @@ using CUDA
 using Images
 using Random
 using FFTW
-#using DifferentialEquations: EM, solve, SDEProblem
 """
 Helper function to make an image plot.
 """
@@ -167,27 +166,6 @@ function image_grid(x::AbstractArray{T,N}; num_columns=10) where {T,N}
     end
     return x
 end
-#=
-"Helper to make a gif from an SDEProblem"
-function reverse_model_gif(model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5)
-    time_steps = LinRange(1.0f0, ϵ, nsteps)
-    Δt = time_steps[1] - time_steps[2]
-    sde_problem = setup_reverse_SDEProblem(model, init_x, time_steps, Δt)
-    solution = DifferentialEquations.solve(sde_problem, DifferentialEquations.EM(), dt=Δt)
-    animation_images = convert_to_animation(solution)
-    gif(animation_images, joinpath(savepath, plotname), fps=50)
-end
-
-"Helper to make a gif from an SDEProblem"
-function forward_model_gif(model, init_x, nsteps)
-    time_steps = LinRange(0.0f0, 1.0f0, nsteps)
-    Δt = time_steps[2] - time_steps[1]
-    sde_problem = setup_forward_SDEProblem(model, init_x, time_steps, Δt)
-    solution = DifferentialEquations.solve(sde_problem, DifferentialEquations.EM(), dt=Δt)
-    animation_images = convert_to_animation(solution)
-    gif(animation_images, joinpath(savepath, plotname), fps=50)
-end
-=#
 
 """
 Helper to make an animation from a batch of images.
@@ -332,57 +310,4 @@ function model_scale(model, x_0, ϵ=1.0f-5)
     scale = sum(scale, dims=1:(ndims(x_0)-1)) # L₂-norm
 
     return t, scale[:]
-end
-
-
-
-"""
-Helper to create a SDEProblem with DifferentialEquations.jl
-for the reverse diffusion model.
-# Notes
-The reverse-time SDE is given by:  
-𝘥x = -σ²ᵗ 𝘚₀(𝙭, 𝘵)𝘥𝘵 + σᵗ𝘥𝘸  
-⟹ `f(u, p, t)` = drift-σ²ᵗ 𝘚₀(𝙭, 𝘵)  
-⟹ `g(u, p, t` = diffusion
-"""
-function reverse_SDEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, time_steps, Δt)
-    function f(u, p, t)
-        batch_time_step = fill!(similar(u, size(u)[end]), 1) .* t
-        return (
-            expand_dims(CliMAgen.drift(model, batch_time_step), 3)-expand_dims(CliMAgen.diffusion(model, batch_time_step), 3) .^ 2 .*
-            CliMAgen.score(model, u, batch_time_step)
-        )
-    end
-
-    function g(u, p, t)
-        batch_time_step = fill!(similar(u), 1) .* t
-        CliMAgen.diffusion(model, batch_time_step)
-    end
-    tspan = (time_steps[begin], time_steps[end])
-    DifferentialEquations.SDEProblem(f, g, init_x, tspan)
-end
-
-"""
-Helper to create an SDEProblem with DifferentialEquations.jl
-for the forward diffusion model.
-# Notes
-The forward-time SDE is given by:  
-𝘥x = f(t) dt + g(t)𝘥𝘸  
-⟹ `f(u, p, t)` = drift  
-⟹ `g(u, p, t` = diffusion
-"""
-function forward_SDEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, time_steps, Δt)
-    function f(u, p, t)
-        batch_time_step = fill!(similar(u, size(u)[end]), 1) .* t
-        return (
-            expand_dims(CliMAgen.drift(model, batch_time_step), 3)
-        )
-    end
-
-    function g(u, p, t)
-        batch_time_step = fill!(similar(u), 1) .* t
-        expand_dims(CliMAgen.diffusion(model, batch_time_step), 3)
-    end
-    tspan = (time_steps[begin], time_steps[end])
-    DifferentialEquations.SDEProblem(f, g, init_x, tspan)
 end
