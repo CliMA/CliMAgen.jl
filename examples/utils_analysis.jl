@@ -6,7 +6,7 @@ using CUDA
 using Images
 using Random
 using FFTW
-
+using DifferentialEquations
 """
 Helper function to make an image plot.
 """
@@ -170,21 +170,15 @@ end
 """
 Helper to make an animation from a batch of images.
 """
-function convert_to_animation(x, hpdata)
-    frames = size(x)[end]
-    batches = size(x)[end-1]
-    animation = @animate for i = 1:frames+frames÷4
-        if i <= frames
+function convert_to_animation(x, time_stride)
+    init_frames = length(x)
+    x = x[1:time_stride:init_frames]
+    frames = length(x)
+    animation = @animate for i = 1:frames
             heatmap(
-                image_grid(x[:, :, :, :, i]),
-                title="Iteration: $i out of $frames"
+                image_grid(x[i]),
+                xaxis = false, yaxis = false, xticks = false, yticks = false,
             )
-        else
-            heatmap(
-                image_grid(x[:, :, :, :, end]),
-                title="Iteration: $frames out of $frames"
-            )
-        end
     end
     return animation
 end
@@ -310,4 +304,27 @@ function model_scale(model, x_0, ϵ=1.0f-5)
     scale = sum(scale, dims=1:(ndims(x_0)-1)) # L₂-norm
 
     return t, scale[:]
+end
+"Helper to set up a DiffEq SDEProblem"
+function setup_SDEProblem(model, init_x, nsteps; ϵ=1.0f-5, reverse = false)
+    if reverse
+        time_steps = LinRange(1.0f0, ϵ, nsteps)
+        f,g = CliMAgen.reverse_sde(model)
+        Δt = time_steps[1] - time_steps[2]
+    else
+        time_steps = LinRange(0.0f0, 1.0f0, nsteps)
+        f,g = CliMAgen.forward_sde(model)
+        Δt = time_steps[2] - time_steps[1]
+    end
+    tspan = (time_steps[begin], time_steps[end])
+    sde_problem = DifferentialEquations.SDEProblem(f, g, init_x, tspan)
+    return sde_problem, Δt
+end
+
+"Helper to make a noising/denoising gif, using DifferentialEquations"
+function model_gif(model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, reverse = false, fps = 50, solver = DifferentialEquations.EM(), time_stride = 2)
+    sde_problem, Δt = setup_SDEProblem(model, init_x,nsteps; ϵ=ϵ, reverse = reverse)
+    solution = DifferentialEquations.solve(sde_problem, solver, dt=Δt)
+    animation_images = convert_to_animation(solution.u, time_stride)
+    gif(animation_images, joinpath(savepath, plotname))
 end

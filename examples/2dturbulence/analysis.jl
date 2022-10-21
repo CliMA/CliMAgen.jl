@@ -95,6 +95,8 @@ function run_analysis(params; FT=Float32, logger=nothing)
     img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
     img_plot(samples[:, :, [2], 1:nimages], savedir, "$(sampler)_images_ch2.png")
     img_plot(xtrain[:, :, [2], 1:nimages], savedir, "train_images_ch2.png")
+    model_gif(model, xtrain[:,:,:,[1]] |> device, 500, savedir, "forward.gif"; fps = 25)
+    model_gif(model, xtrain[:,:,:,[1]] |> device, 500, savedir, "reverse.gif"; fps = 25, reverse = true)
 end
 
 function main(; experiment_toml="Experiment.toml")
