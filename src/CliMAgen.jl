@@ -28,8 +28,8 @@ include("sampling.jl")
 export struct2dict, dict2nt
 export VarianceExplodingSDE
 export drift, diffusion, marginal_prob, score
-export score_matching_loss, score_matching_loss_variant
-export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock, NoiseConditionalScoreNetworkVariant
+export score_matching_loss, score_matching_loss_variant,score_matching_loss_variant_regularized
+export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock, NoiseConditionalScoreNetworkVariant,NoiseConditionalScoreNetworkVariantCNNBypass
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler

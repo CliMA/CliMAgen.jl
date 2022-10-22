@@ -1,3 +1,182 @@
+struct NoiseConditionalScoreNetworkVariantCNNBypass
+    layers::NamedTuple
+    mean_bypass_layers::NamedTuple
+    time_layers::NamedTuple
+end
+
+"""
+User Facing API for NoiseConditionalScoreNetwork architecture.
+"""
+function NoiseConditionalScoreNetworkVariantCNNBypass(; nspatial=2, num_residual=8, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+    time_layers =  (
+        gaussfourierproj=GaussianFourierProjection(embed_dim, scale),
+        linear=Dense(embed_dim, embed_dim, swish),
+    )
+    
+    layers = (#Lifting
+              conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad()),
+              dense1=Dense(embed_dim, channels[1]),
+              gnorm1=GroupNorm(channels[1], 4, swish),
+              
+              # Encoding
+              conv2=Downsampling(channels[1] => channels[2], nspatial),
+              dense2=Dense(embed_dim, channels[2]),
+              gnorm2=GroupNorm(channels[2], 32, swish),
+              
+              conv3=Downsampling(channels[2] => channels[3], nspatial),
+              dense3=Dense(embed_dim, channels[3]),
+              gnorm3=GroupNorm(channels[3], 32, swish),
+              
+              conv4=Downsampling(channels[3] => channels[4], nspatial),
+              dense4=Dense(embed_dim, channels[4]),
+              
+              # Residual Blocks
+              resnet_blocks = 
+              [ResnetBlockVariant(channels[end], nspatial, embed_dim, 0.0f0) for _ in range(1, length=num_residual)],
+              
+              # Decoding
+              gnorm4=GroupNorm(channels[4], 32, swish),
+              tconv4=Upsampling(channels[4] => channels[3], nspatial),
+              denset4=Dense(embed_dim, channels[3]),
+              tgnorm4=GroupNorm(channels[3], 32, swish),
+              
+              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial),
+              denset3=Dense(embed_dim, channels[2]),
+              tgnorm3=GroupNorm(channels[2], 32, swish),
+              
+              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial),
+              denset2=Dense(embed_dim, channels[1]),
+              tgnorm2=GroupNorm(channels[1], 32, swish),
+              
+              # Projection
+              tconv1=Conv((3, 3), channels[1] + channels[1] => inchannels, stride=1, pad=SamePad()),
+    )
+    mean_bypass_layers = (# Lifting
+                          conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad()),
+                          dense1=Dense(embed_dim, channels[1]),
+                          gnorm1=GroupNorm(channels[1], 4, swish),
+                          
+                          # Encoding
+                          conv2=Downsampling(channels[1] => channels[2], nspatial),
+                          dense2=Dense(embed_dim, channels[2]),
+                          gnorm2=GroupNorm(channels[2], 32, swish),
+                          
+                          conv3=Downsampling(channels[2] => channels[3], nspatial),
+                          dense3=Dense(embed_dim, channels[3]),
+                          gnorm3=GroupNorm(channels[3], 32, swish),
+                          
+                          conv4=Downsampling(channels[3] => channels[4], nspatial),
+                          dense4=Dense(embed_dim, channels[4]),
+                          
+                          # Residual Blocks
+                          resnet_blocks = 
+                              [ResnetBlockVariant(channels[end], nspatial, embed_dim, 0.0f0) for _ in range(1, length=num_residual)],
+                          
+                          # Decoding
+                          gnorm4=GroupNorm(channels[4], 32, swish),
+                          tconv4=Upsampling(channels[4] => channels[3], nspatial),
+                          denset4=Dense(embed_dim, channels[3]),
+                          tgnorm4=GroupNorm(channels[3], 32, swish),
+                          
+                          tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial),
+                          denset3=Dense(embed_dim, channels[2]),
+                          tgnorm3=GroupNorm(channels[2], 32, swish),
+                          
+                          tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial),
+                          denset2=Dense(embed_dim, channels[1]),
+                          tgnorm2=GroupNorm(channels[1], 32, swish),
+                          
+                          # Projection
+                          tconv1=Conv((3, 3), channels[1] + channels[1] => inchannels, stride=1, pad=SamePad()),
+                          )
+    
+    return NoiseConditionalScoreNetworkVariantCNNBypass(layers, mean_bypass_layers, time_layers)
+end
+
+@functor NoiseConditionalScoreNetworkVariantCNNBypass
+
+function (net::NoiseConditionalScoreNetworkVariantCNNBypass)(x, t)
+    # Embedding
+    embed = net.time_layers.gaussfourierproj(t)
+    embed = net.time_layers.linear(embed)
+
+    # Encoder
+    h1 = x .- mean(x, dims=(1,2)) # remove mean before input
+    
+    h1 = net.layers.conv1(h1)
+    h1 = h1 .+ expand_dims(net.layers.dense1(embed), 2)
+    h1 = net.layers.gnorm1(h1)
+    h2 = net.layers.conv2(h1)
+    h2 = h2 .+ expand_dims(net.layers.dense2(embed), 2)
+    h2 = net.layers.gnorm2(h2)
+    h3 = net.layers.conv3(h2)
+    h3 = h3 .+ expand_dims(net.layers.dense3(embed), 2)
+    h3 = net.layers.gnorm3(h3)
+    h4 = net.layers.conv4(h3)
+    h4 = h4 .+ expand_dims(net.layers.dense4(embed), 2)
+
+    # middle
+    h = h4
+    for block in net.layers.resnet_blocks
+        h = block(h, embed)
+    end
+
+    # Decoder
+    h = net.layers.gnorm4(h)
+    h = net.layers.tconv4(h)
+    h = h .+ expand_dims(net.layers.denset4(embed), 2)
+    h = net.layers.tgnorm4(h)
+    h = net.layers.tconv3(cat(h, h3; dims=3))
+    h = h .+ expand_dims(net.layers.denset3(embed), 2)
+    h = net.layers.tgnorm3(h)
+    h = net.layers.tconv2(cat(h, h2, dims=3))
+    h = h .+ expand_dims(net.layers.denset2(embed), 2)
+    h = net.layers.tgnorm2(h)
+    h = net.layers.tconv1(cat(h, h1, dims=3))
+
+    h = h .- mean(h, dims=(1,2)) # remove mean after output
+
+
+    # Mean processing
+    zero_img = similar(x) .* 0
+    hm1 = mean(x, dims = (1,2)) .+ zero_img # extract mean
+    hm1 = net.mean_bypass_layers.conv1(hm1)
+    hm1 = hm1 .+ expand_dims(net.mean_bypass_layers.dense1(embed), 2)
+    hm1 = net.mean_bypass_layers.gnorm1(hm1)
+    hm2 = net.mean_bypass_layers.conv2(hm1)
+    hm2 = hm2 .+ expand_dims(net.mean_bypass_layers.dense2(embed), 2)
+    hm2 = net.mean_bypass_layers.gnorm2(hm2)
+    hm3 = net.mean_bypass_layers.conv3(hm2)
+    hm3 = hm3 .+ expand_dims(net.mean_bypass_layers.dense3(embed), 2)
+    hm3 = net.mean_bypass_layers.gnorm3(hm3)
+    hm4 = net.mean_bypass_layers.conv4(hm3)
+    hm4 = hm4 .+ expand_dims(net.mean_bypass_layers.dense4(embed), 2)
+
+    # middle
+    hm = hm4
+    for block in net.mean_bypass_layers.resnet_blocks
+        hm = block(hm, embed)
+    end
+
+    # Decoder
+    hm = net.mean_bypass_layers.gnorm4(hm)
+    hm = net.mean_bypass_layers.tconv4(hm)
+    hm = hm .+ expand_dims(net.mean_bypass_layers.denset4(embed), 2)
+    hm = net.mean_bypass_layers.tgnorm4(hm)
+    hm = net.mean_bypass_layers.tconv3(cat(hm, hm3; dims=3))
+    hm = hm .+ expand_dims(net.mean_bypass_layers.denset3(embed), 2)
+    hm = net.mean_bypass_layers.tgnorm3(hm)
+    hm = net.mean_bypass_layers.tconv2(cat(hm, hm2, dims=3))
+    hm = hm .+ expand_dims(net.mean_bypass_layers.denset2(embed), 2)
+    hm = net.mean_bypass_layers.tgnorm2(hm)
+    hm = net.mean_bypass_layers.tconv1(cat(hm, hm1, dims=3))
+
+    hm =  mean(hm, dims = (1,2)) .+ zero_img # remove spatial variation
+
+    return h .+ hm
+
+end
+
 """
     ClimaGen.NoiseConditionalScoreNetwork\n
 
