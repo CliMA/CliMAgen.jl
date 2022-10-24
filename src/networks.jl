@@ -172,6 +172,8 @@ function (net::NoiseConditionalScoreNetworkVariantCNNBypass)(x, t)
     hm = net.mean_bypass_layers.tconv1(cat(hm, hm1, dims=3))
 
     hm =  mean(hm, dims = (1,2)) .+ zero_img # remove spatial variation
+    scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
+    hm = hm ./ scale
 
     return h .+ hm
 
