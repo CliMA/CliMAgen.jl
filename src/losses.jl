@@ -78,7 +78,7 @@ function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f
     return [loss_avg, loss_dev]
 end
 
-function score_matching_loss_variant_regularized(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
+function score_matching_loss_variant_regularized(model::AbstractDiffusionModel, x_0, λ = 1.0f0, ϵ=1.0f-5)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 
@@ -101,7 +101,6 @@ function score_matching_loss_variant_regularized(model::AbstractDiffusionModel, 
     s_t_dev = @. s_t - s_t_avg
 
     # spatial average component of loss
-    # We have retained the 1/n in front of the avg loss in order to compare with original net
     loss_avg = @. (z_star + √n * σ_t * s_t_avg)^2 # squared deviations from real score
     loss_avg = mean(loss_avg, dims=1:(ndims(x_0)-1)) # spatial & channel mean
     loss_avg = Statistics.mean(loss_avg) # mean over samples/batches
@@ -109,7 +108,7 @@ function score_matching_loss_variant_regularized(model::AbstractDiffusionModel, 
     # spatial deviation component of loss
     loss_dev = @. (z_dev + σ_t * s_t_dev)^2 # squared deviations from real score
     loss_dev = mean(loss_dev, dims=1:(ndims(x_0)-1)) # spatial & channel mean
-    loss_dev = Statistics.mean(loss_dev) # mean over samples/batches
+    loss_dev = λ * Statistics.mean(loss_dev) # mean over samples/batches
 
     return [loss_avg, loss_dev]
 end
