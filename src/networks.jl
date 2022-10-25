@@ -228,6 +228,7 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
     h = h .+ expand_dims(net.layers.denset2(embed), 2)
     h = net.layers.tgnorm2(h)
     h = net.layers.tconv1(cat(h, h1, dims=3))
+
     if net.shift_output
         h = h .- mean(h, dims=(1,2)) # remove mean after output
     end
@@ -253,6 +254,112 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
     else
         return h
     end
+end
+
+
+struct NoiseConditionalScoreNetworkNew
+    layers::NamedTuple
+end
+
+"""
+User Facing API for NoiseConditionalScoreNetwork architecture.
+"""
+function NoiseConditionalScoreNetworkVariant(; nspatial=2, num_residual=8, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+    layers = (gaussfourierproj=GaussianFourierProjection(embed_dim, scale),
+              linear=Dense(embed_dim, embed_dim, swish),
+              
+              # Lifting
+              conv1=Conv((3, 3), 2*inchannels => channels[1], stride=1, pad=SamePad()),
+              dense1=Dense(embed_dim, channels[1]),
+              gnorm1=GroupNorm(channels[1], 4, swish),
+              
+              # Encoding
+              conv2=Downsampling(channels[1] => channels[2], nspatial),
+              dense2=Dense(embed_dim, channels[2]),
+              gnorm2=GroupNorm(channels[2], 32, swish),
+              
+              conv3=Downsampling(channels[2] => channels[3], nspatial),
+              dense3=Dense(embed_dim, channels[3]),
+              gnorm3=GroupNorm(channels[3], 32, swish),
+              
+              conv4=Downsampling(channels[3] => channels[4], nspatial),
+              dense4=Dense(embed_dim, channels[4]),
+              
+              # Residual Blocks
+              resnet_blocks = 
+              [ResnetBlockVariant(channels[end], nspatial, embed_dim, 0.0f0) for _ in range(1, length=num_residual)],
+              
+              # Decoding
+              gnorm4=GroupNorm(channels[4], 32, swish),
+              tconv4=Upsampling(channels[4] => channels[3], nspatial),
+              denset4=Dense(embed_dim, channels[3]),
+              tgnorm4=GroupNorm(channels[3], 32, swish),
+              
+              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial),
+              denset3=Dense(embed_dim, channels[2]),
+              tgnorm3=GroupNorm(channels[2], 32, swish),
+              
+              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial),
+              denset2=Dense(embed_dim, channels[1]),
+              tgnorm2=GroupNorm(channels[1], 32, swish),
+              
+              # Projection
+              tconv1=Conv((3, 3), channels[1] + channels[1] => 2*inchannels, stride=1, pad=SamePad()),
+              mean_bypass_layers...
+              )
+    
+    return NoiseConditionalScoreNetworkNew(layers)
+end
+
+@functor NoiseConditionalScoreNetworkVariant
+
+function (net::NoiseConditionalScoreNetworkVariant)(x, t)
+    # Embedding
+    embed = net.layers.gaussfourierproj(t)
+    embed = net.layers.linear(embed)
+
+    # Encoder
+    if net.shift_input
+        h1 = x .- mean(x, dims=(1,2)) # remove mean before input
+    else
+        h1 = x
+    end
+    
+    h1 = net.layers.conv1(h1)
+    h1 = h1 .+ expand_dims(net.layers.dense1(embed), 2)
+    h1 = net.layers.gnorm1(h1)
+    h2 = net.layers.conv2(h1)
+    h2 = h2 .+ expand_dims(net.layers.dense2(embed), 2)
+    h2 = net.layers.gnorm2(h2)
+    h3 = net.layers.conv3(h2)
+    h3 = h3 .+ expand_dims(net.layers.dense3(embed), 2)
+    h3 = net.layers.gnorm3(h3)
+    h4 = net.layers.conv4(h3)
+    h4 = h4 .+ expand_dims(net.layers.dense4(embed), 2)
+
+    # middle
+    h = h4
+    for block in net.layers.resnet_blocks
+        h = block(h, embed)
+    end
+
+    # Decoder
+    h = net.layers.gnorm4(h)
+    h = net.layers.tconv4(h)
+    h = h .+ expand_dims(net.layers.denset4(embed), 2)
+    h = net.layers.tgnorm4(h)
+    h = net.layers.tconv3(cat(h, h3; dims=3))
+    h = h .+ expand_dims(net.layers.denset3(embed), 2)
+    h = net.layers.tgnorm3(h)
+    h = net.layers.tconv2(cat(h, h2, dims=3))
+    h = h .+ expand_dims(net.layers.denset2(embed), 2)
+    h = net.layers.tgnorm2(h)
+    h = net.layers.tconv1(cat(h, h1, dims=3))
+    
+
+
+    scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
+    hm = hm ./ scale
 end
 
 """
