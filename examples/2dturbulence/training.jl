@@ -6,7 +6,7 @@ using TOML
 
 using CliMAgen
 using CliMAgen: dict2nt
-using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetworkVariant
+using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetworkNew
 using CliMAgen: score_matching_loss_variant
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
@@ -26,11 +26,9 @@ function run_training(params; FT=Float32, logger=nothing)
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
     inchannels = params.model.inchannels
-    shift_input = params.model.shift_input
-    shift_output = params.model.shift_output
-    mean_bypass = params.model.mean_bypass
-    scale_mean_bypass = params.model.scale_mean_bypass
-    gnorm = params.model.gnorm
+    demean_input = params.model.demean_input
+    demean_output = params.model.demean_output
+    mean_rescale = params.model.mean_rescale
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
     learning_rate::FT = params.optimizer.learning_rate
@@ -62,13 +60,11 @@ function run_training(params; FT=Float32, logger=nothing)
     )
 
     # set up model
-    net = NoiseConditionalScoreNetworkVariant(; 
+    net = NoiseConditionalScoreNetworkNew(; 
         inchannels = inchannels,
-        shift_input = shift_input,
-        shift_output = shift_output,
-        mean_bypass = mean_bypass,
-        scale_mean_bypass = scale_mean_bypass,
-        gnorm = gnorm,
+        demean_input = demean_input,
+        demean_output = demean_output,
+        mean_rescale = mean_rescale,
     )
     model = VarianceExplodingSDE(sigma_max, sigma_min, net)
     model = device(model)

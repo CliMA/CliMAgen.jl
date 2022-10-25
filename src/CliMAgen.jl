@@ -29,7 +29,7 @@ export struct2dict, dict2nt
 export VarianceExplodingSDE
 export drift, diffusion, marginal_prob, score
 export score_matching_loss, score_matching_loss_variant
-export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock, NoiseConditionalScoreNetworkVariant
+export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock, NoiseConditionalScoreNetworkVariant, NoiseConditionalScoreNetworkNew
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler

@@ -259,17 +259,32 @@ end
 
 struct NoiseConditionalScoreNetworkNew
     layers::NamedTuple
+    demean_input::Bool
+    demean_output::Bool
+    mean_rescale::Bool
 end
 
 """
 User Facing API for NoiseConditionalScoreNetwork architecture.
 """
-function NoiseConditionalScoreNetworkVariant(; nspatial=2, num_residual=8, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+function NoiseConditionalScoreNetworkNew(; demean_input=false, demean_output=false, mean_rescale=false, nspatial=2, num_residual=8, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+    if demean_input
+        first_channels = 2inchannels
+    else
+        first_channels = inchannels
+    end
+    
+    if demean_output
+        last_channels = 2inchannels
+    else
+        last_channels = inchannels
+    end
+
     layers = (gaussfourierproj=GaussianFourierProjection(embed_dim, scale),
               linear=Dense(embed_dim, embed_dim, swish),
               
               # Lifting
-              conv1=Conv((3, 3), 2*inchannels => channels[1], stride=1, pad=SamePad()),
+              conv1=Conv((3, 3), first_channels => channels[1], stride=1, pad=SamePad()),
               dense1=Dense(embed_dim, channels[1]),
               gnorm1=GroupNorm(channels[1], 4, swish),
               
@@ -304,27 +319,28 @@ function NoiseConditionalScoreNetworkVariant(; nspatial=2, num_residual=8, incha
               tgnorm2=GroupNorm(channels[1], 32, swish),
               
               # Projection
-              tconv1=Conv((3, 3), channels[1] + channels[1] => 2*inchannels, stride=1, pad=SamePad()),
-              mean_bypass_layers...
+              tconv1=Conv((3, 3), channels[1] + channels[1] => last_channels, stride=1, pad=SamePad()),
               )
     
-    return NoiseConditionalScoreNetworkNew(layers)
+    return NoiseConditionalScoreNetworkNew(layers, demean_input, demean_output, mean_rescale)
 end
 
-@functor NoiseConditionalScoreNetworkVariant
+@functor NoiseConditionalScoreNetworkNew
 
-function (net::NoiseConditionalScoreNetworkVariant)(x, t)
+function (net::NoiseConditionalScoreNetworkNew)(x, t)
     # Embedding
     embed = net.layers.gaussfourierproj(t)
     embed = net.layers.linear(embed)
 
-    # Encoder
-    if net.shift_input
-        h1 = x .- mean(x, dims=(1,2)) # remove mean before input
+    # turn incoming data into two groups: mean and deviation
+    if net.demean_input
+        x_dev = x .- mean(x, dims=(1,2)) # remove mean before input
+        x_mean = x .- x_dev
+        h1 = cat(x_dev, x_mean; dims=3) # concat mean and deviation
     else
         h1 = x
     end
-    
+
     h1 = net.layers.conv1(h1)
     h1 = h1 .+ expand_dims(net.layers.dense1(embed), 2)
     h1 = net.layers.gnorm1(h1)
@@ -356,10 +372,26 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
     h = net.layers.tgnorm2(h)
     h = net.layers.tconv1(cat(h, h1, dims=3))
     
+    if net.demean_output
+        inchannels = size(x, 3) ÷ 2
+        
+        # Split output into what will become the mean and deviation components
+        h_dev = view(h, :, :, 1:inchannels, :)
+        h_mean = view(h, :, :, inchannels+1:2inchannels, :)
 
+        # only retain deviations and means, respectively.
+        h_dev = h_dev .- mean(h_dev, dims=(1,2)) # remove mean before output
+        h_mean = h_mean .- (h_mean .- mean(h_mean, dims=(1,2))) # remove dev before output
 
-    scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
-    hm = hm ./ scale
+        if net.mean_rescale
+            scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
+            h_mean = h_mean ./ scale
+        end
+
+        return h_dev .+ h_mean
+    else
+        return h
+    end
 end
 
 """
