@@ -40,7 +40,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _ = get_data_2dturbulence_variant(
+    dl, _ = get_data_2dturbulence_coherence(
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
