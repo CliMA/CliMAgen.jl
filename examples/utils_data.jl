@@ -142,6 +142,50 @@ function get_data_2dturbulence_variant(batchsize; width=(32, 32), stride=(32, 32
     return (; loader_train, loader_test)
 end
 
+function get_data_2dturbulence_coherence(batchsize; width=(128, 128), stride=(128, 128), FT=Float32)
+    xtrain = CliMADatasets.Turbulence2D(:train; resolution=:high, Tx=FT)[:]
+    nsamp_raw = size(xtrain)[4]
+    xtrain = tile_array(xtrain, width[1], width[2], stride[1], stride[2])
+
+    # Only look at channel 2 and keep sequential snapshots
+    nsamp = size(xtrain)[4]
+    xtrain = cat(xtrain[:, :, 2:2, 1:nsamp-1], xtrain[:, :, 2:2, 2:nsamp], dims=3)
+
+    # remove the ones that are not sequential
+    xtrain = xtrain[:, :, :, mod.(1:nsamp-1, Ref(nsamp_raw)) .!= 0]
+
+    # fancy rescaler
+    x̄ = mean(xtrain, dims=(1, 2))
+    maxtrain_mean = maximum(x̄, dims=4)
+    mintrain_mean = minimum(x̄, dims=4)
+    Δ̄ = maxtrain_mean .- mintrain_mean
+    x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
+
+    xp = xtrain .- x̄
+    maxtrain_p = maximum(xp, dims=(1, 2, 4))
+    mintrain_p = minimum(xp, dims=(1, 2, 4))
+    Δp = maxtrain_p .- mintrain_p
+    x̃p = @. 2(xp - mintrain_p) / Δp - 1
+
+    xtrain = x̄̃ .+ x̃p
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+
+    xtest = CliMADatasets.Turbulence2D(:test; resolution=:high, Tx=FT)[:]
+    xtest = tile_array(xtest, width[1], width[2], stride[1], stride[2])
+
+    # apply the same rescaler as on training set
+    x̄ = mean(xtest, dims=(1, 2))
+    xp = xtest .- x̄
+    x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
+    x̃p = @. 2(xp - mintrain_p) / Δp - 1
+
+    xtest = x̄̃ .+ x̃p
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
 """
 Helper function that tiles an array in the first two spatial dimensions.
 
