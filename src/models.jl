@@ -26,27 +26,49 @@ end
 
 """
     ClimaGen.forward_sde
+    
+    These functions expect the input `t` to be a scalar, in order to work with DifferentialEquations.
 """
 function forward_sde(m::AbstractDiffusionModel)
-    f(x, p, t) = ones(eltype(x), size(x)) .* drift(m, t)
-    g(x, p, t) = ones(eltype(x), size(x)) .* diffusion(m, t)
+    function f(x, p, t)
+        t = fill!(similar(x, size(x)[end]), 1) .* t
+        expand_dims(drift(m, t), ndims(x) - 1)
+    end
+    function g(x, p, t)
+        t = fill!(similar(x, size(x)[end]), 1) .* t
+        expand_dims(diffusion(m, t), ndims(x) - 1)
+    end
+
     return f, g
 end
 
 """
     ClimaGen.reverse_sde
+
+    These functions expect the input `t` to be a scalar, in order to work with DifferentialEquations.
 """
 function reverse_sde(m::AbstractDiffusionModel)
-    f(x, p, t) = drift(m, t) .- diffusion(m, t) .^ 2 .* score(m, x, t)
-    g(x, p, t) = ones(eltype(x), size(x)) .* diffusion(m, t)
+    function f(x, p, t) 
+        t = fill!(similar(x, size(x)[end]), 1) .* t
+        expand_dims(drift(m, t), ndims(x) - 1) .- expand_dims(diffusion(m, t), ndims(x) - 1) .^ 2 .* score(m, x, t)
+    end
+    function g(x, p, t)
+        t = fill!(similar(x, size(x)[end]), 1) .* t
+        expand_dims(diffusion(m, t), ndims(x) - 1)
+    end
     return f, g
 end
 
 """
     ClimaGen.reverse_ode
+
+    These functions expect the input `t` to be a scalar, in order to work with DifferentialEquations.
 """
 function reverse_ode(m::AbstractDiffusionModel)
-    f(x, p, t) = drift(m, t) .- diffusion(m, t) .^ 2 .* score(m, x, t) ./ 2
+    function f(x, p, t) 
+        t = fill!(similar(x, size(x)[end]), 1) .* t
+        expand_dims(drift(m, t), ndims(x) - 1) .- expand_dims(diffusion(m, t), ndims(x) - 1) .^ 2 .* score(m, x, t) ./ 2
+    end
     return f
 end
 
@@ -68,7 +90,7 @@ end
 @functor VarianceExplodingSDE
 
 function drift(::VarianceExplodingSDE{FT}, t) where {FT}
-    return zeros(FT, size(t))
+    return similar(t) .* FT(0)
 end
 
 function diffusion(m::VarianceExplodingSDE, t)
