@@ -60,11 +60,11 @@ function reverse_sde(m::AbstractDiffusionModel)
 end
 
 """
-    ClimaGen.reverse_ode
+    ClimaGen.probability_flow_ode
 
     These functions expect the input `t` to be a scalar, in order to work with DifferentialEquations.
 """
-function reverse_ode(m::AbstractDiffusionModel)
+function probability_flow_ode(m::AbstractDiffusionModel)
     function f(x, p, t) 
         t = fill!(similar(x, size(x)[end]), 1) .* t
         expand_dims(drift(m, t), ndims(x) - 1) .- expand_dims(diffusion(m, t), ndims(x) - 1) .^ 2 .* score(m, x, t) ./ 2
