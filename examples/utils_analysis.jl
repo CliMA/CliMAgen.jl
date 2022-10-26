@@ -10,12 +10,12 @@ using DifferentialEquations
 """
 Helper function to make an image plot.
 """
-function img_plot(samples, savepath, plotname; FT=Float32, logger=nothing)
+function img_plot(samples, savepath, plotname; ncolumns = 10,FT=Float32, logger=nothing)
     # clip samples to [0, 1] range
     @. samples = max(0, samples)
     @. samples = min(1, samples)
 
-    samples = image_grid(samples)
+    samples = image_grid(samples; ncolumns = ncolumns)
     Images.save(joinpath(savepath, plotname), samples)
 
     if !(logger isa Nothing)
@@ -139,26 +139,26 @@ end
 """
 Helper to make a conglomerate image from an batch of images.
 """
-function image_grid(x::AbstractArray{T,N}; num_columns=10) where {T,N}
+function image_grid(x::AbstractArray{T,N}; ncolumns=10) where {T,N}
     # Number of images per row of the grid
-    num_batch = size(x)[end]
-    num_columns = min(num_batch, num_columns)
+    batchsize = size(x)[end]
+    ncolumns = min(batchsize, ncolumns)
     # We want either an even number of images per row
-    num_images = div(num_batch, num_columns)*num_columns
-    x = x[:,:,:,1:num_images]
+    nimages = div(batchsize, ncolumns)*ncolumns
+    x = x[:,:,:,1:nimages]
     
     # Number of pixels per spatial direction of a single image
-    num_pixels = size(x)[1]
+    npixels = size(x)[1]
 
     inchannels = size(x)[end-1]
     if inchannels == 1
-        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x |> cpu, num_columns), num_pixels, :)...), (2, 1)))
+        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x |> cpu, ncolumns), npixels, :)...), (2, 1)))
         return x
     elseif inchannels == 2
-        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x[:, :, 1, :] |> cpu, num_columns), num_pixels, :)...), (2, 1)))
+        x = Gray.(permutedims(vcat(reshape.(Flux.chunk(x[:, :, 1, :] |> cpu, ncolumns), npixels, :)...), (2, 1)))
         return x
     elseif inchannels == 3
-        tmp = reshape.(Flux.chunk(permutedims(x, (3, 2, 1, 4)) |> cpu, num_columns), 3, num_pixels, :)
+        tmp = reshape.(Flux.chunk(permutedims(x, (3, 2, 1, 4)) |> cpu, ncolumns), 3, npixels, :)
         rgb = colorview.(Ref(RGB), tmp)
         return vcat(rgb...)
     else
@@ -323,8 +323,29 @@ end
 
 "Helper to make a noising/denoising gif, using DifferentialEquations"
 function model_gif(model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, reverse = false, fps = 50, solver = DifferentialEquations.EM(), time_stride = 2)
-    sde_problem, Δt = setup_SDEProblem(model, init_x,nsteps; ϵ=ϵ, reverse = reverse)
-    solution = DifferentialEquations.solve(sde_problem, solver, dt=Δt)
+    sde, Δt = setup_SDEProblem(model, init_x,nsteps; ϵ=ϵ, reverse = reverse)
+    solution = DifferentialEquations.solve(sde, solver, dt=Δt)
     animation_images = convert_to_animation(solution.u, time_stride)
-    gif(animation_images, joinpath(savepath, plotname))
+    gif(animation_images, joinpath(savepath, plotname); fps = fps)
+end
+
+"Helper to make a noising/denoising bridge plot, using DifferentialEquations
+
+The forward and reverse models may have been trained on different data sets.
+In the final plot, we've shifted everything to be on the same grayscale [0,1].
+"
+function bridge_plot(forward_model, reverse_model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, solver = DifferentialEquations.EM(), nimages = 4)
+    # I am assuming both models 
+    forward_sde, Δt = setup_SDEProblem(forward_model, init_x,nsteps; ϵ=ϵ)
+    save_step = (1-ϵ^(1/4))/nimages
+    saveat = (ϵ^(1/4):save_step:1).^4
+    forward_solution = DifferentialEquations.solve(forward_sde, solver, dt=Δt, saveat = saveat)
+    reverse_sde, Δt = setup_SDEProblem(reverse_model, randn!(similar(init_x)), nsteps; ϵ=ϵ, reverse = true)
+    reverse_solution = DifferentialEquations.solve(reverse_sde, solver, dt=Δt, saveat = reverse(saveat))
+    images = cat(forward_solution.u..., reverse_solution.u[2:end]..., dims = (4));
+    maxes = maximum(images[:,:,[1],:], dims = (1,2))
+    mins = minimum(images[:,:,[1],:], dims = (1,2))
+    images = @. (images[:,:,[1],:] - mins) / (maxes - mins)
+
+    img_plot(images, savepath, plotname; ncolumns = size(images)[end])
 end
