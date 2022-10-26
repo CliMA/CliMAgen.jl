@@ -335,7 +335,6 @@ The forward and reverse models may have been trained on different data sets.
 In the final plot, we've shifted everything to be on the same grayscale [0,1].
 "
 function bridge_plot(forward_model, reverse_model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, solver = DifferentialEquations.EM(), nimages = 4)
-    # I am assuming both models 
     forward_sde, Δt = setup_SDEProblem(forward_model, init_x,nsteps; ϵ=ϵ)
     save_step = (1-ϵ^(1/4))/nimages
     saveat = (ϵ^(1/4):save_step:1).^4
