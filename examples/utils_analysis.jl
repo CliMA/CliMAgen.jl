@@ -321,6 +321,16 @@ function setup_SDEProblem(model, init_x, nsteps; ϵ=1.0f-5, reverse = false)
     return sde_problem, Δt
 end
 
+"Helper to set up a DiffEq SDEProblem"
+function setup_ODEProblem(model, init_x, nsteps; ϵ=1.0f-5)
+    time_steps = LinRange(1.0f0, ϵ, nsteps)
+    f = CliMAgen.reverse_ode(model)
+    Δt = time_steps[1] - time_steps[2]
+    tspan = (time_steps[begin], time_steps[end])
+    sde_problem = DifferentialEquations.ODEProblem(f, init_x, tspan)
+    return sde_problem, Δt
+end
+
 "Helper to make a noising/denoising gif, using DifferentialEquations"
 function model_gif(model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, reverse = false, fps = 50, solver = DifferentialEquations.EM(), time_stride = 2)
     sde, Δt = setup_SDEProblem(model, init_x,nsteps; ϵ=ϵ, reverse = reverse)
@@ -334,13 +344,18 @@ end
 The forward and reverse models may have been trained on different data sets.
 In the final plot, we've shifted everything to be on the same grayscale [0,1].
 "
-function bridge_plot(forward_model, reverse_model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, solver = DifferentialEquations.EM(), nimages = 4)
+function bridge_plot(forward_model, reverse_model, init_x, nsteps, savepath, plotname ; FT = Float32, ϵ=1.0f-5, forward_solver = DifferentialEquations.EM(), reverse_solver = DifferentialEquations.EM(), nimages = 4, sde = true)
     forward_sde, Δt = setup_SDEProblem(forward_model, init_x,nsteps; ϵ=ϵ)
-    save_step = (1-ϵ^(1/4))/nimages
-    saveat = (ϵ^(1/4):save_step:1).^4
-    forward_solution = DifferentialEquations.solve(forward_sde, solver, dt=Δt, saveat = saveat)
-    reverse_sde, Δt = setup_SDEProblem(reverse_model, randn!(similar(init_x)), nsteps; ϵ=ϵ, reverse = true)
-    reverse_solution = DifferentialEquations.solve(reverse_sde, solver, dt=Δt, saveat = reverse(saveat))
+    save_step = FT((1-ϵ^(1/4))/nimages)
+    saveat = vcat(FT.((ϵ^(1/4):save_step:1).^4), 1)
+    forward_solution = DifferentialEquations.solve(forward_sde, forward_solver, dt=Δt, saveat = saveat)
+    if sde
+        reverse_sde, Δt = setup_SDEProblem(reverse_model, forward_solution.u[end], nsteps; ϵ=ϵ, reverse = true)
+        reverse_solution = DifferentialEquations.solve(reverse_sde, reverse_solver, dt=Δt, saveat = reverse(saveat))
+    else
+        reverse_ode, Δt = setup_ODEProblem(reverse_model, forward_solution.u[end], nsteps; ϵ=ϵ)
+        reverse_solution = DifferentialEquations.solve(reverse_ode, reverse_solver, dt=Δt, saveat = reverse(saveat), adaptive = false)
+    end
     images = cat(forward_solution.u..., reverse_solution.u[2:end]..., dims = (4));
     maxes = maximum(images[:,:,[1],:], dims = (1,2))
     mins = minimum(images[:,:,[1],:], dims = (1,2))

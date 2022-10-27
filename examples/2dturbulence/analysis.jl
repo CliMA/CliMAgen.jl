@@ -61,7 +61,8 @@ function run_analysis(params; FT=Float32, logger=nothing)
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model)
 
-    bridge_plot(model, model, xtrain[:,:,:,[1]] |> device, 125, "./", "tmp.png"; nimages = 4)
+    bridge_plot(model, model, xtrain[:,:,:,[1]] |> device, 125, "./", "tmp.png")
+    bridge_plot(model, model, xtrain[:,:,:,[1]] |> device, 500, "./", "tmp_ode.png"; sde = false, reverse_solver = DifferentialEquations.RK4())
     model_gif(model, xtrain[:,:,:,[1]] |> device, 500, savedir, "forward.gif"; fps = 25)
     model_gif(model, randn(FT, size(xtrain[:,:,:,[1]])) |> device, 500, savedir, "reverse.gif"; fps = 25, reverse = true)
     
