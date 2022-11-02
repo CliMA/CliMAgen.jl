@@ -40,7 +40,8 @@ function run_training(params; FT=Float32, logger=nothing)
     ema_rate::FT = params.optimizer.ema_rate
     nepochs = params.training.nepochs
     freq_chckpt = params.training.freq_chckpt
-    std = params.data.std
+    maxtrain = params.data.max
+    mintrain = params.data.min
     ndata = params.data.ndata
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -56,7 +57,7 @@ function run_training(params; FT=Float32, logger=nothing)
 
     # set up dataset
     dataloaders = get_data_uniform(
-        batchsize, std, ndata;
+        batchsize, maxtrain, mintrain, ndata;
         size = tilesize,
         FT=FT
     )
