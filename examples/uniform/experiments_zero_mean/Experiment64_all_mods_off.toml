@@ -1,7 +1,7 @@
 [experiment]
 project           = "CliMAgen.jl"
-name              = "uniform_nx64"
-savedir           = "/home/kdeck/output/uniform_64_nonzero_means/"
+name              = "uniform_64_nonzero_means_all_mods_off"
+savedir           = "/home/kdeck/output/uniform_64_nonzero_means_all_mods_off/"
 rngseed           = 123
 logging           = false
 nogpu             = false

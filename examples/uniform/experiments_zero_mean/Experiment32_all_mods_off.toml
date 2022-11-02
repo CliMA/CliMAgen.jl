@@ -1,19 +1,19 @@
 [experiment]
 project           = "CliMAgen.jl"
-name              = "uniform_nx64"
-savedir           = "/home/kdeck/output/uniform_64_nonzero_means/"
+name              = "uniform_32_nonzero_means_all_mods_off"
+savedir           = "/home/kdeck/output/uniform_32_nonzero_means_all_mods_off/"
 rngseed           = 123
 logging           = false
 nogpu             = false
 
 [data]
 batchsize         = 64
-tilesize          = 64
+tilesize          = 32
 ndata             = 200
 
 [model]
 inchannels        = 1
-sigma_max         = 64.0
+sigma_max         = 32.0
 sigma_min         = 1e-2
 mean_bypass       = false
 shift_input       = false
@@ -39,4 +39,4 @@ nsteps            = 1000
 nsamples          = 100
 nimages           = 20
 sampler           = "euler"
-tilesize          = 64
+tilesize          = 32

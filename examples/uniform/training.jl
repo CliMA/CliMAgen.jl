@@ -40,8 +40,6 @@ function run_training(params; FT=Float32, logger=nothing)
     ema_rate::FT = params.optimizer.ema_rate
     nepochs = params.training.nepochs
     freq_chckpt = params.training.freq_chckpt
-    maxtrain = params.data.max
-    mintrain = params.data.min
     ndata = params.data.ndata
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -57,15 +55,21 @@ function run_training(params; FT=Float32, logger=nothing)
 
     # set up dataset
     dataloaders = get_data_uniform(
-        batchsize, maxtrain, mintrain, ndata;
+        batchsize, ndata;
         size = tilesize,
         FT=FT
     )
 
     # set up model
-    net = NoiseConditionalScoreNetwork(; 
+    net = NoiseConditionalScoreNetworkVariant(; 
         inchannels = inchannels,
+        shift_input = shift_input,
+        shift_output = shift_output,
+        mean_bypass = mean_bypass,
+        scale_mean_bypass = scale_mean_bypass,
+        gnorm = gnorm,
     )
+    
     model = VarianceExplodingSDE(sigma_max, sigma_min, net)
     model = device(model)
 

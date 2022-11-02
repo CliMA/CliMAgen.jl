@@ -4,16 +4,18 @@ using CliMAgen: expand_dims
 """
 Helper function that creates uniform images and returns loaders.
 """
-function get_data_uniform(batchsize, maxtrain, mintrain, ndata; size=32, FT=Float32)
+function get_data_uniform(batchsize, ndata; size=32, FT=Float32)
     train_means = FT.(randn(ndata))
     test_means = FT.(randn(ndata))
     xtrain = zeros(FT, (size, size, 1, ndata)) .+ expand_dims(train_means, 3)
+    maxtrain = maximum(xtrain, dims=(1, 2, 4))
+    mintrain = minimum(xtrain, dims=(1, 2, 4))
 
-    xtrain = @. 2(xtrain - mintrain) / (maxtrain - mintrain) - 1
+    xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     
     xtest = zeros(FT, (size, size, 1, ndata)) .+ expand_dims(test_means, 3)
-    xtest = @. 2(xtest - mintrain) / (maxtrain - mintrain) - 1
+    xtest = @. (xtest - mintrain) / (maxtrain - mintrain)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
     return (; loader_train, loader_test)
 end

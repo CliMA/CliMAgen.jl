@@ -26,8 +26,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
-    maxtrain = params.data.max
-    mintrain = params.data.min
     ndata = params.data.ndata
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -43,7 +41,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
 
     # set up dataset
     dl, _ = get_data_uniform(
-        batchsize, maxtrain, mintrain, ndata;
+        batchsize, ndata;
         size = tilesize,
         FT=FT
     )
@@ -76,15 +74,15 @@ function run_analysis(params; FT=Float32, logger=nothing)
 
     # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
-
-    # create plots with nimages images of sampled data and training data
-    # Rescale now using mintrain and maxtrain
-    xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
-    samples = @. (samples - mintrain) / (maxtrain - mintrain)
-
-    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images.png")
-    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images.png")
-end
+    μ_data = mean(xtrain, dims = (1,2,3))[:]
+    μ_samples = mean(samples, dims = (1,2,3))[:]
+    open(joinpath(savedir,"summary_stats.txt"), "w") do io
+        write(io, "mean data $(mean(μ_data))\n")
+        write(io, "std data $(std(μ_data))\n")
+        write(io, "mean samples $(mean(μ_samples))\n")
+        write(io, "std samples $(std(μ_samples))\n")
+    end
+end;
 
 function main(; experiment_toml="Experiment.toml")
     FT = Float32

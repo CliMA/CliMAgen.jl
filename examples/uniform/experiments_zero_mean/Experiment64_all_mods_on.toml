@@ -1,7 +1,7 @@
 [experiment]
 project           = "CliMAgen.jl"
-name              = "uniform_nx64"
-savedir           = "/home/kdeck/output/uniform_64_nonzero_means/"
+name              = "uniform_64_nonzero_means_all_mods_on"
+savedir           = "/home/kdeck/output/uniform_64_nonzero_means_all_mods_on/"
 rngseed           = 123
 logging           = false
 nogpu             = false
@@ -15,11 +15,11 @@ ndata             = 200
 inchannels        = 1
 sigma_max         = 64.0
 sigma_min         = 1e-2
-mean_bypass       = false
-shift_input       = false
-shift_output      = false
-scale_mean_bypass = false
-gnorm             = false
+mean_bypass       = true
+shift_input       = true
+shift_output      = true
+scale_mean_bypass = true
+gnorm             = true
 
 [optimizer]
 learning_rate     = 2e-4
