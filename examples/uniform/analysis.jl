@@ -48,10 +48,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
         FT=FT
     )
     xtrain = cat([x for x in dl]..., dims=4)
-    # To use Images.Gray, we need the input to be between 0 and 1.
-    # Obtain max and min here using the whole data set
-#    maxtrain = maximum(xtrain, dims=(1, 2, 4))
-#    mintrain = minimum(xtrain, dims=(1, 2, 4))
     
     # To compare statistics from samples and training data,
     # cut training data to length nsamples.
