@@ -328,3 +328,19 @@ function model_gif(model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, revers
     animation_images = convert_to_animation(solution.u, time_stride)
     gif(animation_images, joinpath(savepath, plotname))
 end
+
+#init_x = randn!(similar(xtrain[:,:,:,[1]] |> gpu))
+function ensemble_sde_solution(model, init_x; nsteps = 100, ϵ=1.0f-5, reverse = true, solver = DifferentialEquations.EM(), trajectories = 100)
+    save_step = FT((1-ϵ^(1/4))/nsteps)
+    saveat = vcat(FT.((ϵ^(1/4):save_step:1).^4), 1)
+    sde, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = true)
+    function prob_func(prob,i,repeat)
+        randn!(prob.u0)
+        prob
+    end
+    wrapper(f) = (sol, i) -> ((f̄ = mean.(f.(sol.u, Ref(nothing), sol.t)), t = sol.t), false)
+    output_f = wrapper(sde.f)
+    ensemble_prob = DifferentialEquations.EnsembleProblem(sde; output_func = output_f, prob_func = prob_func)
+    sol = solve(ensemble_prob, solver, dt = Δt,trajectories = trajectories)
+    return sol
+end
