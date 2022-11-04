@@ -63,8 +63,13 @@ function run_training(params; FT=Float32, logger=nothing)
     )
 
     # set up model
-    net = NoiseConditionalScoreNetwork(; 
+    net = NoiseConditionalScoreNetworkVariant(; 
         inchannels = inchannels,
+        shift_input = shift_input,
+        shift_output = shift_output,
+        mean_bypass = mean_bypass,
+        scale_mean_bypass = scale_mean_bypass,
+        gnorm = gnorm,
     )
     model = VarianceExplodingSDE(sigma_max, sigma_min, net)
     model = device(model)

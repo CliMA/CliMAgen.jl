@@ -15,7 +15,7 @@ ndata             = 200
 
 [model]
 inchannels        = 1
-sigma_max         = 6.0
+sigma_max         = 3.0
 sigma_min         = 1e-2
 mean_bypass       = true
 shift_input       = true
