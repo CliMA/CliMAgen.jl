@@ -20,6 +20,20 @@ function get_data_uniform(batchsize, std, ndata; size=32, FT=Float32)
     return (; loader_train, loader_test)
 end
 
+
+"""
+Helper function that creates Gaussian images and returns loaders.
+"""
+function get_data_gaussian(batchsize, mean, std, ndata; size=32, FT=Float32)
+    xtrain = randn(FT, (size, size, 1, ndata)) .* std .+mean
+    xtest = randn(FT, (size, size, 1, ndata)) .* std .+mean
+
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
 """
 Helper function that loads MNIST images and returns loaders.
 """
