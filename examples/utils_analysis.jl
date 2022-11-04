@@ -330,17 +330,19 @@ function model_gif(model, init_x, nsteps, savepath, plotname ; ϵ=1.0f-5, revers
 end
 
 #init_x = randn!(similar(xtrain[:,:,:,[1]] |> gpu))
-function ensemble_sde_solution(model, init_x; nsteps = 100, ϵ=1.0f-5, reverse = true, solver = DifferentialEquations.EM(), trajectories = 100)
+function ensemble_sde_stats(model, init_x; nsteps = 100, ϵ=1.0f-5, reverse = true, solver = DifferentialEquations.EM(), trajectories = 100)
     save_step = FT((1-ϵ^(1/4))/nsteps)
     saveat = vcat(FT.((ϵ^(1/4):save_step:1).^4), 1)
     sde, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = true)
     function prob_func(prob,i,repeat)
-        randn!(prob.u0)
+        randn!(prob.u0).*model.σ_max
         prob
     end
-    wrapper(f) = (sol, i) -> ((f̄ = mean.(f.(sol.u, Ref(nothing), sol.t)), t = sol.t), false)
+    diffusion(t) =  model.σ_min * sqrt(2* log( model.σ_max/ model.σ_min))*(model.σ_max/ model.σ_min)^t
+    wrapper(f) = (sol, i) -> ((score = mean.(f.(sol.u, Ref(nothing), sol.t)) ./ diffusion.(sol.t).^2, u = mean.(sol.u), t = sol.t), false)
     output_f = wrapper(sde.f)
     ensemble_prob = DifferentialEquations.EnsembleProblem(sde; output_func = output_f, prob_func = prob_func)
-    sol = solve(ensemble_prob, solver, dt = Δt,trajectories = trajectories)
-    return sol
+    sol = solve(ensemble_prob, solver, DifferentialEquations.EnsembleThreads(), dt = Δt,trajectories = trajectories)
+    summ = DifferentialEquations.EnsembleAnalysis.EnsembleSummary(ensemble_sol)
+    return summ.qlow, summ.med, summ.qhigh
 end
