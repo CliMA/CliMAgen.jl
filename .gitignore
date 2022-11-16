@@ -1,12 +1,13 @@
 .DS_Store
 
 /Manifest.toml
-
+examples/Manifest.toml
 output/
 wandb/
 experiments/
-~.sh
+*.sh
 slurm*out
+*#
 *~
 *.png
 *.jpg
