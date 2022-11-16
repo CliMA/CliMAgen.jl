@@ -28,6 +28,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     tilesize_sampling = params.sampling.tilesize
     data_std = params.data.std
     data_mean = params.data.mean
+    lengthscale = params.data.lengthscale
     ndata = params.data.ndata
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -42,8 +43,8 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _ = get_data_gaussian(
-        batchsize, data_mean, data_std, ndata;
+    dl, _ = get_single_mode_data(
+        batchsize, data_mean, data_std, lengthscale, ndata;
         size = tilesize,
         FT=FT
     )
@@ -81,13 +82,19 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
 
+    # create q-q plot for cumulants of pre-specified scalar statistics
+    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
+
+    # create plots for comparison of real vs. generated spectra
+    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
+
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
     xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     samples = @. (samples - mintrain) / (maxtrain - mintrain)
 
-    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images.png")
-    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images.png")
+    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
+    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
 end
 
 function main(; experiment_toml="Experiment.toml")

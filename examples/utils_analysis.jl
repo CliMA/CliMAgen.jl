@@ -312,7 +312,7 @@ function setup_SDEProblem(model, init_x, nsteps; ϵ=1.0f-5, reverse = false)
         f,g = CliMAgen.reverse_sde(model)
         Δt = time_steps[1] - time_steps[2]
     else
-        time_steps = LinRange(0.0f0, 1.0f0, nsteps)
+        time_steps = LinRange(ϵ, 1.0f0, nsteps)
         f,g = CliMAgen.forward_sde(model)
         Δt = time_steps[2] - time_steps[1]
     end

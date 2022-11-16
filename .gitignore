@@ -5,7 +5,8 @@
 output/
 wandb/
 experiments/
-
+~.sh
+slurm*out
 *~
 *.png
 *.jpg

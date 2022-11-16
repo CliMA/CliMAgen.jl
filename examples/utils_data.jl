@@ -24,13 +24,84 @@ end
 """
 Helper function that creates Gaussian images and returns loaders.
 """
-function get_data_gaussian(batchsize, mean, std, ndata; size=32, FT=Float32)
-    xtrain = randn(FT, (size, size, 1, ndata)) .* std .+mean
-    xtest = randn(FT, (size, size, 1, ndata)) .* std .+mean
+function get_data_gaussian(batchsize, μ, σ, ndata; size=32, FT=Float32)
+    xtrain = randn(FT, (size, size, 1, ndata)) .* σ .+ μ
+    xtest = randn(FT, (size, size, 1, ndata)) .* σ .+ μ
+
+    x̄ = mean(xtrain, dims=(1, 2))
+    maxtrain_mean = maximum(x̄, dims=4)
+    mintrain_mean = minimum(x̄, dims=4)
+    Δ̄ = maxtrain_mean .- mintrain_mean
+    x̄̃ = @. 2(x̄ -  mintrain_mean) / Δ̄ - 1
+    
+    xp = xtrain .- x̄
+    maxtrain_p = maximum(xp, dims=(1, 2, 4))
+    mintrain_p = minimum(xp, dims=(1, 2, 4))
+    Δp = maxtrain_p .- mintrain_p
+    x̃p = @. 2(xp -  mintrain_p) / Δp - 1
+
+    xtrain = x̄̃ .+ x̃p
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+
+    x̄ = mean(xtest, dims=(1, 2))
+    xp = xtest .- x̄
+    x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
+    x̃p = @. 2(xp - mintrain_p) / Δp - 1
+
+    xtest = x̄̃ .+ x̃p
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+
+function get_data_gaussian_basic(batchsize, μ, σ, ndata; size=32, FT=Float32)
+    xtrain = randn(FT, (size, size, 1, ndata)) .* σ .+ μ
+    xtest = randn(FT, (size, size, 1, ndata)) .* σ .+ μ
 
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
+    return (; loader_train, loader_test)
+end
+
+function get_single_mode_data(batchsize, μ, σ, L, ndata; size=32, FT=Float32)
+    coords_x = zeros(FT, (size, size, 1))
+    coords_y = zeros(FT, (size, size, 1))
+    for i in 1:size 
+        for j in 1:size
+            coords_x[i,j,:] .= FT(i)
+            coords_y[i,j,:] .= FT(j)
+        end
+    end
+    img = sin.(FT(2π/L) .* (coords_x .+coords_y))
+    xtrain = cat([img.*(μ + σ*randn(FT)) for _ in 1:ndata]..., dims=4)
+    xtest = cat([img.*(μ + σ*randn(FT)) for _ in 1:ndata]..., dims=4)
+
+    x̄ = mean(xtrain, dims=(1, 2))
+    maxtrain_mean = maximum(x̄, dims=4)
+    mintrain_mean = minimum(x̄, dims=4)
+    Δ̄ = maxtrain_mean .- mintrain_mean
+    x̄̃ = @. 2(x̄ -  mintrain_mean) / Δ̄ - 1
+    
+    xp = xtrain .- x̄
+    maxtrain_p = maximum(xp, dims=(1, 2, 4))
+    mintrain_p = minimum(xp, dims=(1, 2, 4))
+    Δp = maxtrain_p .- mintrain_p
+    x̃p = @. 2(xp -  mintrain_p) / Δp - 1
+
+    xtrain = x̄̃ .+ x̃p
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    
+    x̄ = mean(xtest, dims=(1, 2))
+    xp = xtest .- x̄
+    x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
+    x̃p = @. 2(xp - mintrain_p) / Δp - 1
+
+    xtest = x̄̃ .+ x̃p
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
     return (; loader_train, loader_test)
 end
 
