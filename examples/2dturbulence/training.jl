@@ -23,6 +23,8 @@ function run_training(params; FT=Float32, logger=nothing)
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
     tilesize = params.data.tilesize
+    kernelsize = params.data.kernelsize
+    standard_scaling = params.data.standard_scaling
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
     inchannels = params.model.inchannels
@@ -54,10 +56,12 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_2dturbulence_variant(
+    dataloaders = get_data_2dturbulence(
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
+        kernelsize=kernelsize,
+        standard_scaling=standard_scaling,
         FT=FT
     )
 
