@@ -26,6 +26,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
+    preprocess = params.data.preprocess
 
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -40,12 +41,22 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _ = get_data_2dturbulence_variant(
-        batchsize;
-        width=(tilesize, tilesize),
-        stride=(tilesize, tilesize),
-        FT=FT
-    )
+    if preprocess
+        dl, _ = get_data_2dturbulence_variant(
+            batchsize;
+            width=(tilesize, tilesize),
+            stride=(tilesize, tilesize),
+            FT=FT
+        )
+    else
+        dl, _ = get_data_2dturbulence(
+            batchsize;
+            width=(tilesize, tilesize),
+            stride=(tilesize, tilesize),
+            FT=FT
+        )
+    end
+    
     xtrain = cat([x for x in dl]..., dims=4)
     # To use Images.Gray, we need the input to be between 0 and 1.
     # Obtain max and min here using the whole data set

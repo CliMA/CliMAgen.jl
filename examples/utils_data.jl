@@ -66,7 +66,7 @@ function get_data_gaussian_basic(batchsize, μ, σ, ndata; size=32, FT=Float32)
     return (; loader_train, loader_test)
 end
 
-function get_single_mode_data(batchsize, μ, σ, L, ndata; size=32, FT=Float32)
+function get_single_mode_data(batchsize, L, ndata; size=32, FT=Float32)
     coords_x = zeros(FT, (size, size, 1))
     coords_y = zeros(FT, (size, size, 1))
     for i in 1:size 
@@ -75,9 +75,9 @@ function get_single_mode_data(batchsize, μ, σ, L, ndata; size=32, FT=Float32)
             coords_y[i,j,:] .= FT(j)
         end
     end
-    img = sin.(FT(2π/L) .* (coords_x .+coords_y))
-    xtrain = cat([img.*(μ + σ*randn(FT)) for _ in 1:ndata]..., dims=4)
-    xtest = cat([img.*(μ + σ*randn(FT)) for _ in 1:ndata]..., dims=4)
+    img = FT(0.01) .*sin.(FT(2π/L) .* (coords_x .+coords_y))
+    xtrain = cat([img .+ randn((size, size, 1)) for _ in 1:ndata]..., dims=4)
+    xtest = cat([img .+ randn((size, size, 1)) for _ in 1:ndata]..., dims=4)
 
     x̄ = mean(xtrain, dims=(1, 2))
     maxtrain_mean = maximum(x̄, dims=4)

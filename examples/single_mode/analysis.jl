@@ -26,8 +26,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
-    data_std = params.data.std
-    data_mean = params.data.mean
     lengthscale = params.data.lengthscale
     ndata = params.data.ndata
     # set up rng
@@ -44,7 +42,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
 
     # set up dataset
     dl, _ = get_single_mode_data(
-        batchsize, data_mean, data_std, lengthscale, ndata;
+        batchsize, lengthscale, ndata;
         size = tilesize,
         FT=FT
     )

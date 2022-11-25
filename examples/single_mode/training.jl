@@ -40,8 +40,6 @@ function run_training(params; FT=Float32, logger=nothing)
     ema_rate::FT = params.optimizer.ema_rate
     nepochs = params.training.nepochs
     freq_chckpt = params.training.freq_chckpt
-    std = params.data.std
-    mean = params.data.mean
     lengthscale = params.data.lengthscale
     ndata = params.data.ndata
     # set up rng
@@ -58,7 +56,7 @@ function run_training(params; FT=Float32, logger=nothing)
 
     # set up dataset
     dataloaders = get_single_mode_data(
-        batchsize, mean, std, lengthscale, ndata;
+        batchsize, lengthscale, ndata;
         size = tilesize,
         FT=FT
     )

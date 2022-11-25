@@ -40,7 +40,7 @@ function run_training(params; FT=Float32, logger=nothing)
     ema_rate::FT = params.optimizer.ema_rate
     nepochs = params.training.nepochs
     freq_chckpt = params.training.freq_chckpt
-
+    preprocess = params.data.preprocess
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
@@ -54,12 +54,21 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_2dturbulence_variant(
-        batchsize;
-        width=(tilesize, tilesize),
-        stride=(tilesize, tilesize),
-        FT=FT
-    )
+    if preprocess
+        dataloaders = get_data_2dturbulence_variant(
+            batchsize;
+            width=(tilesize, tilesize),
+            stride=(tilesize, tilesize),
+            FT=FT
+        )
+    else
+        dataloaders = get_data_2dturbulence(
+            batchsize;
+            width=(tilesize, tilesize),
+            stride=(tilesize, tilesize),
+            FT=FT
+        ) 
+    end
 
     # set up model
     net = NoiseConditionalScoreNetworkVariant(; 
