@@ -9,6 +9,10 @@ nogpu             = false
 [data]
 batchsize         = 64
 tilesize          = 128
+kernel_std        = 0
+standard_scaling  = true
+bias_amplitude    = 0
+bias_wn           = 0
 
 [model]
 inchannels        = 2

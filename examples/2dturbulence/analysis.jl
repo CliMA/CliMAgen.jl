@@ -20,6 +20,10 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
     tilesize = params.data.tilesize
+    kernel_std = params.data.kernel_std
+    standard_scaling = params.data.standard_scaling
+    bias_wn = params.data.bias_wn
+    bias_amplitude = params.data.bias_amplitude
     inchannels = params.model.inchannels
     nsamples = params.sampling.nsamples
     nimages = params.sampling.nimages
@@ -40,10 +44,14 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _ = get_data_2dturbulence_variant(
+    dl, _ = get_data_2dturbulence(
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
+        kernel_std=kernel_std,
+        standard_scaling=standard_scaling,
+        bias_wn = bias_wn,
+        bias_amplitude = bias_amplitude,
         FT=FT
     )
     xtrain = cat([x for x in dl]..., dims=4)

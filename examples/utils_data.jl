@@ -102,60 +102,73 @@ end
 """
 Helper function that loads 2d turbulence images and returns loaders.
 """
-function get_data_2dturbulence(batchsize; width=(32, 32), stride=(32, 32), FT=Float32)
+function get_data_2dturbulence(batchsize;
+                               width=(32, 32),
+                               stride=(32, 32),
+                               standard_scaling=true,
+                               kernel_std=0,
+                               bias_amplitude=0,
+                               bias_wn=1,
+                               FT=Float32)
     xtrain = CliMADatasets.Turbulence2D(:train; resolution=:high, Tx=FT)[:]
     xtrain = tile_array(xtrain, width[1], width[2], stride[1], stride[2])
-
-    # min-max rescaler
-    maxtrain = maximum(xtrain, dims=(1, 2, 4))
-    mintrain = minimum(xtrain, dims=(1, 2, 4))
-    xtrain = @. 2(xtrain - mintrain) / (maxtrain - mintrain) - 1
-
-    xtrain = MLUtils.shuffleobs(xtrain)
-    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
 
     xtest = CliMADatasets.Turbulence2D(:test; resolution=:high, Tx=FT)[:]
     xtest = tile_array(xtest, width[1], width[2], stride[1], stride[2])
 
-    # apply the same rescaler as on training set
-    xtest = @. 2(xtest - mintrain) / (maxtrain - mintrain) - 1
+    if kernel_std > 0
+        kernel = Kernel.gaussian(kernel_std)
+        filter(img) = imfilter(img, kernel)
+        xtrain = mapslices(filter, xtrain, dims = (1,2))
+        xtest = mapslices(filter, xtest, dims = (1,2))
+    end
 
-    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+    if bias_amplitude > 0
+        nx, ny = size(xtrain)[1:2]
+        amp = maximum(xtrain, dims=(1,2,4)) - minimum(xtrain, dims=(1,2,4))
 
-    return (; loader_train, loader_test)
-end
+        xx = FT.(LinRange(0, 1, nx)) * ones(FT, ny)'
+        yy = ones(FT, nx) * FT.(LinRange(0, 1, ny))'
 
-function get_data_2dturbulence_variant(batchsize; width=(32, 32), stride=(32, 32), FT=Float32)
-    xtrain = CliMADatasets.Turbulence2D(:train; resolution=:high, Tx=FT)[:]
-    xtrain = tile_array(xtrain, width[1], width[2], stride[1], stride[2])
-
-    # fancy rescaler
-    x̄ = mean(xtrain, dims=(1, 2))
-    maxtrain_mean = maximum(x̄, dims=4)
-    mintrain_mean = minimum(x̄, dims=4)
-    Δ̄ = maxtrain_mean .- mintrain_mean
-    x̄̃ = @. 2(x̄ -  mintrain_mean) / Δ̄ - 1
+        bias_field = sin.(2π .* xx .* bias_wn) .* sin.(2π .* yy .* bias_wn)
+        xtrain = xtrain .* (1 .+ amp .* bias_amplitude .* bias_field)
+        xtest = xtest .* (1 .+ amp .* bias_amplitude .* bias_field)
+    end
     
-    xp = xtrain .- x̄
-    maxtrain_p = maximum(xp, dims=(1, 2, 4))
-    mintrain_p = minimum(xp, dims=(1, 2, 4))
-    Δp = maxtrain_p .- mintrain_p
-    x̃p = @. 2(xp -  mintrain_p) / Δp - 1
+    if standard_scaling
+        # perform a standard minmax scaling
+        maxtrain = maximum(xtrain, dims=(1, 2, 4))
+        mintrain = minimum(xtrain, dims=(1, 2, 4))
+        xtrain = @. 2(xtrain - mintrain) / (maxtrain - mintrain) - 1
+        # apply the same rescaler as on training set
+        xtest = @. 2(xtest - mintrain) / (maxtrain - mintrain) - 1
+    else
+        #scale means and spatial variations separately
+        x̄ = mean(xtrain, dims=(1, 2))
+        maxtrain_mean = maximum(x̄, dims=4)
+        mintrain_mean = minimum(x̄, dims=4)
+        Δ̄ = maxtrain_mean .- mintrain_mean
+        x̄̃ = @. 2(x̄ -  mintrain_mean) / Δ̄ - 1
+        
+        xp = xtrain .- x̄
+        maxtrain_p = maximum(xp, dims=(1, 2, 4))
+        mintrain_p = minimum(xp, dims=(1, 2, 4))
+        Δp = maxtrain_p .- mintrain_p
+        x̃p = @. 2(xp -  mintrain_p) / Δp - 1
+    
+        xtrain = x̄̃ .+ x̃p
 
-    xtrain = x̄̃ .+ x̃p
+         # apply the same rescaler as on training set
+        x̄ = mean(xtest, dims=(1, 2))
+        xp = xtest .- x̄
+        x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
+        x̃p = @. 2(xp - mintrain_p) / Δp - 1
+
+        xtest = x̄̃ .+ x̃p
+    end
+
     xtrain = MLUtils.shuffleobs(xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
-
-    xtest = CliMADatasets.Turbulence2D(:test; resolution=:high, Tx=FT)[:]
-    xtest = tile_array(xtest, width[1], width[2], stride[1], stride[2])
-
-    # apply the same rescaler as on training set
-    x̄ = mean(xtest, dims=(1, 2))
-    xp = xtest .- x̄
-    x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
-    x̃p = @. 2(xp - mintrain_p) / Δp - 1
-
-    xtest = x̄̃ .+ x̃p
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
     return (; loader_train, loader_test)
