@@ -105,8 +105,8 @@ Helper function that loads 2d turbulence images and returns loaders.
 function get_data_2dturbulence(batchsize;
                                width=(32, 32),
                                stride=(32, 32),
-                               standard_scaling = true,
-                               kernelsize = 1,
+                               standard_scaling=true,
+                               kernelsize=0,
                                FT=Float32)
     xtrain = CliMADatasets.Turbulence2D(:train; resolution=:high, Tx=FT)[:]
     xtrain = tile_array(xtrain, width[1], width[2], stride[1], stride[2])
@@ -114,10 +114,9 @@ function get_data_2dturbulence(batchsize;
     xtest = CliMADatasets.Turbulence2D(:test; resolution=:high, Tx=FT)[:]
     xtest = tile_array(xtest, width[1], width[2], stride[1], stride[2])
 
-    if kernelsize > 1
-        nspatial = ndims(xtrain)-2
-        kernel = centered(ones(FT, Tuple(kernelsize for _ in 1:nspatial)))
-        filter(img) = imfilter(img, kernel ./ sum(kernel))
+    if kernelsize > 0
+        kernel = Kernel.gaussian(kernelsize)
+        filter(img) = imfilter(img, kernel)
         xtrain = mapslices(filter, xtrain, dims = (1,2))
         xtest = mapslices(filter, xtest, dims = (1,2))
     end
