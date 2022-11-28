@@ -9,7 +9,7 @@ nogpu             = false
 [data]
 batchsize         = 64
 tilesize          = 128
-kernelsize        = 0
+kernel_std        = 0
 standard_scaling  = true
 
 [model]

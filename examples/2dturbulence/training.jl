@@ -23,7 +23,7 @@ function run_training(params; FT=Float32, logger=nothing)
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
     tilesize = params.data.tilesize
-    kernelsize = params.data.kernelsize
+    kernel_std = params.data.kernel_std
     standard_scaling = params.data.standard_scaling
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
@@ -60,7 +60,7 @@ function run_training(params; FT=Float32, logger=nothing)
         batchsize;
         width=(tilesize, tilesize),
         stride=(tilesize, tilesize),
-        kernelsize=kernelsize,
+        kernel_std=kernel_std,
         standard_scaling=standard_scaling,
         FT=FT
     )
