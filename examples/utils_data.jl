@@ -107,6 +107,8 @@ function get_data_2dturbulence(batchsize;
                                stride=(32, 32),
                                standard_scaling=true,
                                kernel_std=0,
+                               bias_amplitude=0,
+                               bias_wn=1,
                                FT=Float32)
     xtrain = CliMADatasets.Turbulence2D(:train; resolution=:high, Tx=FT)[:]
     xtrain = tile_array(xtrain, width[1], width[2], stride[1], stride[2])
@@ -121,6 +123,17 @@ function get_data_2dturbulence(batchsize;
         xtest = mapslices(filter, xtest, dims = (1,2))
     end
 
+    if bias_amplitude > 0
+        nx, ny = size(xtrain)[1:2]
+        amp = maximum(xtrain, dims=(1,2,4)) - minimum(xtrain, dims=(1,2,4))
+
+        xx = FT.(LinRange(0, 1, nx)) * ones(FT, ny)'
+        yy = ones(FT, nx) * FT.(LinRange(0, 1, ny))'
+
+        bias_field = sin.(2π .* xx .* bias_wn) .* sin.(2π .* yy .* bias_wn)
+        xtrain = xtrain .* (1 .+ amp .* bias_amplitude .* bias_field)
+        xtest = xtest .* (1 .+ amp .* bias_amplitude .* bias_field)
+    end
     
     if standard_scaling
         # perform a standard minmax scaling
