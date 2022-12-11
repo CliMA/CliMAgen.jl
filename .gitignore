@@ -5,7 +5,9 @@
 output/
 wandb/
 experiments/
-
+experiments/Manifest.toml
+experiments/2dturbulence/*sh
+experiments/uniform/*sh
 *~
 *.png
 *.jpg
