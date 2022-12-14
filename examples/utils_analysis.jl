@@ -22,23 +22,38 @@ function loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::B
     path = joinpath(savepath,plotname)
     filename = joinpath(savepath, "losses.txt")
     data = DelimitedFiles.readdlm(filename, ',', skipstart = 1)
-
-     plt1 = plot(left_margin = 20Plots.mm, ylabel = "Log10(Mean Loss)")
-    plt2 = plot(bottom_margin = 10Plots.mm, left_margin = 20Plots.mm,xlabel = "Epoch", ylabel = "Log10(Spatial Loss)")
-    plot!(plt1, data[:,1], data[:,2], label = "Train", linecolor = :black)
-    plot!(plt1, data[:,1], data[:,4], label = "Test", linecolor = :red)
-    plot!(plt2, data[:,1], data[:,3], label = "", linecolor = :black)
-    plot!(plt2, data[:,1], data[:,5], label = "", linecolor = :red)
-    if xlog
-        plot!(plt1, xaxis=:log)
-        plot!(plt2, xaxis=:log)
+    
+    if size(data)[2] == 5
+        plt1 = plot(left_margin = 20Plots.mm, ylabel = "Log10(Mean Loss)")
+	plt2 = plot(bottom_margin = 10Plots.mm, left_margin = 20Plots.mm,xlabel = "Epoch", ylabel = "Log10(Spatial Loss)")
+	plot!(plt1, data[:,1], data[:,2], label = "Train", linecolor = :black)
+    	plot!(plt1, data[:,1], data[:,4], label = "Test", linecolor = :red)
+    	plot!(plt2, data[:,1], data[:,3], label = "", linecolor = :black)
+    	plot!(plt2, data[:,1], data[:,5], label = "", linecolor = :red)
+    	if xlog
+           plot!(plt1, xaxis=:log)
+           plot!(plt2, xaxis=:log)
+    	end
+    	if ylog
+           plot!(plt1, yaxis=:log)
+           plot!(plt2, yaxis=:log)
+        end
+	plot(plt1, plt2, layout =(2,1))
+	savefig(path)
+    elseif size(data)[2] == 3
+        plt1 = plot(left_margin = 20Plots.mm, ylabel = "Log10(Loss)")
+	plot!(plt1, data[:,1], data[:,2], label = "Train", linecolor = :black)
+    	plot!(plt1, data[:,1], data[:,3], label = "Test", linecolor = :red)
+    	if xlog
+           plot!(plt1, xaxis=:log)
+    	end
+    	if ylog
+           plot!(plt1, yaxis=:log)
+        end
+	savefig(path)
+    else
+        @info "Loss CSV file has incorrect number of columns"
     end
-    if ylog
-        plot!(plt1, yaxis=:log)
-        plot!(plt2, yaxis=:log)
-    end
-    plot(plt1, plt2, layout =(2,1))
-    savefig(path)
 end
 
 
