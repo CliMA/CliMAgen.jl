@@ -41,7 +41,7 @@ function score_matching_loss(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
 
     return loss
 end
-
+#=
 function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
@@ -77,4 +77,40 @@ function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f
 
     return [loss_avg, loss_dev]
 end
+=#
+function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
+    # sample times
+    t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 
+    # sample from normal marginal
+    z = randn!(similar(x_0))
+    μ_t, σ_t = marginal_prob(model, x_0, t)
+    x_t = @. μ_t + σ_t * z
+
+    # evaluate model score s₀(𝘹(𝘵), 𝘵)
+    s_t = score(model, x_t, t)
+
+    # split into spatial averages and deviations
+    nspatial = ndims(x_0)-2
+    n = prod(size(z)[1:nspatial])
+    √n = convert(eltype(x_0), sqrt(n))
+    z_avg = Statistics.mean(z, dims=1:nspatial)
+    z_dev = @. z - z_avg
+    z_star = @. √n * z_avg
+    s_t_avg = Statistics.mean(s_t, dims=1:nspatial)
+    s_t_dev = @. s_t - s_t_avg
+
+    # Doesnt make sense to compute a spectral loss for the mean term
+    loss_avg = @. (z_star + √n * σ_t * s_t_avg)^2 # squared deviations from real score
+    loss_avg = mean(loss_avg, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
+    loss_avg = 1/n * Statistics.mean(loss_avg) # mean over samples/batches
+
+    # spatial deviation component of loss
+    dev = @. (z_dev + σ_t * s_t_dev)
+    loss_dev = abs2.(fft(dev, 1:(ndims(x_0)-2))) # over spatial dimensions only
+    #loss_dev = @. (z_dev + σ_t * s_t_dev)^2 # squared deviations from real score
+    loss_dev = mean(loss_dev, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
+    loss_dev = Statistics.mean(loss_dev) # mean over samples/batches    
+
+    return [loss_avg, loss_dev]
+end
