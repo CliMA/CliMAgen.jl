@@ -609,8 +609,9 @@ https://distill.pub/2016/deconv-checkerboard/
 """
 function Upsampling(channels::Pair{S,S}, nspatial::Int, factor::Int=2, kernel_size::Int=3) where {S}
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
-    return Chain(
-        Flux.Upsample(factor, :nearest),
-        Conv(conv_kernel, channels, pad=SamePad())
-    )
+    return ConvTranspose(conv_kernel, channels, stride=factor, pad=SamePad())
+    #return Chain(
+    #    Flux.Upsample(factor, :nearest),
+    #    Conv(conv_kernel, channels, pad=SamePad())
+    #)
 end

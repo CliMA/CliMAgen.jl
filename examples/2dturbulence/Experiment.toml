@@ -39,7 +39,7 @@ freq_chckpt       = 80
 
 [sampling]
 nsteps            = 1000
-nsamples          = 100
-nimages           = 25
+nsamples          = 10
+nimages           = 10
 sampler           = "euler"
 tilesize          = 128
