@@ -8,7 +8,7 @@ nogpu             = false
 
 [data]
 batchsize         = 64
-tilesize          = 128
+tilesize          = 32
 kernel_std        = 0
 standard_scaling  = true
 bias_amplitude    = 0
@@ -34,12 +34,12 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 1
+nepochs           = 10
 freq_chckpt       = 80
 
 [sampling]
 nsteps            = 1000
-nsamples          = 100
-nimages           = 25
+nsamples          = 10
+nimages           = 10
 sampler           = "euler"
-tilesize          = 128
+tilesize          = 32

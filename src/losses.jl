@@ -71,7 +71,8 @@ function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f
     loss_avg = 1/n * Statistics.mean(loss_avg) # mean over samples/batches
 
     # spatial deviation component of loss
-    loss_dev = @. (z_dev + σ_t * s_t_dev)^2 # squared deviations from real score
+    weight = expand_dims((2 .-t), ndims(x_t) - 1)
+    loss_dev = @. (z_dev + σ_t * s_t_dev)^2 * weight#/(σ_t)^(1/6) # squared deviations from real score
     loss_dev = mean(loss_dev, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
     loss_dev = Statistics.mean(loss_dev) # mean over samples/batches    
 
