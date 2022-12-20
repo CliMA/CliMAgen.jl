@@ -1,23 +1,17 @@
 """
     ClimaGen.train!
 """
-function train!(model, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Function; savedir="./output/", logger=nothing, freq_chckpt=Inf)
+function train!(model, model_smooth, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Function; start_epoch=1, savedir="./output/", logger=nothing, freq_chckpt=Inf)
     # model parameters
     ps = Flux.params(model)
 
-    # setup smoothed parameters & model
-    model_smooth = deepcopy(model)
+    # setup smoothed parameters
     ps_smooth = Flux.params(model_smooth)
 
     # training loop
-    loss_names = reshape(["#Epoch", "Mean Train", "Spatial Train","Mean Test","Spatial Test"], (1,5))
-    open(joinpath(savedir, "losses.txt"),"a") do io
-        DelimitedFiles.writedlm(io, 
-                                loss_names,',')
-    end
     loss_train, loss_test = Inf, Inf
     @info "Start Training, total $(nepochs) epochs"
-    for epoch = 1:nepochs
+    for epoch = start_epoch:nepochs
         @info "Epoch $(epoch)"
 
         # update the params and compute losses

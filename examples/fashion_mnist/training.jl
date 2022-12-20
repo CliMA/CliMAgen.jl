@@ -58,31 +58,50 @@ function run_training(params; FT=Float32, logger=nothing)
         FT=FT
     )
 
-    # set up model
-    net = NoiseConditionalScoreNetworkVariant(; 
-        inchannels = inchannels,
-        shift_input = shift_input,
-        shift_output = shift_output,
-        mean_bypass = mean_bypass,
-        scale_mean_bypass = scale_mean_bypass,
-        gnorm = gnorm,
-    )
-    model = VarianceExplodingSDE(sigma_max, sigma_min, net)
-    model = device(model)
-
-    # set up optimizers
-    opt = Flux.Optimise.Optimiser(
-        WarmupSchedule{FT}(
-            nwarmup 
-         ),
-        Flux.Optimise.ClipNorm(gradnorm),
-        Flux.Optimise.Adam(
-            learning_rate,
-            (beta_1, beta_2),
-            epsilon
+    # set up model and optimizers
+    checkpoint_path = joinpath(savedir, "checkpoint.bson")
+    loss_file = joinpath(savedir, "losses.txt")
+    
+    if isfile(checkpoint_path) && isfile(loss_file)
+        BSON.@load checkpoint_path model model_smooth opt opt_smooth
+        model = device(model)
+        model_smooth = device(model_smooth)
+        loss_data = DelimitedFiles.readdlm(loss_file, ',', skipstart = 1)
+        start_epoch = loss_data[end,1]+1
+    else
+        net = NoiseConditionalScoreNetworkVariant(; 
+            inchannels = inchannels,
+            shift_input = shift_input,
+            shift_output = shift_output,
+            mean_bypass = mean_bypass,
+            scale_mean_bypass = scale_mean_bypass,
+            gnorm = gnorm,
         )
-    )
-    opt_smooth = ExponentialMovingAverage(ema_rate)
+        model = VarianceExplodingSDE(sigma_max, sigma_min, net)
+        model = device(model)
+        model_smooth = deepcopy(model)
+    
+        opt = Flux.Optimise.Optimiser(
+            WarmupSchedule{FT}(
+                nwarmup 
+            ),
+            Flux.Optimise.ClipNorm(gradnorm),
+            Flux.Optimise.Adam(
+                learning_rate,
+                (beta_1, beta_2),
+                epsilon
+            )
+        )
+        opt_smooth = ExponentialMovingAverage(ema_rate)
+
+        # set up loss file
+        loss_names = reshape(["#Epoch", "Mean Train", "Spatial Train","Mean Test","Spatial Test"], (1,5))
+        open(loss_file,"w") do io
+             DelimitedFiles.writedlm(io, loss_names,',')
+        end
+
+        start_epoch=1
+    end
 
     # set up loss function
     lossfn = x -> score_matching_loss_variant(model, x)
@@ -90,12 +109,14 @@ function run_training(params; FT=Float32, logger=nothing)
     # train the model
     train!(
         model,
+        model_smooth,
         lossfn,
         dataloaders,
         opt,
         opt_smooth,
         nepochs,
         device;
+        start_epoch = start_epoch,
         savedir = savedir,
         logger = logger,
         freq_chckpt = freq_chckpt,
