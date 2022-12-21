@@ -11,7 +11,7 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Fu
 
     # training loop
     loss_names = reshape(["#Epoch", "Mean Train", "Spatial Train","Mean Test","Spatial Test"], (1,5))
-    open(joinpath(savedir, "losses.txt"),"a") do io
+    open(joinpath(savedir, "losses.txt"),"w") do io
         DelimitedFiles.writedlm(io, 
                                 loss_names,',')
     end
