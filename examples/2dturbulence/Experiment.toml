@@ -42,4 +42,4 @@ nsteps            = 1000
 nsamples          = 100
 nimages           = 25
 sampler           = "euler"
-tilesize          = 32
+tilesize          = 128
