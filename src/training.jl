@@ -10,6 +10,11 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Fu
     ps_smooth = Flux.params(model_smooth)
 
     # training loop
+    loss_names = reshape(["#Epoch", "Mean Train", "Spatial Train","Mean Test","Spatial Test"], (1,5))
+    open(joinpath(savedir, "losses.txt"),"a") do io
+        DelimitedFiles.writedlm(io, 
+                                loss_names,',')
+    end
     loss_train, loss_test = Inf, Inf
     @info "Start Training, total $(nepochs) epochs"
     for epoch = 1:nepochs
@@ -20,6 +25,9 @@ function train!(model, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Fu
         loss_train, loss_test = CliMAgen.compute_losses(lossfn, dataloaders, device)
         for (ltrain, ltest) in zip(loss_train, loss_test)
             @info "Loss: $(ltrain) (train) | $(ltest) (test)"
+        end
+        open(joinpath(savedir, "losses.txt"),"a") do io
+            DelimitedFiles.writedlm(io, transpose([epoch, loss_train...,loss_test...]),',')
         end
 
         # store model checkpoint on disk
