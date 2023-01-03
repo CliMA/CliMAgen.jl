@@ -14,6 +14,7 @@ using Random
 using Statistics
 using Tullio
 using DelimitedFiles
+using FFTW
 using CliMAgen
 
 include("utils.jl")

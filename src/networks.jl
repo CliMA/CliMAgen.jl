@@ -168,11 +168,11 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
               denset4=Dense(embed_dim, channels[3]),
               tgnorm4=GroupNorm(channels[3], 32, swish),
               
-              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=7),
+              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=5),
               denset3=Dense(embed_dim, channels[2]),
               tgnorm3=GroupNorm(channels[2], 32, swish),
               
-              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=9),
+              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=7),
               denset2=Dense(embed_dim, channels[1]),
               tgnorm2=GroupNorm(channels[1], 32, swish),
               
