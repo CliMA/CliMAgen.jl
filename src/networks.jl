@@ -147,11 +147,11 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
               gnorm1=GroupNorm(channels[1], 4, swish),
               
               # Encoding
-              conv2=Downsampling(channels[1] => channels[2], nspatial),
+              conv2=Downsampling(channels[1] => channels[2], nspatial, kernel_size=3),
               dense2=Dense(embed_dim, channels[2]),
               gnorm2=GroupNorm(channels[2], 32, swish),
               
-              conv3=Downsampling(channels[2] => channels[3], nspatial),
+              conv3=Downsampling(channels[2] => channels[3], nspatial, kernel_size=3),
               dense3=Dense(embed_dim, channels[3]),
               gnorm3=GroupNorm(channels[3], 32, swish),
               
@@ -168,11 +168,11 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
               denset4=Dense(embed_dim, channels[3]),
               tgnorm4=GroupNorm(channels[3], 32, swish),
               
-              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial),
+              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=7),
               denset3=Dense(embed_dim, channels[2]),
               tgnorm3=GroupNorm(channels[2], 32, swish),
               
-              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial),
+              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=9),
               denset2=Dense(embed_dim, channels[1]),
               tgnorm2=GroupNorm(channels[1], 32, swish),
               
@@ -594,7 +594,7 @@ apply_attention_weights(w, v, ::Val{2}) =
     @tullio v_weighted[h2, w2, c, b] := w[h1, w1, h2, w2, b] * v[h1, w1, c, b]
 
 
-function Downsampling(channels::Pair, nspatial::Int, factor::Int=2, kernel_size::Int=3)
+function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
     return Conv(conv_kernel, channels, stride=factor, pad=SamePad())
 end
@@ -607,11 +607,11 @@ Checkerboard-save upsampling using nearest neighbor interpolation and convolutio
 References:
 https://distill.pub/2016/deconv-checkerboard/
 """
-function Upsampling(channels::Pair{S,S}, nspatial::Int, factor::Int=2, kernel_size::Int=3) where {S}
+function Upsampling(channels::Pair{S,S}, nspatial::Int; factor::Int=2, kernel_size::Int=3) where {S}
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
-    return ConvTranspose(conv_kernel, channels, stride=factor, pad=SamePad())
-    #return Chain(
-    #    Flux.Upsample(factor, :nearest),
-    #    Conv(conv_kernel, channels, pad=SamePad())
-    #)
+    #return ConvTranspose(conv_kernel, channels, stride=factor, pad=SamePad())
+    return Chain(
+        Flux.Upsample(factor, :nearest),
+        Conv(conv_kernel, channels, pad=SamePad())
+    )
 end
