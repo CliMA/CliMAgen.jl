@@ -168,8 +168,7 @@ end
 Helper function to make a spectrum plot.
 """
 function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing) 
-    L = FT(1) # Eventually a physical size
-    statistics = x -> hcat(power_spectrum2d(x, L)...)
+    statistics = x -> hcat(power_spectrum2d(x)...)
     inchannels = size(data)[end-1]
 
     data_results = mapslices(statistics, data, dims=[1, 2])
@@ -190,10 +189,10 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing
         lower_gen_spectrum = mapslices(x -> percentile(x[:], 10), gen_results[:, channel, :], dims=2)
         upper_gen_spectrum = mapslices(x -> percentile(x[:], 90), gen_results[:, channel, :], dims=2)
         gen_confidence = (gen_spectrum .- lower_gen_spectrum, upper_gen_spectrum .- gen_spectrum)
-        plt = plot(k, data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log, xaxis=:log)
+        plt = plot(k, data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log)
         plot!(plt, k, gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
         plot!(plt,
-            xlabel="Log(k)",
+            xlabel="Wavenumber",
             ylabel="Log(Power)",
             title=string("Ch:", string(channel)),
             tickfontsize=4)
@@ -271,7 +270,7 @@ have the same number of points in all directions.
 - img: a 2 dimension matrix of size (N, N).
 - L: physical size domain
 """
-function power_spectrum2d(img, L)
+function power_spectrum2d(img)
     @assert size(img)[1] == size(img)[2]
     dim = size(img)[1]
     img_fft = abs.(fft(img .- mean(img)))
@@ -293,15 +292,14 @@ function power_spectrum2d(img, L)
     for i in 1:size(rx, 1), j in 1:size(ry, 1)
         r[i, j] = sqrt(R_x[i]^2 + R_y[j]^2)
     end
-    dx = 2 * pi / L
-    k = range(1, stop=k_nyq, step=1) .* dx
+    k = range(1, stop=k_nyq, step=1)
     endk = size(k, 1)
     contribution = zeros(endk)
     spectrum = zeros(endk)
     for N in 2:Int64(k_nyq - 1)
         for i in 1:size(rx, 1), j in 1:size(ry, 1)
-            if (r[i, j] * dx <= (k'[N+1] + k'[N]) / 2) &&
-               (r[i, j] * dx > (k'[N] + k'[N-1]) / 2)
+            if (r[i, j] <= (k'[N+1] + k'[N]) / 2) &&
+               (r[i, j] > (k'[N] + k'[N-1]) / 2)
                 spectrum[N] =
                     spectrum[N] + m[i, j]^2
                 contribution[N] = contribution[N] + 1
@@ -309,21 +307,21 @@ function power_spectrum2d(img, L)
         end
     end
     for i in 1:size(rx, 1), j in 1:size(ry, 1)
-        if (r[i, j] * dx <= (k'[2] + k'[1]) / 2)
+        if (r[i, j] <= (k'[2] + k'[1]) / 2)
             spectrum[1] =
                 spectrum[1] + m[i, j]^2
             contribution[1] = contribution[1] + 1
         end
     end
     for i in 1:size(rx, 1), j in 1:size(ry, 1)
-        if (r[i, j] * dx <= k'[endk]) &&
-           (r[i, j] * dx > (k'[endk] + k'[endk-1]) / 2)
+        if (r[i, j] <= k'[endk]) &&
+           (r[i, j] > (k'[endk] + k'[endk-1]) / 2)
             spectrum[endk] =
                 spectrum[endk] + m[i, j]^2
             contribution[endk] = contribution[endk] + 1
         end
     end
-    spectrum = spectrum .* 2 .* pi .* k .^ 2 ./ (contribution .* dx .^ 2)
+    spectrum = spectrum .* 2 .* pi .* k .^ 2 ./ contribution
 
     return spectrum, k
 end

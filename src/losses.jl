@@ -71,10 +71,62 @@ function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f
     loss_avg = 1/n * Statistics.mean(loss_avg) # mean over samples/batches
 
     # spatial deviation component of loss
-    loss_dev = @. (z_dev + σ_t * s_t_dev)^2 # squared deviations from real score
+    dev = @. (z_dev + σ_t * s_t_dev)
+    loss_dev = dev.^2 # squared deviations from real score
     loss_dev = mean(loss_dev, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
     loss_dev = Statistics.mean(loss_dev) # mean over samples/batches    
 
-    return [loss_avg, loss_dev]
+    # spectral loss for deviations
+    dim = size(dev, 1)
+    dev_fft = abs.(fft(dev, 1:(ndims(x_0)-2))) ./ dim^2
+    if mod(dim, 2) == 0
+        rx = range(0, stop=dim - 1, step=1) .- dim / 2 .+ 1
+        ry = range(0, stop=dim - 1, step=1) .- dim / 2 .+ 1
+        R_x = circshift(rx', (1, dim / 2 + 1))
+        R_y = circshift(ry', (1, dim / 2 + 1))
+        k_nyq = dim / 2
+    else
+        rx = range(0, stop=dim - 1, step=1) .- (dim - 1) / 2
+        ry = range(0, stop=dim - 1, step=1) .- (dim - 1) / 2
+        R_x = circshift(rx', (1, (dim + 1) / 2))
+        R_y = circshift(ry', (1, (dim + 1) / 2))
+        k_nyq = (dim - 1) / 2
+    end
+    r = zeros(eltype(x_0), size(rx, 1), size(ry, 1))
+    for i in 1:size(rx, 1), j in 1:size(ry, 1)
+        r[i, j] = sqrt(R_x[i]^2 + R_y[j]^2)
+    end
+    k = range(1, stop=k_nyq, step=1)
+    endk = size(k, 1)
+    contribution = zeros(eltype(x_0),(endk, (size(x_0)[ndims(x_0)-1],size(x_0)[end])...))
+    spectrum = zeros(eltype(x_0),(endk, (size(x_0)[ndims(x_0)-1],size(x_0)[end])...))
+    for N in 2:Int64(k_nyq - 1)
+        for i in 1:size(rx, 1), j in 1:size(ry, 1)
+            if (r[i, j] <= (k'[N+1] + k'[N]) / 2) &&
+               (r[i, j] > (k'[N] + k'[N-1]) / 2)
+                spectrum[N,:,:] +=  dev_fft[i, j,:,:].^2
+                contribution[N,:,:] .+=  1
+            end
+        end
+    end
+    for i in 1:size(rx, 1), j in 1:size(ry, 1)
+        if (r[i, j]  <= (k'[2] + k'[1]) / 2)
+            spectrum[1,:,:] += dev_fft[i, j,:,:].^2
+            contribution[1,:,:] .+=  1
+        end
+    end
+    for i in 1:size(rx, 1), j in 1:size(ry, 1)
+        if (r[i, j]  <= k'[endk]) &&
+           (r[i, j]  > (k'[endk] + k'[endk-1]) / 2)
+            spectrum[endk,:,:] +=  dev_fft[i, j,:,:].^2
+            contribution[endk,:,:] .+= 1
+        end
+    end
+    spectrum = @. (spectrum * 2 * pi * k ^ 2 / contribution)
+    loss_spec = Statistics.mean(spectrum) # avg over channels and batch members
+    return [loss_avg, loss_dev, loss_spec]
 end
+
+
+
 
