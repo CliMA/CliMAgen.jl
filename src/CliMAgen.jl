@@ -27,7 +27,7 @@ include("training.jl")
 include("sampling.jl")
 
 export struct2dict, dict2nt
-export VarianceExplodingSDE
+export VarianceExplodingSDE, VarianceExplodingSDEVariant
 export drift, diffusion, marginal_prob, score
 export score_matching_loss, score_matching_loss_variant
 export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, AttentionBlock, NoiseConditionalScoreNetworkVariant

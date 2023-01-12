@@ -102,3 +102,31 @@ function marginal_prob(m::VarianceExplodingSDE, x_0, t)
     σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^t
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end
+
+
+"""
+    ClimaGen.VarianceExplodingSDEVariant
+
+Explores a more mild increase between σ_min and σ_max
+"""
+Base.@kwdef struct VarianceExplodingSDEVariant{FT,N} <: AbstractDiffusionModel
+    σ_max::FT
+    σ_min::FT
+    net::N
+end
+
+@functor VarianceExplodingSDEVariant
+
+function drift(::VarianceExplodingSDEVariant{FT}, t) where {FT}
+    return similar(t) .* FT(0)
+end
+
+function diffusion(m::VarianceExplodingSDEVariant, t)
+    return @. 2 * m.σ_min * (m.σ_max/m.σ_min)^(t*t)*sqrt(t*log(m.σ_max/m.σ_min))
+end
+
+function marginal_prob(m::VarianceExplodingSDEVariant, x_0, t)
+    μ_t = x_0
+    σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^(t*t)
+    return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
+end

@@ -21,12 +21,14 @@ function run_training(params; FT=Float32, logger=nothing)
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
+
     batchsize = params.data.batchsize
     tilesize = params.data.tilesize
     kernel_std = params.data.kernel_std
     standard_scaling = params.data.standard_scaling
     bias_wn = params.data.bias_wn
     bias_amplitude = params.data.bias_amplitude
+
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
     inchannels = params.model.inchannels
@@ -35,6 +37,12 @@ function run_training(params; FT=Float32, logger=nothing)
     mean_bypass = params.model.mean_bypass
     scale_mean_bypass = params.model.scale_mean_bypass
     gnorm = params.model.gnorm
+    proj_kernelsize = params.model.proj_kernelsize
+    outer_kernelsize = params.model.outer_kernelsize
+    middle_kernelsize = params.model.middle_kernelsize
+    inner_kernelsize = params.model.inner_kernelsize
+    w::FT = params.model.w
+
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
     learning_rate::FT = params.optimizer.learning_rate
@@ -87,6 +95,10 @@ function run_training(params; FT=Float32, logger=nothing)
             mean_bypass = mean_bypass,
             scale_mean_bypass = scale_mean_bypass,
             gnorm = gnorm,
+            proj_kernelsize = proj_kernelsize,
+            outer_kernelsize = outer_kernelsize,
+            middle_kernelsize = middle_kernelsize,
+            inner_kernelsize = inner_kernelsize
         )
         model = VarianceExplodingSDE(sigma_max, sigma_min, net)
         model = device(model)
@@ -115,7 +127,7 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up loss function
-    lossfn = x -> score_matching_loss_variant(model, x)
+    lossfn = x -> score_matching_loss_variant(model, x; w = w)
 
     # train the model
     train!(
