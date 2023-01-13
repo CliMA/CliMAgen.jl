@@ -105,7 +105,21 @@ end
 """
 User Facing API for NoiseConditionalScoreNetwork architecture.
 """
-function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_bypass=false, shift_input=false, shift_output=false, gnorm=false, nspatial=2, num_residual=8, inchannels=1, channels=[32, 64, 128, 256], embed_dim=256, scale=30.0f0)
+function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, 
+                                               scale_mean_bypass=false,
+                                               shift_input=false,
+                                               shift_output=false,
+                                               gnorm=false,
+                                               nspatial=2,
+                                               num_residual=8,
+                                               inchannels=1,
+                                               channels=[32, 64, 128, 256],
+                                               embed_dim=256,
+                                               scale=30.0f0,
+                                               proj_kernelsize = 3,
+                                               outer_kernelsize = 3,
+                                               middle_kernelsize = 3,
+                                               inner_kernelsize = 3)
     if scale_mean_bypass & !mean_bypass
         @error("Attempting to scale the mean bypass term without adding in a mean bypass connection.")
     end
@@ -147,15 +161,15 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
               gnorm1=GroupNorm(channels[1], 4, swish),
               
               # Encoding
-              conv2=Downsampling(channels[1] => channels[2], nspatial),
+              conv2=Downsampling(channels[1] => channels[2], nspatial, kernel_size=3),
               dense2=Dense(embed_dim, channels[2]),
               gnorm2=GroupNorm(channels[2], 32, swish),
               
-              conv3=Downsampling(channels[2] => channels[3], nspatial),
+              conv3=Downsampling(channels[2] => channels[3], nspatial, kernel_size=3),
               dense3=Dense(embed_dim, channels[3]),
               gnorm3=GroupNorm(channels[3], 32, swish),
               
-              conv4=Downsampling(channels[3] => channels[4], nspatial),
+              conv4=Downsampling(channels[3] => channels[4], nspatial, kernel_size=3),
               dense4=Dense(embed_dim, channels[4]),
               
               # Residual Blocks
@@ -164,20 +178,20 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, scale_mean_b
               
               # Decoding
               gnorm4=GroupNorm(channels[4], 32, swish),
-              tconv4=Upsampling(channels[4] => channels[3], nspatial),
+              tconv4=Upsampling(channels[4] => channels[3], nspatial, kernel_size=inner_kernelsize),
               denset4=Dense(embed_dim, channels[3]),
               tgnorm4=GroupNorm(channels[3], 32, swish),
               
-              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial),
+              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=middle_kernelsize),
               denset3=Dense(embed_dim, channels[2]),
               tgnorm3=GroupNorm(channels[2], 32, swish),
               
-              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial),
+              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=outer_kernelsize),
               denset2=Dense(embed_dim, channels[1]),
               tgnorm2=GroupNorm(channels[1], 32, swish),
               
               # Projection
-              tconv1=Conv((3, 3), channels[1] + channels[1] => inchannels, stride=1, pad=SamePad()),
+              tconv1=Conv((proj_kernelsize, proj_kernelsize), channels[1] + channels[1] => inchannels, stride=1, pad=SamePad()),
               mean_bypass_layers...
               )
     
@@ -594,7 +608,7 @@ apply_attention_weights(w, v, ::Val{2}) =
     @tullio v_weighted[h2, w2, c, b] := w[h1, w1, h2, w2, b] * v[h1, w1, c, b]
 
 
-function Downsampling(channels::Pair, nspatial::Int, factor::Int=2, kernel_size::Int=3)
+function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
     return Conv(conv_kernel, channels, stride=factor, pad=SamePad())
 end
@@ -607,7 +621,7 @@ Checkerboard-save upsampling using nearest neighbor interpolation and convolutio
 References:
 https://distill.pub/2016/deconv-checkerboard/
 """
-function Upsampling(channels::Pair{S,S}, nspatial::Int, factor::Int=2, kernel_size::Int=3) where {S}
+function Upsampling(channels::Pair{S,S}, nspatial::Int; factor::Int=2, kernel_size::Int=3) where {S}
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
     return Chain(
         Flux.Upsample(factor, :nearest),
