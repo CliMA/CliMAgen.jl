@@ -176,8 +176,8 @@ as well as the spatial frequencies `k`.
 This has issues with memory for large images.
 Revisit!
 """
-function batch_spectra(data, L::Int)
-    statistics = x -> hcat(power_spectrum2d(x, L)...)
+function batch_spectra(data)
+    statistics = x -> hcat(power_spectrum2d(x)...)
     data = data |> Flux.cpu
     results = mapslices(statistics, data, dims=[1, 2])
     k = results[:, 2, 1, 1]
@@ -503,12 +503,13 @@ is equal to `power`.
 If `power` is the power of the radially averaged Fourier spectrum
 of a source image, at wavenumber `k`, this time corresponds to the 
 approximate time at which the signal to noise at `k` is 1.
-This is because the radial power(k) for white noise is: k^2*σ^2/2π,
+This is because the radial power(k) for white noise is: k^2*σ^2*2π/L^2,
 and the forward diffusion process for a VE difussion mode 
 satisfies dx = g(t) dw, with ∫_0^t g(s)^2 ds) = σ_min^2(σ_max/σ_min)^(2t).
 """
-function t_cutoff(power::FT, k::FT, σ_max::FT, σ_min::FT) where {FT}
-    return 1/2*log(2 * pi * power/k^2/σ_min^2)/log(σ_max/σ_min)
+function t_cutoff(power::FT, k::FT, σ_max::FT, σ_min::FT, L::FT) where {FT}
+
+    return 1/2*log(L^2*power/k^2/σ_min^2/2π)/log(σ_max/σ_min)
 end
 
 """
