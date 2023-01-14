@@ -84,6 +84,7 @@ Base.deepcopy(m::M) where {M <: AbstractDiffusionModel} =
 Base.@kwdef struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
     σ_max::FT
     σ_min::FT
+    n::FT
     net::N
 end
 
@@ -94,11 +95,13 @@ function drift(::VarianceExplodingSDE{FT}, t) where {FT}
 end
 
 function diffusion(m::VarianceExplodingSDE, t)
-    return @. m.σ_min * (m.σ_max/m.σ_min)^t*sqrt(2*log(m.σ_max/m.σ_min))
+    tn = t.^m.n
+    return @. m.σ_min * (m.σ_max/m.σ_min)^(tn)*sqrt(2*log(m.σ_max/m.σ_min)*m.n*tn/t)
 end
 
 function marginal_prob(m::VarianceExplodingSDE, x_0, t)
     μ_t = x_0
-    σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^t
+    tn = t.^m.n
+    σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^(tn)
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end

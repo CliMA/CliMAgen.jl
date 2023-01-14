@@ -23,6 +23,7 @@ shift_input       = true
 shift_output      = true
 scale_mean_bypass = true
 gnorm             = true
+exponent          = 1
 
 [optimizer]
 learning_rate     = 2e-4
