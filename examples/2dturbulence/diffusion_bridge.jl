@@ -57,6 +57,34 @@ function unpack_experiment(experiment_toml; nogpu = false, FT=Float32)
     return model, xtrain |> device
 end
 
+function white_noise_spectrum_plot(; target_toml="experiments/Experiment256_base_copy.toml")
+    FT = Float32
+    nogpu = false
+    nsteps = 125
+    savepath = "./"
+    nsamples = 32
+    channel = 1
+    reverse_model, xtarget = unpack_experiment(target_toml; nogpu=nogpu, FT=FT)
+    target_spectra, k = batch_spectra(xtarget |> cpu, size(xtarget)[1])
+    wavenumber = k/(2π)*size(xtarget)[1]
+    white_noise_spectra_σ_1, _ = power_spectrum2d(randn((256,256))*0.1, 256)
+    white_noise_spectra_σ_0, _ = power_spectrum2d(randn((256,256))*1, 256)
+    white_noise_spectra_σ_p1, _ = power_spectrum2d(randn((256,256))*10, 256)
+    white_noise_spectra_σ_p2, _ = power_spectrum2d(randn((256,256))*100, 256)
+    plot(wavenumber, Statistics.mean(target_spectra, dims = (2,3))[:], label = "data")
+    plot!(xlabel = "Log(wavenumber)", ylabel = "Log(Power)", xaxis = :log, yaxis = :log)
+    plot!(bottom_margin = 10Plots.mm, left_margin = 20Plots.mm, tickfontsize=10)
+    plot!(wavenumber, white_noise_spectra_σ_1, label = "")
+    plot!(wavenumber, white_noise_spectra_σ_0, label = "")
+    plot!(wavenumber, white_noise_spectra_σ_p1, label = "")
+    plot!(wavenumber, white_noise_spectra_σ_p2, label = "")
+    plot!(legend = :bottomright)
+    annotate!(45,1e-2, text("σ=0.1, t = 0.21", 8))
+    annotate!(45,1, text("σ=1, t = 0.43", 8))
+    annotate!(45,1e2, text("σ=10, t = 0.64", 8))
+    annotate!(45,1e4, text("σ=100, t = 0.85", 8))
+    savefig(joinpath(savepath, "white_noise.png"))
+end
 
 function two_model_bridge(;
                           source_toml="experiments/Experiment256_larger_bias_and_blurry.toml",
