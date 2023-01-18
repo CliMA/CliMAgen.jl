@@ -86,7 +86,9 @@ end
 end
 
 @testset "NCSN Variant Network" begin
-    net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2)
+    net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, outer_kernelsize=5, channels=[32, 64, 128, 256])
+    @test size(Flux.params(net.layers.tconv2)[1]) == (5, 5, 128, 32)
+
     ps = Flux.params(net)
     k = 5
     x = rand(Float32, 2^k, 2^k, 2, 11)
@@ -100,11 +102,11 @@ end
     end
     @test loss isa Real
 
-    shift_input_net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, shift_input=true)
+    shift_input_net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, shift_input=true, outer_kernelsize=5,)
     Flux.loadmodel!(shift_input_net, net)
     @test net(x.-mean(x, dims = (1,2)), t) ≈ shift_input_net(x, t)
 
-    shift_output_net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, shift_output=true)
+    shift_output_net = CliMAgen.NoiseConditionalScoreNetworkVariant(inchannels=2, shift_output=true, outer_kernelsize=5,)
     Flux.loadmodel!(shift_output_net, net)
     @test (net(x, t) .-mean(net(x,t), dims = (1,2))) ≈ shift_output_net(x, t)
 
