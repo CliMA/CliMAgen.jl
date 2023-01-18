@@ -84,7 +84,6 @@ Base.deepcopy(m::M) where {M <: AbstractDiffusionModel} =
 Base.@kwdef struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
     σ_max::FT
     σ_min::FT
-    n::FT
     net::N
 end
 
@@ -95,13 +94,41 @@ function drift(::VarianceExplodingSDE{FT}, t) where {FT}
 end
 
 function diffusion(m::VarianceExplodingSDE, t)
-    tn = t.^m.n
-    return @. m.σ_min * (m.σ_max/m.σ_min)^(tn)*sqrt(2*log(m.σ_max/m.σ_min)*m.n*tn/t)
+    return @. m.σ_min * (m.σ_max/m.σ_min)^t*sqrt(2*log(m.σ_max/m.σ_min))
 end
 
 function marginal_prob(m::VarianceExplodingSDE, x_0, t)
     μ_t = x_0
+    σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^(t)
+    return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
+end
+
+
+"""
+    ClimaGen.VarianceExplodingSDEVariant
+"""
+Base.@kwdef struct VarianceExplodingSDEVariant{FT,N} <: AbstractDiffusionModel
+    σ_max::FT
+    σ_min::FT
+    n::FT
+    net::N
+end
+
+@functor VarianceExplodingSDEVariant
+
+function drift(::VarianceExplodingSDEVariant{FT}, t) where {FT}
+    return similar(t) .* FT(0)
+end
+
+function diffusion(m::VarianceExplodingSDEVariant, t)
     tn = t.^m.n
-    σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^(tn)
+    tnm1 = t.^(m.n-1)
+    return @. sqrt(2*(m.σ_max - m.σ_min) * m.n * tnm1 * m.σ_min * ((m.σ_max/m.σ_min -1)*tn +1))
+end
+
+function marginal_prob(m::VarianceExplodingSDEVariant, x_0, t)
+    μ_t = x_0
+    tn = t.^m.n
+    σ_t = @. m.σ_min * ((m.σ_max/m.σ_min)*tn+1)
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end

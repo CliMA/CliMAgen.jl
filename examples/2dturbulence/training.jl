@@ -89,7 +89,7 @@ function run_training(params; FT=Float32, logger=nothing)
             scale_mean_bypass = scale_mean_bypass,
             gnorm = gnorm,
         )
-        model = VarianceExplodingSDE(sigma_max, sigma_min, exponent, net)
+        model = VarianceExplodingSDEVariant(sigma_max, sigma_min, exponent, net)
         model = device(model)
         model_smooth = deepcopy(model)
     
