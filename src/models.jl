@@ -123,12 +123,12 @@ end
 function diffusion(m::VarianceExplodingSDEVariant, t)
     tn = t.^m.n
     tnm1 = t.^(m.n-1)
-    return @. sqrt(2*(m.σ_max - m.σ_min) * m.n * tnm1 * m.σ_min * ((m.σ_max/m.σ_min -1)*tn +1))
+    return @. sqrt(2*(m.σ_max - m.σ_min) * m.n * tnm1 * m.σ_min * ((m.σ_max/m.σ_min - 1) * tn + 1))
 end
 
 function marginal_prob(m::VarianceExplodingSDEVariant, x_0, t)
     μ_t = x_0
     tn = t.^m.n
-    σ_t = @. m.σ_min * ((m.σ_max/m.σ_min)*tn+1)
+    σ_t = @. m.σ_min * ((m.σ_max/m.σ_min - 1) * tn + 1)
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end
