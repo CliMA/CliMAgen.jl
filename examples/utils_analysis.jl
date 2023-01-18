@@ -568,9 +568,9 @@ function diffusion_simulation(model::CliMAgen.AbstractDiffusionModel,
     end
 
     if sde
-        de, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end)
+        de, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end *FT(1.01))
     else
-        de, Δt = setup_ODEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end)
+        de, Δt = setup_ODEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end * FT(1.01))
     end
     solution = DifferentialEquations.solve(de, solver, dt=Δt, saveat = saveat, adaptive = false)
     return solution

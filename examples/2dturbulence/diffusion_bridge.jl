@@ -67,6 +67,7 @@ function white_noise_spectrum_plot(; target_toml="experiments/Experiment256_base
     reverse_model, xtarget = unpack_experiment(target_toml; nogpu=nogpu, FT=FT)
     target_spectra, k = batch_spectra(xtarget |> cpu, size(xtarget)[1])
     wavenumber = k/(2π)*size(xtarget)[1]
+    white_noise_spectra_σ_2, _ = power_spectrum2d(randn((256,256))*0.01, 256)
     white_noise_spectra_σ_1, _ = power_spectrum2d(randn((256,256))*0.1, 256)
     white_noise_spectra_σ_0, _ = power_spectrum2d(randn((256,256))*1, 256)
     white_noise_spectra_σ_p1, _ = power_spectrum2d(randn((256,256))*10, 256)
@@ -74,11 +75,13 @@ function white_noise_spectrum_plot(; target_toml="experiments/Experiment256_base
     plot(wavenumber, Statistics.mean(target_spectra, dims = (2,3))[:], label = "data")
     plot!(xlabel = "Log(wavenumber)", ylabel = "Log(Power)", xaxis = :log, yaxis = :log)
     plot!(bottom_margin = 10Plots.mm, left_margin = 20Plots.mm, tickfontsize=10)
+    plot!(wavenumber, white_noise_spectra_σ_2, label = "")
     plot!(wavenumber, white_noise_spectra_σ_1, label = "")
     plot!(wavenumber, white_noise_spectra_σ_0, label = "")
     plot!(wavenumber, white_noise_spectra_σ_p1, label = "")
     plot!(wavenumber, white_noise_spectra_σ_p2, label = "")
     plot!(legend = :bottomright)
+    annotate!(45,1e-4, text("σ=0.01, t = 0.0", 8))
     annotate!(45,1e-2, text("σ=0.1, t = 0.21", 8))
     annotate!(45,1, text("σ=1, t = 0.43", 8))
     annotate!(45,1e2, text("σ=10, t = 0.64", 8))
@@ -87,7 +90,7 @@ function white_noise_spectrum_plot(; target_toml="experiments/Experiment256_base
 end
 
 function two_model_bridge(;
-                          source_toml="experiments/Experiment256_larger_bias_and_blurry.toml",
+                          source_toml="experiments/Experiment256_blurry_copy.toml",
                           target_toml="experiments/Experiment256_base_copy.toml")
     FT = Float32
     nogpu = false
@@ -103,14 +106,27 @@ function two_model_bridge(;
     
     source_spectra, k = batch_spectra(xsource |> cpu, size(xsource)[1])
     target_spectra, k = batch_spectra(xtarget |> cpu, size(xtarget)[1])
-
+    wavenumber = k/(2π)*size(xtarget)[1]
     # this is manual right now. just eyeball it.
-    cutoff_idx = 3
+    mean_source_spectra = Statistics.mean(source_spectra, dims = (2,3))[:]
+    mean_target_spectra = Statistics.mean(target_spectra, dims = (2,3))[:]
+
+    plot(wavenumber, mean_target_spectra, label = "target (hi-res)")
+    plot!(xlabel = "Log(wavenumber)", ylabel = "Log(Power)", xaxis = :log, yaxis = :log)
+    plot!(bottom_margin = 10Plots.mm, left_margin = 20Plots.mm, tickfontsize=10)
+    plot!(wavenumber,  mean_source_spectra, label = "source (biased, low-res)")
+    cutoff_idx = 6
     k_cutoff = FT(k[cutoff_idx])
 
-    source_power_at_cutoff = FT(mean(source_spectra[cutoff_idx,:,:]))
+    source_power_at_cutoff = FT(mean_source_spectra[cutoff_idx])
     forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, forward_model.σ_max, forward_model.σ_min))
-    target_power_at_cutoff = FT(mean(target_spectra[cutoff_idx,:,:]))
+    σ_t_end = forward_model.σ_min*(forward_model.σ_max/forward_model.σ_min)^forward_t_end
+    white_noise_spectra_t_end = (σ_t_end^2/2/π).*k.^2
+    plot!(wavenumber, white_noise_spectra_t_end, label = "")
+    annotate!(40,3, text("σ(t_c) = 2.0, t_c = 0.49", 8))
+    savefig("./t_cutoff_illustration.png")
+
+    target_power_at_cutoff = FT(mean_target_spectra[cutoff_idx])
     reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, reverse_model.σ_max, reverse_model.σ_min))
 
     # create a bridge plot for a single image.
@@ -125,7 +141,8 @@ function two_model_bridge(;
                                                                      forward_sde=false,
                                                                      reverse_solver=DifferentialEquations.EM(),
                                                                      reverse_t_end=reverse_t_end,
-                                                                     reverse_sde=true
+                                                                     reverse_sde=true,
+                                                                     nsave=4
                                                                      )
     # To make the plot with grayscale, we need to scale each one to between 0 and 1. 
     images = cat(forward_solution.u..., reverse_solution.u[2:end]..., dims = (4));
