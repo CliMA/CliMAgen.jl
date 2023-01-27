@@ -1,0 +1,49 @@
+[experiment]
+project           = "CliMAgen.jl"
+name              = "2dturbulence_128_original_preprocess"
+savedir           = "/home/kdeck/output/2dturbulence_128_original_preprocess/"
+rngseed           = 123
+logging           = false
+nogpu             = false
+
+[data]
+batchsize         = 64
+tilesize          = 128
+kernel_std        = 0
+standard_scaling  = false
+bias_amplitude    = 0
+bias_wn           = 0
+
+[model]
+inchannels        = 2
+sigma_max         = 300.0
+sigma_min         = 1e-2
+mean_bypass       = false
+shift_input       = false
+shift_output      = false
+scale_mean_bypass = false
+gnorm             = false
+proj_kernelsize   = 3
+outer_kernelsize  = 3
+middle_kernelsize = 3
+inner_kernelsize  = 3
+
+[optimizer]
+learning_rate     = 2e-4
+epsilon           = 1e-8
+beta_1            = 0.9
+beta_2            = 0.999
+gradnorm          = 1.0
+ema_rate          = 0.999
+nwarmup           = 5000
+
+[training]
+nepochs           = 240
+freq_chckpt       = 240
+
+[sampling]
+nsteps            = 1000
+nsamples          = 100
+nimages           = 20
+sampler           = "euler"
+tilesize          = 128
