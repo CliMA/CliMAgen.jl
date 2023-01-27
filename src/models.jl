@@ -132,3 +132,32 @@ function marginal_prob(m::VarianceExplodingSDEVariant, x_0, t)
     σ_t = @. m.σ_min * ((m.σ_max/m.σ_min - 1) * tn + 1)
     return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
 end
+
+"""
+    ClimaGen.VarianceExplodingSDEGeometricVariant
+"""
+Base.@kwdef struct VarianceExplodingSDEGeometricVariant{FT,N} <: AbstractDiffusionModel
+    σ_max::FT
+    σ_min::FT
+    n::FT
+    net::N
+end
+
+@functor VarianceExplodingSDEGeometricVariant
+
+function drift(::VarianceExplodingSDEGeometricVariant{FT}, t) where {FT}
+    return similar(t) .* FT(0)
+end
+
+function diffusion(m::VarianceExplodingSDEGeometricVariant{FT}, t) where {FT}
+    tn = (t .+eps(FT)).^m.n
+    tnm1 = (t .+eps(FT)).^(m.n-1)
+    return @. m.σ_min * (m.σ_max/m.σ_min)^tn * sqrt(2*m.n*tnm1*log(m.σ_max/m.σ_min))
+end
+
+function marginal_prob(m::VarianceExplodingSDEGeometricVariant{FT}, x_0, t) where {FT}
+    μ_t = x_0
+    tn = (t .+eps(FT)).^m.n
+    σ_t = @. m.σ_min * (m.σ_max/m.σ_min)^tn
+    return μ_t, expand_dims(σ_t, ndims(μ_t) - 1)
+end

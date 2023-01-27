@@ -87,9 +87,19 @@ function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, logger=not
     data_results = data_results[1,1,:,:]
     plot_array = []
     for channel in 1:inchannels
-        plt = plot(xlabel = "Spatial Mean", ylabel = "Probability density", title = string("Ch:",string(channel)))
-        plot!(plt, data_results[channel,:], seriestype=:stephist, label = "data", norm = true, color = :red)
-        plot!(plt, gen_results[channel,:],  seriestype=:stephist, label ="generated", norm = true, color = :black)
+        plt = plot(xlabel = "Spatial Mean", title = string("Channel ",string(channel)))
+        if channel == 1
+            plot!(plt, ylabel = "Probability density")
+            plot!(plt, data_results[channel,:], seriestype=:stephist, label = "data", norm = true, color = :red)
+            plot!(plt, gen_results[channel,:],  seriestype=:stephist, label ="generated", norm = true, color = :black)
+    
+        else
+            plot!(plt, data_results[channel,:], seriestype=:stephist, label = "", norm = true, color = :red)
+            plot!(plt, gen_results[channel,:],  seriestype=:stephist, label ="", norm = true, color = :black)
+        end
+        plot!(plt, tickfontsize=8,
+        bottom_margin = 10Plots.mm,
+        left_margin = 10Plots.mm)
         push!(plot_array, plt)
     end
     
@@ -124,17 +134,21 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
             data_cdf = data_results[1, stat, channel, :]
             gen_cdf = gen_results[1, stat, channel, :]
             plt = plot(gen_cdf, data_cdf, color=:red, label="")
-            plot!(plt, data_cdf, data_cdf, color=:black, linestyle=:dot, label="")
+            plot!(plt, data_cdf, data_cdf, color=:black, linestyle=:dot, label="", bottom_margin = 10Plots.mm,
+            left_margin = 10Plots.mm)
             plot!(plt,
-                xlabel="Gen",
-                ylabel="Data",
                 title=string("Ch:", string(channel), ", ", statistic_names[stat]),
-                tickfontsize=4)
+                tickfontsize=6, aspect_ratio=:equal)
+            if channel ==inchannels
+                plot!(plt, xlabel = "generated", ylabel = "data")
+            end
             push!(plot_array, plt)
         end
     end
 
     plot(plot_array..., layout=(inchannels, length(statistics)), aspect_ratio=:equal)
+    plot!(
+          size = (800,600))
     Plots.savefig(joinpath(savepath, plotname))
 
     if !(logger isa Nothing)
@@ -144,12 +158,10 @@ end
 
 """
     batch_spectra(data, L::Int)
-
 Computes and returns the mean radially average power 
 spectrum for the data, where the mean is taken
 over the batch dimension, not the channel dimension,
 as well as the spatial frequencies `k`.
-
 This has issues with memory for large images.
 Revisit!
 """
@@ -168,12 +180,13 @@ end
 Helper function to make a spectrum plot.
 """
 function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing) 
-    L = FT(1) # Eventually a physical size
+    L = size(data)[1]
     statistics = x -> hcat(power_spectrum2d(x, L)...)
     inchannels = size(data)[end-1]
 
     data_results = mapslices(statistics, data, dims=[1, 2])
     k = data_results[:, 2, 1, 1]
+    wavenumber = k /(2π)*L
     data_results = data_results[:, 1, :, :]
 
     gen = gen |> Flux.cpu
@@ -190,17 +203,29 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing
         lower_gen_spectrum = mapslices(x -> percentile(x[:], 10), gen_results[:, channel, :], dims=2)
         upper_gen_spectrum = mapslices(x -> percentile(x[:], 90), gen_results[:, channel, :], dims=2)
         gen_confidence = (gen_spectrum .- lower_gen_spectrum, upper_gen_spectrum .- gen_spectrum)
-        plt = plot(k, data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log, xaxis=:log)
-        plot!(plt, k, gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
+        if channel == inchannels
+            plt = plot(wavenumber, data_spectrum, ribbon = data_confidence, color=:red, label="data", yaxis=:log, xaxis=:log)
+            plot!(plt, wavenumber, gen_spectrum, ribbon = gen_confidence, color=:blue, label="generated")
+            plot!(plt, xlabel = "Log(Wavenumber)")
+        else        
+            plt = plot(wavenumber, data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log, xaxis=:log)
+            plot!(plt, wavenumber, gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
+    
+        end
+
         plot!(plt,
-            xlabel="Log(k)",
-            ylabel="Log(Power)",
-            title=string("Ch:", string(channel)),
-            tickfontsize=4)
+            #ylabel = "Log(Power)",
+            title=string("Channel ", string(channel)),
+            tickfontsize=10,
+            bottom_margin = 10Plots.mm,
+            left_margin = 20Plots.mm)
         push!(plot_array, plt)
     end
 
     plot(plot_array..., layout=(inchannels, 1))
+    plot!(
+          ylabel = "Log(Power)",
+          size = (800,800))
     Plots.savefig(joinpath(savepath, plotname))
 
     if !(logger isa Nothing)
