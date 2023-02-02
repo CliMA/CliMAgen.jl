@@ -23,15 +23,16 @@ function run_training(params; FT=Float32, logger=nothing)
     nogpu = params.experiment.nogpu
 
     batchsize = params.data.batchsize
-    tilesize = params.data.tilesize
-    kernel_std = params.data.kernel_std
-    standard_scaling = params.data.standard_scaling
-    bias_wn = params.data.bias_wn
-    bias_amplitude = params.data.bias_amplitude
+    resolution = params.data.resolution
+    wavenumber::FT = params.data.wavenumber
+    fraction::FT = params.data.fraction
+    standard_scaling  = params.data.standard_scaling
+    transform_moisture = params.data.transform_moisture
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
-    inchannels = params.model.inchannels
+    noised_channels = params.model.noised_channels
+    context_channels = params.model.context_channels
     shift_input = params.model.shift_input
     shift_output = params.model.shift_output
     mean_bypass = params.model.mean_bypass
@@ -66,14 +67,13 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_2dturbulence(
+    dataloaders = get_data_context2dturbulence(
         batchsize;
-        width=(tilesize, tilesize),
-        stride=(tilesize, tilesize),
-        kernel_std=kernel_std,
-        standard_scaling=standard_scaling,
-        bias_wn = bias_wn,
-        bias_amplitude = bias_amplitude,
+        resolution = resolution,
+        wavenumber = wavenumber,
+        fraction = fraction,
+        standard_scaling = standard_scaling,
+        transform_moisture = transform_moisture,
         FT=FT
     )
 
@@ -89,7 +89,9 @@ function run_training(params; FT=Float32, logger=nothing)
         start_epoch = loss_data[end,1]+1
     else
         net = NoiseConditionalScoreNetworkVariant(;
-                                                  noised_channels = inchannels,
+                                                  context = true,
+                                                  noised_channels = noised_channels,
+                                                  context_channels = context_channels,
                                                   shift_input = shift_input,
                                                   shift_output = shift_output,
                                                   mean_bypass = mean_bypass,
@@ -127,7 +129,11 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up loss function
-    lossfn = x -> score_matching_loss_variant(model, x)
+    function lossfn(y; noised_channels = noised_channels, context_channels=context_channels)
+        x = y[:,:,1:noised_channels,:]
+        c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
+        return score_matching_loss_variant(model, x; c = c)
+    end
 
     # train the model
     train!(

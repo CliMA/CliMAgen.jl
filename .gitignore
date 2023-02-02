@@ -4,10 +4,12 @@
 
 output/
 wandb/
-experiments/
-experiments/Manifest.toml
-experiments/2dturbulence/*sh
-experiments/uniform/*sh
+examples/2dturbulence/*out
+examples/2dturbulence/experiments
+examples/Manifest.toml
+examples/2dturbulence/*sh
+examples/uniform/*sh
+examples/uniform/experiments
 *~
 *.png
 *.jpg

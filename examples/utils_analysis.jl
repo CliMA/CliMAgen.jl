@@ -336,7 +336,7 @@ as a function of time. This is different from the true loss
 term optimized by the network, which takes the expectation of this
 quantity over time, training data x(0), and samples from P(x(t)|x(0)).
 """
-function timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
+function timewise_score_matching_loss(model, x_0; ϵ=1.0f-5, c=nothing)
     # sample times
     t = LinRange(ϵ,1.0f0,size(x_0)[end])
 
@@ -346,7 +346,7 @@ function timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
     x_t = @. μ_t + σ_t * z
 
     # evaluate model score s₀(𝘹(𝘵), 𝘵)
-    s_t = CliMAgen.score(model, x_t, t)
+    s_t = CliMAgen.score(model, x_t, t; c=c)
 
     # Assume that λ(t) = σ(t)² and pull it into L₂-norm
     # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
@@ -361,7 +361,7 @@ end
 Compute the scaled score for a single realization of data
 as a function of time. 
 """
-function model_scale(model, x_0, ϵ=1.0f-5)
+function model_scale(model, x_0; ϵ=1.0f-5, c=nothing)
     # sample times
     t = LinRange(ϵ, 1.0f0, size(xtrain)[end])
 
@@ -371,7 +371,7 @@ function model_scale(model, x_0, ϵ=1.0f-5)
     x_t = @. μ_t + σ_t * z
 
     # evaluate model score s₀(𝘹(𝘵), 𝘵)
-    s_t = CliMAgen.score(model, x_t, t)
+    s_t = CliMAgen.score(model, x_t, t;c=c)
 
     # Assume that λ(t) = σ(t)² and pull it into L₂-norm
     # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
@@ -398,7 +398,7 @@ and the integration proceeds from `ϵ` to `t_end`.
 The timestep `Δt `corresponding to this setup is also returned. This is a positive
 quantity by defintion.
 """
-function setup_SDEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps::Int; ϵ=1.0f-5, reverse::Bool=false, t_end=1.0f0)
+function setup_SDEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps::Int; c=nothing,ϵ=1.0f-5, reverse::Bool=false, t_end=1.0f0)
     if reverse
         time_steps = LinRange(t_end, ϵ, nsteps)
         f,g = CliMAgen.reverse_sde(model)
@@ -409,7 +409,7 @@ function setup_SDEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps
         Δt = time_steps[2] - time_steps[1]
     end
     tspan = (time_steps[begin], time_steps[end])
-    sde_problem = DifferentialEquations.SDEProblem(f, g, init_x, tspan)
+    sde_problem = DifferentialEquations.SDEProblem(f, g, init_x, tspan, c)
     return sde_problem, Δt
 end
 
@@ -428,7 +428,7 @@ tendency is used in either case.
 The timestep `Δt `corresponding to this setup is also returned. This is a positive
 quantity by defintion.
 """
-function setup_ODEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps::Int; ϵ=1.0f-5, reverse::Bool=false, t_end=1.0f0)
+function setup_ODEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps::Int; c=nothing,ϵ=1.0f-5, reverse::Bool=false, t_end=1.0f0)
     if reverse
         time_steps = LinRange(t_end, ϵ, nsteps)
         f= CliMAgen.probability_flow_ode(model)
@@ -439,7 +439,7 @@ function setup_ODEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps
         Δt = time_steps[2] - time_steps[1]
     end
     tspan = (time_steps[begin], time_steps[end])
-    ode_problem = DifferentialEquations.ODEProblem(f, init_x, tspan)
+    ode_problem = DifferentialEquations.ODEProblem(f, init_x, tspan, c)
     return ode_problem, Δt
 end
 
@@ -460,11 +460,11 @@ and uses the DifferentialEquations solver passed in via the `solver` kwarg. If y
 you willy likely need to import it directly from DifferentialEquations.
 """
 function model_gif(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps::Int, savepath::String, plotname::String;
-                   ϵ=1.0f-5, reverse::Bool=false, fps=50, sde::Bool=true, solver=DifferentialEquations.EM(), time_stride::Int=2)
+                   c=nothing, ϵ=1.0f-5, reverse::Bool=false, fps=50, sde::Bool=true, solver=DifferentialEquations.EM(), time_stride::Int=2)
     if sde
-        de, Δt = setup_SDEProblem(model, init_x,nsteps; ϵ=ϵ, reverse=reverse)
+        de, Δt = setup_SDEProblem(model, init_x, nsteps; c=c,ϵ=ϵ, reverse=reverse)
     else
-        de, Δt = setup_ODEProblem(model, init_x,nsteps; ϵ=ϵ, reverse=reverse)
+        de, Δt = setup_ODEProblem(model, init_x, nsteps; c=c, ϵ=ϵ, reverse=reverse)
     end
     solution = DifferentialEquations.solve(de, solver, dt=Δt)
     animation_images = convert_to_animation(solution.u, time_stride)
@@ -494,6 +494,7 @@ end
     diffusion_simulation(model::CliMAgen.AbstractDiffusionModel,
                          init_x,
                          nsteps::Int;
+                         c=nothing,
                          reverse::Bool=false,
                          FT=Float32,
                          ϵ=1.0f-5,
@@ -524,6 +525,7 @@ Returns a DifferentialEquations solution object, with fields `t` and `u`.
 function diffusion_simulation(model::CliMAgen.AbstractDiffusionModel,
                               init_x,
                               nsteps::Int;
+                              c=nothing,
                               reverse::Bool=false,
                               FT=Float32,
                               ϵ=1.0f-5,
@@ -542,9 +544,9 @@ function diffusion_simulation(model::CliMAgen.AbstractDiffusionModel,
 
     # Pad end time slightly to make sure we integrate and save the solution at t_end
     if sde
-        de, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
+        de, Δt = setup_SDEProblem(model, init_x, nsteps; c=c, ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
     else
-        de, Δt = setup_ODEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
+        de, Δt = setup_ODEProblem(model, init_x, nsteps; c=c, ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
     end
     solution = DifferentialEquations.solve(de, solver, dt=Δt, saveat = saveat, adaptive = false)
     return solution
@@ -581,7 +583,10 @@ end
                                 reverse_model::CliMAgen.VarianceExplodingSDE,
                                 init_x,
                                 nsteps::Int,
-                                ; FT=Float32,
+                                ;
+                                forward_c=nothing,
+                                reverse_c=nothing,
+                                FT=Float32,
                                 ϵ=1.0f-5,
                                 forward_sde::Bool=false,
                                 reverse_sde::Bool=false,
@@ -612,7 +617,10 @@ function diffusion_bridge_simulation(forward_model::CliMAgen.VarianceExplodingSD
                                      reverse_model::CliMAgen.VarianceExplodingSDE,
                                      init_x,
                                      nsteps::Int,
-                                     ; FT=Float32,
+                                     ;
+                                     forward_c=nothing,
+                                     reverse_c=nothing,
+                                     FT=Float32,
                                      ϵ=1.0f-5,
                                      forward_sde::Bool=false,
                                      reverse_sde::Bool=false,
@@ -623,6 +631,7 @@ function diffusion_bridge_simulation(forward_model::CliMAgen.VarianceExplodingSD
                                      nsave::Int=4)
     
     forward_solution = diffusion_simulation(forward_model, init_x, nsteps;
+                                            c=forward_c,
                                             reverse=false,
                                             FT=FT,
                                             ϵ=ϵ,
@@ -633,7 +642,8 @@ function diffusion_bridge_simulation(forward_model::CliMAgen.VarianceExplodingSD
 
     init_x_reverse = adapt_x(forward_solution.u[end], forward_model, reverse_model, forward_t_end, reverse_t_end)
 
-    reverse_solution = diffusion_simulation(reverse_model, init_x_reverse, nsteps;
+    reverse_solution = diffusion_simulation(reverse_model, init_x_reverse,  nsteps;
+                                            c=reverse_c,
                                             reverse=true,
                                             FT=FT,
                                             ϵ=ϵ,

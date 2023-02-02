@@ -175,6 +175,70 @@ function get_data_2dturbulence(batchsize;
 end
 
 """
+Helper function that loads 2d turbulence images with context and returns loaders.
+"""
+function get_data_context2dturbulence(batchsize;
+                                      resolution=512,
+                                      wavenumber=0.0,
+                                      fraction = 1.0,
+                                      standard_scaling = false,
+                                      transform_moisture = true,
+                                      FT=Float32)
+    @assert resolution ∈ [512, 64]
+    if resolution == 512
+        @assert wavenumber ∈ FT.([0, 1, 2, 4, 8, 16])
+    elseif resolution == 64
+        @assert wavenumber ∈ FT.([0, 1])
+    end
+
+    if wavenumber == FT(0) # Returns all the data, for every wavenumber
+        xtrain = CliMADatasets.Turbulence2DContext(:train; fraction = fraction, resolution=resolution, wavenumber = :all, Tx=FT,)[:]
+        xtest = CliMADatasets.Turbulence2DContext(:test; fraction = fraction, resolution=resolution, wavenumber = :all, Tx=FT,)[:]
+    else # Returns data for a specific wavenumber only
+        xtrain = CliMADatasets.Turbulence2DContext(:train; fraction = fraction, resolution=resolution, wavenumber = wavenumber, Tx=FT,)[:]
+        xtest = CliMADatasets.Turbulence2DContext(:test; fraction = fraction, resolution=resolution, wavenumber = wavenumber, Tx=FT,)[:]
+    end
+
+    if standard_scaling
+        # perform a standard minmax scaling
+        maxtrain = maximum(xtrain, dims=(1, 2, 4))
+        mintrain = minimum(xtrain, dims=(1, 2, 4))
+        xtrain = @. 2(xtrain - mintrain) / (maxtrain - mintrain) - 1
+        # apply the same rescaler as on training set
+        xtest = @. 2(xtest - mintrain) / (maxtrain - mintrain) - 1
+    else
+        #scale means and spatial variations separately
+        x̄ = mean(xtrain, dims=(1, 2))
+        maxtrain_mean = maximum(x̄, dims=4)
+        mintrain_mean = minimum(x̄, dims=4)
+        Δ̄ = maxtrain_mean .- mintrain_mean
+        x̄̃ = @. 2(x̄ -  mintrain_mean) / Δ̄ - 1
+        
+        xp = xtrain .- x̄
+        maxtrain_p = maximum(xp, dims=(1, 2, 4))
+        mintrain_p = minimum(xp, dims=(1, 2, 4))
+        Δp = maxtrain_p .- mintrain_p
+        x̃p = @. 2(xp -  mintrain_p) / Δp - 1
+    
+        xtrain = x̄̃ .+ x̃p
+
+         # apply the same rescaler as on training set
+        x̄ = mean(xtest, dims=(1, 2))
+        xp = xtest .- x̄
+        x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
+        x̃p = @. 2(xp - mintrain_p) / Δp - 1
+
+        xtest = x̄̃ .+ x̃p
+    end
+
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+"""
 Helper function that tiles an array in the first two spatial dimensions.
 
 Tiles wrap around periodically if input width is larger than spatial size of array.

@@ -19,9 +19,9 @@ function marginal_prob end
 """
     ClimaGen.score
 """
-function score(m::AbstractDiffusionModel, x, t)
+function score(m::AbstractDiffusionModel, x, t; c = nothing)
     _, σ_t = marginal_prob(m, x, t)
-    return m.net(x, t) ./ σ_t
+    return m.net(x, c, t) ./ σ_t
 end
 
 """
@@ -50,7 +50,7 @@ end
 function reverse_sde(m::AbstractDiffusionModel)
     function f(x, p, t) 
         t = fill!(similar(x, size(x)[end]), 1) .* t
-        expand_dims(drift(m, t), ndims(x) - 1) .- expand_dims(diffusion(m, t), ndims(x) - 1) .^ 2 .* score(m, x, t)
+        expand_dims(drift(m, t), ndims(x) - 1) .- expand_dims(diffusion(m, t), ndims(x) - 1) .^ 2 .* score(m, x, t; c=p)
     end
     function g(x, p, t)
         t = fill!(similar(x, size(x)[end]), 1) .* t
@@ -67,7 +67,7 @@ end
 function probability_flow_ode(m::AbstractDiffusionModel)
     function f(x, p, t) 
         t = fill!(similar(x, size(x)[end]), 1) .* t
-        expand_dims(drift(m, t), ndims(x) - 1) .- expand_dims(diffusion(m, t), ndims(x) - 1) .^ 2 .* score(m, x, t) ./ 2
+        expand_dims(drift(m, t), ndims(x) - 1) .- expand_dims(diffusion(m, t), ndims(x) - 1) .^ 2 .* score(m, x, t; c=p) ./ 2
     end
     return f
 end
