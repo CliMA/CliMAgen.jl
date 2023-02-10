@@ -59,10 +59,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # Obtain max and min here using the whole data set
     maxtrain = maximum(xtrain, dims=(1, 2, 4))
     mintrain = minimum(xtrain, dims=(1, 2, 4))
-    
-    # To compare statistics from samples and training data,
-    # cut training data to length nsamples.
-    xtrain = xtrain[:, :, :, 1:nsamples]
 
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
@@ -85,12 +81,19 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
     samples = cpu(samples)
 
-    # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
-
+    channel_aliases = ["Vorticity", "Moisture"]
+    
+    
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger, channel_aliases = channel_aliases)
 
+    # create plot showing distribution of spatial mean of generated and real images
+    summary_stats = spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger, channel_aliases = channel_aliases)
+    @show summary_stats
+
+    # To compare statistics from samples and training data,
+    # cut training data to length nsamples.
+    xtrain = xtrain[:, :, :, 1:nsamples]
     # create plots for comparison of real vs. generated spectra
     spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
 
