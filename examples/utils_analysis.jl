@@ -8,7 +8,6 @@ using Random
 using FFTW
 using DifferentialEquations
 using DelimitedFiles
-using StatsPlots
 using Printf
 
 """
@@ -27,8 +26,8 @@ function loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::B
     
     if size(data)[2] == 5
         plt1 = plot(left_margin = 20Plots.mm, ylabel = "Log10(Mean Loss)")
-	plt2 = plot(bottom_margin = 10Plots.mm, left_margin = 20Plots.mm,xlabel = "Epoch", ylabel = "Log10(Spatial Loss)")
-	plot!(plt1, data[:,1], data[:,2], label = "Train", linecolor = :black)
+	    plt2 = plot(bottom_margin = 10Plots.mm, left_margin = 20Plots.mm,xlabel = "Epoch", ylabel = "Log10(Spatial Loss)")
+	    plot!(plt1, data[:,1], data[:,2], label = "Train", linecolor = :black)
     	plot!(plt1, data[:,1], data[:,4], label = "Test", linecolor = :red)
     	plot!(plt2, data[:,1], data[:,3], label = "", linecolor = :black)
     	plot!(plt2, data[:,1], data[:,5], label = "", linecolor = :red)
@@ -44,7 +43,7 @@ function loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::B
 	savefig(path)
     elseif size(data)[2] == 3
         plt1 = plot(left_margin = 20Plots.mm, ylabel = "Log10(Loss)")
-	plot!(plt1, data[:,1], data[:,2], label = "Train", linecolor = :black)
+	    plot!(plt1, data[:,1], data[:,2], label = "Train", linecolor = :black)
     	plot!(plt1, data[:,1], data[:,3], label = "Test", linecolor = :red)
     	if xlog
            plot!(plt1, xaxis=:log)
@@ -77,22 +76,26 @@ end
 
 """
 Helper function to make analyze the means of the samples.
+
+Input data are on the CPU.
 """
 function spatial_mean_plot(data, gen, savepath, plotname;channel_aliases =nothing, FT=Float32, logger=nothing)
     inchannels = size(data)[end-1]
 
-    gen = gen |> Flux.cpu
+    # compute the spatial means of generated samples and data, by channel
     gen_results = mapslices(Statistics.mean, gen, dims=[1, 2])
     gen_results = gen_results[1,1,:,:]
 
     data_results = mapslices(Statistics.mean, data, dims=[1, 2])
     data_results = data_results[1,1,:,:]
-    # compute statistics of means
+
+    #Compute some core statistics of the sampled means, by channel
     gen_μ = Statistics.mean(gen_results, dims = 2)
     gen_σ = Statistics.std(gen_results, dims = 2)
     data_μ = Statistics.mean(data_results, dims = 2)
     data_σ = Statistics.std(data_results, dims = 2)
 
+    # Make plots and print core statistics
     plot_array = []
     for channel in 1:inchannels
         if channel_aliases isa Nothing
@@ -100,10 +103,12 @@ function spatial_mean_plot(data, gen, savepath, plotname;channel_aliases =nothin
         else
             name = channel_aliases[channel]
         end
-        @printf("%s generated mean: %.3lf pm %.3lf\n", name, gen_μ[channel], gen_σ[channel]/sqrt(size(gen)[end]) )
-        @printf("%s data mean: %.3lf\n", name, data_μ[channel])
-        @printf("%s generated sigma: %.3lf pm %.3lf\n", name, gen_σ[channel], gen_σ[channel]/sqrt(2*size(gen)[end]))
-        @printf("%s data sigma: %.3lf\n", name, data_σ[channel])
+        open(joinpath(savepath, "mean_statistics.txt"), "w") do file
+            @printf(file, "%s generated mean: %.3lf pm %.3lf\n", name, gen_μ[channel], gen_σ[channel]/sqrt(size(gen)[end]) )
+            @printf(file, "%s data mean: %.3lf\n", name, data_μ[channel])
+            @printf(file, "%s generated sigma: %.3lf pm %.3lf\n", name, gen_σ[channel], gen_σ[channel]/sqrt(2*size(gen)[end]))
+            @printf(file,"%s data sigma: %.3lf\n", name, data_σ[channel])
+        end
 
         plt = plot(xlabel = "Spatial Mean", title = name)
         if channel == 1
@@ -115,9 +120,7 @@ function spatial_mean_plot(data, gen, savepath, plotname;channel_aliases =nothin
             plot!(plt, data_results[channel,:], seriestype=:stephist, label = "", norm = true, color = :red)
             plot!(plt, gen_results[channel,:],  seriestype=:stephist, label ="", norm = true, color = :black)
         end
-        plot!(plt, tickfontsize=8,
-        bottom_margin = 10Plots.mm,
-        left_margin = 15Plots.mm)
+        plot!(plt, tickfontsize=8, bottom_margin=10Plots.mm, left_margin=15Plots.mm)
         push!(plot_array, plt)
     end
     
@@ -130,30 +133,35 @@ function spatial_mean_plot(data, gen, savepath, plotname;channel_aliases =nothin
     end
 end
 
+"""
+    Helper function to make q-q plots.
 
-function qq_plot(data, gen, savepath, plotname; FT=Float32, channel_aliases=nothing, logger=nothing)
+Input data are on the CPU.
+"""
+function qq_plot(data, gen, savepath, plotname; nbootstrap=10, FT=Float32, channel_aliases=nothing, logger=nothing)
     statistics = (Statistics.var, x -> StatsBase.cumulant(x[:], 3), x -> StatsBase.cumulant(x[:], 4))
     statistic_names = ["σ²", "κ₃", "κ₄"]
+    nstatistics =length(statistics)
     inchannels = size(data)[end-1]
+    nsamples = size(gen)[end]
 
-    gen = gen |> Flux.cpu
-    gen_results = mapslices.(statistics, Ref(gen), dims=[1, 2])
-    gen_results = (cat(gen_results..., dims=ndims(gen) - 2))[1,:,:,:]
-    sort!(gen_results, dims=ndims(gen_results)) # CDF of the generated data for each channel and each statistics
-    
-    #Bootstrap
-    nbootstrap = 10
-    n_samples = size(gen)[end]
-    preallocate = zeros(FT, (length(statistics),inchannels,n_samples, nbootstrap))
+    # Bootstrap to get uncertainties in statistics of interest due to finite sample size
+    preallocate = zeros(FT, (nstatistics,inchannels,nsamples, nbootstrap))
     for iter in 1:nbootstrap
-        sample= rand(1:size(data)[end],n_samples)
-        data_results = mapslices.(statistics, Ref(data[:,:,:,rand(1:size(data)[end],n_samples)]), dims=[1, 2])
+        sample = rand(1:size(data)[end],nsamples)
+        data_results = mapslices.(statistics, Ref(data[:,:,:,sample]), dims=[1, 2])
         data_results = (cat(data_results..., dims=ndims(data) - 2))[1,:,:,:]
         preallocate[:,:,:,iter] = sort!(data_results, dims=ndims(data_results)) # CDF of the  data for each channel and each statistics
     end
     data_cdf = Statistics.mean(preallocate, dims = 4)
     std_data_cdf =  Statistics.std(preallocate, dims = 4)
 
+    # Compute statistics using the generated data
+    gen_results = mapslices.(statistics, Ref(gen), dims=[1, 2])
+    gen_results = (cat(gen_results..., dims=ndims(gen) - 2))[1,:,:,:]
+    sort!(gen_results, dims=ndims(gen_results)) # CDF of the generated data for each channel and each statistics
+    
+    # Make Q-Q plots
     plot_array = []
     for channel in 1:inchannels
         if channel_aliases isa Nothing
@@ -161,16 +169,18 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32, channel_aliases=noth
         else
             name = channel_aliases[channel]
         end
-        for stat in 1:length(statistics)
-            gen_cdf = gen_results[stat, channel, :]
-            plt = plot(data_cdf[stat,channel,:,1], data_cdf[stat, channel,:,1],
-            ribbon = (std_data_cdf[stat,channel,:,1], std_data_cdf[stat,channel,:,1])
-            , color=:red, label="")
-            plot!(plt, gen_cdf, data_cdf[stat,channel,:,1], color=:black, linestyle=:dot, label="", bottom_margin = 10Plots.mm,
-            left_margin = 10Plots.mm, right_margin = 5Plots.mm)
+        for stat in 1:nstatistics
+            X = gen_results[stat, channel, :]
+            Y = data_cdf[stat,channel,:,1]
+            xr, yr = extrema(X), extrema(Y)
+            lims = min(xr[1], yr[1]), max(xr[2], yr[2])
+            σY = std_data_cdf[stat,channel,:,1]
+            xtickvals = (xr[1], (xr[2]+xr[1])/4, (xr[2]+xr[1])/2, (xr[2]+xr[1])*3/4, xr[2])
+            ytickvals = (yr[1], (yr[2]+yr[1])/4, (yr[2]+yr[1])/2, (yr[2]+xr[1])*3/4, yr[2])
+            plt = plot(Y, Y, ribbon = (σY, σY) , color=:red, label="", lim =lims, widen=true, xticks=xtickvals, yticks=ytickvals)
+            plot!(plt, X, Y, color=:black, linestyle=:dot, label="", bottom_margin=10Plots.mm, left_margin=10Plots.mm, right_margin=5Plots.mm)
             Plots.plot!(plt, ann=[(:bottomright, string(name, ", ", statistic_names[stat]),8)])
-            plot!(plt,
-                tickfontsize=6, aspect_ratio=:equal)
+            plot!(plt, tickfontsize=6, aspect_ratio=:equal)
                 if channel == inchannels
                     Plots.plot!(plt, xlabel = "Generated")
                 end
@@ -184,61 +194,6 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32, channel_aliases=noth
     plot(plot_array..., layout=(inchannels, length(statistics)), aspect_ratio=:equal)
     plot!(
           size = (800,600))
-    Plots.savefig(joinpath(savepath, plotname))
-
-    if !(logger isa Nothing)
-        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
-    end
-end
-
-
-"""
-Helper function to make a Q-Q plot.
-"""
-function qq_plot_new(data, gen, savepath, plotname; FT=Float32, channel_aliases = nothing, logger=nothing)
-    statistics = (Statistics.var, x -> StatsBase.cumulant(x[:], 3), x -> StatsBase.cumulant(x[:], 4))
-    statistic_names = ["σ²", "κ₃", "κ₄"]
-    inchannels = size(data)[end-1]
-
-    gen = gen |> Flux.cpu
-    gen_results = mapslices.(statistics, Ref(gen), dims=[1, 2])
-    gen_results = cat(gen_results..., dims=ndims(gen) - 2)
-    sort!(gen_results, dims=ndims(gen_results)) # CDF of the generated data for each channel and each statistics
-
-
-    data_results = mapslices.(statistics, Ref(data), dims=[1, 2])
-    data_results = cat(data_results..., dims=ndims(data) - 2)
-    sort!(data_results, dims=ndims(data_results)) # CDF of the  data for each channel and each statistics
-    plot_array = []
-    for channel in 1:inchannels
-        if channel_aliases isa Nothing
-            name = string("Channel ",string(channel)) 
-        else
-            name = channel_aliases[channel]
-        end
-        for stat in 1:length(statistics)
-            data_cdf = data_results[1, stat, channel, :]
-            gen_cdf = gen_results[1, stat, channel, :]
-            plt = StatsPlots.marginalkde(gen_cdf,data_cdf)
-            Plots.plot!(plt, bottom_margin = 10Plots.mm, left_margin = 10Plots.mm, subplot = 2)
-            Plots.abline!(plt, 1, 0, line=:dash, subplot = 2)
-            Plots.plot!(plt, ann=[(:bottomright, string(name, ", ", statistic_names[stat]),8)],subplot = 2)
-            if channel == 1
-                Plots.plot!(plt, xlabel = "Generated", subplot=2)
-            end
-            if stat == 1
-                Plots.plot!(plt, ylabel = "Data", subplot=2)
-            end
-
-            push!(plot_array, plt)
-        end
-    end
-
-    plot(plot_array..., layout=(inchannels, length(statistics)), tickfontsize =8, fontsize = 8)
-    plot!(
-          size = (800,600))
-
-
     Plots.savefig(joinpath(savepath, plotname))
 
     if !(logger isa Nothing)
@@ -280,7 +235,6 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing
     k = data_results[:, 2, 1, 1]
     data_results = data_results[:, 1, :, :]
 
-    gen = gen |> Flux.cpu
     gen_results = mapslices(statistics, gen, dims=[1, 2])
     gen_results = gen_results[:, 1, :, :]
 

@@ -88,11 +88,11 @@ function run_analysis(params; FT=Float32, logger=nothing)
     qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger, channel_aliases = channel_aliases)
 
     # create plot showing distribution of spatial mean of generated and real images
-    summary_stats = spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger, channel_aliases = channel_aliases)
-    @show summary_stats
+    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger, channel_aliases = channel_aliases)
 
     # To compare statistics from samples and training data,
-    # cut training data to length nsamples.
+    # cut training data to length nsamples. TBD if we need to do this, but let's revisit 
+    # when we clean up the spectral code.
     xtrain = xtrain[:, :, :, 1:nsamples]
     # create plots for comparison of real vs. generated spectra
     spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
