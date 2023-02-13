@@ -338,7 +338,7 @@ quantity over time, training data x(0), and samples from P(x(t)|x(0)).
 """
 function timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
     # sample times
-    t = LinRange(0.0f0,1.0f0,size(x_0)[end])
+    t = LinRange(ϵ,1.0f0,size(x_0)[end])
 
     # sample from normal marginal
     z = randn!(similar(x_0))
@@ -363,7 +363,7 @@ as a function of time.
 """
 function model_scale(model, x_0, ϵ=1.0f-5)
     # sample times
-    t = LinRange(0.0f0, 1.0f0, size(xtrain)[end])
+    t = LinRange(ϵ, 1.0f0, size(xtrain)[end])
 
     # sample from normal marginal
     z = randn!(similar(x_0))
@@ -404,7 +404,7 @@ function setup_SDEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps
         f,g = CliMAgen.reverse_sde(model)
         Δt = time_steps[1] - time_steps[2]
     else
-        time_steps = LinRange(0.0f0, t_end, nsteps)
+        time_steps = LinRange(ϵ, t_end, nsteps)
         f,g = CliMAgen.forward_sde(model)
         Δt = time_steps[2] - time_steps[1]
     end
@@ -434,7 +434,7 @@ function setup_ODEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps
         f= CliMAgen.probability_flow_ode(model)
         Δt = time_steps[1] - time_steps[2]
     else
-        time_steps = LinRange(0.0f0, t_end, nsteps)
+        time_steps = LinRange(ϵ, t_end, nsteps)
         f= CliMAgen.probability_flow_ode(model)
         Δt = time_steps[2] - time_steps[1]
     end
@@ -540,10 +540,11 @@ function diffusion_simulation(model::CliMAgen.AbstractDiffusionModel,
         saveat = Base.reverse(saveat)
     end
 
+    # Pad end time slightly to make sure we integrate and save the solution at t_end
     if sde
-        de, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end)
+        de, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
     else
-        de, Δt = setup_ODEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end)
+        de, Δt = setup_ODEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
     end
     solution = DifferentialEquations.solve(de, solver, dt=Δt, saveat = saveat, adaptive = false)
     return solution
