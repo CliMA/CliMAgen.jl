@@ -175,10 +175,9 @@ function qq_plot(data, gen, savepath, plotname; nbootstrap=10, FT=Float32, chann
             xr, yr = extrema(X), extrema(Y)
             lims = min(xr[1], yr[1]), max(xr[2], yr[2])
             σY = std_data_cdf[stat,channel,:,1]
-            xtickvals = (xr[1], (xr[2]+xr[1])/4, (xr[2]+xr[1])/2, (xr[2]+xr[1])*3/4, xr[2])
-            ytickvals = (yr[1], (yr[2]+yr[1])/4, (yr[2]+yr[1])/2, (yr[2]+xr[1])*3/4, yr[2])
-            plt = plot(Y, Y, ribbon = (σY, σY) , color=:red, label="", lim =lims, widen=true, xticks=xtickvals, yticks=ytickvals)
-            plot!(plt, X, Y, color=:black, linestyle=:dot, label="", bottom_margin=10Plots.mm, left_margin=10Plots.mm, right_margin=5Plots.mm)
+            tickvals = round.([yr[1], (yr[2]+yr[1])/2, yr[2]], digits=4)
+            plt = plot(Y, Y, ribbon = (σY, σY) , color=:red, label="", lim =lims, widen=true, xticks=tickvals, yticks=tickvals)
+            plot!(plt, X, Y, color=:black, linestyle=:dot, label="", bottom_margin=10Plots.mm, left_margin=15Plots.mm, right_margin=5Plots.mm)
             Plots.plot!(plt, ann=[(:bottomright, string(name, ", ", statistic_names[stat]),8)])
             plot!(plt, tickfontsize=6, aspect_ratio=:equal)
                 if channel == inchannels
