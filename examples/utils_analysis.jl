@@ -336,68 +336,26 @@ as a function of time. This is different from the true loss
 term optimized by the network, which takes the expectation of this
 quantity over time, training data x(0), and samples from P(x(t)|x(0)).
 """
-function timewise_score_matching_loss(model, x_0; ϵ=1.0f-5)
+function timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
     # sample times
-    t = LinRange(0.0f0,1.0f0,size(x_0)[end])
-    if typeof(x_0) <:CuArray
-        t = CuArray(t)
-    end
-
+    t = LinRange(ϵ,1.0f0,size(x_0)[end])
 
     # sample from normal marginal
     z = randn!(similar(x_0))
-    μ_t, σ_t = marginal_prob(model, x_0, t)
-    x_t = @. μ_t + σ_t * z
-
-    # evaluate model score s₀(𝘹(𝘵), 𝘵)
-     s_t = CliMAgen.score(model, x_t, t)
-
-    # split into spatial averages and deviations
-     nspatial = ndims(x_0)-2
-    n = prod(size(z)[1:nspatial])
-    √n = convert(eltype(x_0), sqrt(n))
-    z_avg = Statistics.mean(z, dims=1:nspatial)
-    z_dev = @. z - z_avg
-    z_star = @. √n * z_avg
-    s_t_avg = Statistics.mean(s_t, dims=1:nspatial)
-    s_t_dev = @. s_t - s_t_avg
-
-    # spatial average component of loss
-    # We have retained the 1/n in front of the avg loss in order to compare with original net
-    loss_avg = @. (z_star + √n * σ_t * s_t_avg)^2 # squared deviations from real score
-    loss_avg = 1/n * mean(loss_avg, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
-
-    # spatial deviation component of loss
-    loss_dev = @. (z_dev + σ_t * s_t_dev)^2 # squared deviations from real score
-    loss_dev = mean(loss_dev, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
-
-
-    return t, loss_avg[:], loss_dev[:]
-end
-
-function timewise_score(model, x_0; ϵ=1.0f-5)
-    # sample times
-    t = LinRange(0.0f0,1.0f0,size(x_0)[end])
-    if typeof(x_0) <:CuArray
-        t = CuArray(t)
-    end
-
-    nspatial = ndims(x_0)-2
-
-    # sample from normal marginal
-    z = randn!(similar(x_0))
-    μ_t, σ_t = marginal_prob(model, x_0, t)
+    μ_t, σ_t = CliMAgen.marginal_prob(model, x_0, t)
     x_t = @. μ_t + σ_t * z
 
     # evaluate model score s₀(𝘹(𝘵), 𝘵)
     s_t = CliMAgen.score(model, x_t, t)
-    s_t_avg = Statistics.mean(s_t, dims=1:nspatial)
-    s_t_dev = @. s_t - s_t_avg
 
-    avg = mean(abs.(s_t_avg), dims=1:(ndims(x_0)-1)) # spatial & channel mean 
-    dev = mean(abs.(s_t_dev), dims=1:(ndims(x_0)-1)) # spatial & channel mean 
-    return t, avg[:], dev[:]
+    # Assume that λ(t) = σ(t)² and pull it into L₂-norm
+    # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
+    loss = @. (z + σ_t * s_t)^2 # squared deviations from real score
+    loss = sum(loss, dims=1:(ndims(x_0)-1)) # L₂-norm
+
+    return t, loss[:]
 end
+
 """
     model_scale(model, x_0, ϵ=1.0f-5)
 
@@ -406,7 +364,7 @@ as a function of time.
 """
 function model_scale(model, x_0, ϵ=1.0f-5)
     # sample times
-    t = LinRange(0.0f0, 1.0f0, size(xtrain)[end])
+    t = LinRange(ϵ, 1.0f0, size(xtrain)[end])
 
     # sample from normal marginal
     z = randn!(similar(x_0))
@@ -447,7 +405,7 @@ function setup_SDEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps
         f,g = CliMAgen.reverse_sde(model)
         Δt = time_steps[1] - time_steps[2]
     else
-        time_steps = LinRange(0.0f0, t_end, nsteps)
+        time_steps = LinRange(ϵ, t_end, nsteps)
         f,g = CliMAgen.forward_sde(model)
         Δt = time_steps[2] - time_steps[1]
     end
@@ -477,7 +435,7 @@ function setup_ODEProblem(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps
         f= CliMAgen.probability_flow_ode(model)
         Δt = time_steps[1] - time_steps[2]
     else
-        time_steps = LinRange(0.0f0, t_end, nsteps)
+        time_steps = LinRange(ϵ, t_end, nsteps)
         f= CliMAgen.probability_flow_ode(model)
         Δt = time_steps[2] - time_steps[1]
     end
@@ -584,9 +542,9 @@ function diffusion_simulation(model::CliMAgen.AbstractDiffusionModel,
     end
 
     if sde
-        de, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end)
+        de, Δt = setup_SDEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
     else
-        de, Δt = setup_ODEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end)
+        de, Δt = setup_ODEProblem(model, init_x, nsteps; ϵ=ϵ, reverse = reverse, t_end = t_end*FT(1.01))
     end
     solution = DifferentialEquations.solve(de, solver, dt=Δt, saveat = saveat, adaptive = false)
     return solution
