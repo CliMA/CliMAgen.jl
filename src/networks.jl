@@ -93,8 +93,10 @@ function (net::NoiseConditionalScoreNetwork)(x, t)
     return h
 end
 
+
 struct NoiseConditionalScoreNetworkVariant
     layers::NamedTuple
+    context::Bool
     mean_bypass::Bool
     scale_mean_bypass::Bool
     shift_input::Bool
@@ -105,14 +107,16 @@ end
 """
 User Facing API for NoiseConditionalScoreNetwork architecture.
 """
-function NoiseConditionalScoreNetworkVariant(; mean_bypass = false, 
+function NoiseConditionalScoreNetworkVariant(; context=false,
+                                               mean_bypass=false, 
                                                scale_mean_bypass=false,
                                                shift_input=false,
                                                shift_output=false,
                                                gnorm=false,
                                                nspatial=2,
                                                num_residual=8,
-                                               inchannels=1,
+                                               noised_channels=1,
+                                               context_channels=0,
                                                channels=[32, 64, 128, 256],
                                                embed_dim=256,
                                                scale=30.0f0,
@@ -126,14 +130,22 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false,
     if gnorm & !mean_bypass
         @error("Attempting to gnorm without adding in a mean bypass connection.")
     end
-
+    if context & (context_channels == 0)
+        @error("Attempting to use context-aware network without context input.")
+    end
+    if !context & (context_channels > 0)
+        @error("Attempting to use context-unaware network with context input.")
+    end
+    
+    inchannels = noised_channels+context_channels
+    outchannels = noised_channels
     # Mean processing as indicated by boolean mean_bypass
     if mean_bypass
         if gnorm
             mean_bypass_layers = (
                 mean_skip_1 = Conv((1, 1), inchannels => embed_dim),
                 mean_skip_2 = Conv((1, 1), embed_dim => embed_dim),
-                mean_skip_3 = Conv((1, 1), embed_dim => inchannels),
+                mean_skip_3 = Conv((1, 1), embed_dim => outchannels),
                 mean_gnorm_1 = GroupNorm(embed_dim, 32, swish),
                 mean_gnorm_2 = GroupNorm(embed_dim, 32, swish),
                 mean_dense_1 = Dense(embed_dim, embed_dim),
@@ -143,7 +155,7 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false,
             mean_bypass_layers = (
                 mean_skip_1 = Conv((1, 1), inchannels => embed_dim),
                 mean_skip_2 = Conv((1, 1), embed_dim => embed_dim),
-                mean_skip_3 = Conv((1, 1), embed_dim => inchannels),
+                mean_skip_3 = Conv((1, 1), embed_dim => outchannels),
                 mean_dense_1 = Dense(embed_dim, embed_dim),
                 mean_dense_2 = Dense(embed_dim, embed_dim),
             )
@@ -191,27 +203,27 @@ function NoiseConditionalScoreNetworkVariant(; mean_bypass = false,
               tgnorm2=GroupNorm(channels[1], 32, swish),
               
               # Projection
-              tconv1=Conv((proj_kernelsize, proj_kernelsize), channels[1] + channels[1] => inchannels, stride=1, pad=SamePad()),
+              tconv1=Conv((proj_kernelsize, proj_kernelsize), channels[1] + channels[1] => outchannels, stride=1, pad=SamePad()),
               mean_bypass_layers...
               )
     
-    return NoiseConditionalScoreNetworkVariant(layers, mean_bypass, scale_mean_bypass, shift_input, shift_output, gnorm)
+    return NoiseConditionalScoreNetworkVariant(layers, context, mean_bypass, scale_mean_bypass, shift_input, shift_output, gnorm)
 end
 
 @functor NoiseConditionalScoreNetworkVariant
 
-function (net::NoiseConditionalScoreNetworkVariant)(x, t)
+function (net::NoiseConditionalScoreNetworkVariant)(x, c, t)
     # Embedding
     embed = net.layers.gaussfourierproj(t)
     embed = net.layers.linear(embed)
 
     # Encoder
     if net.shift_input
-        h1 = x .- mean(x, dims=(1,2)) # remove mean before input
+        h1 = x .- mean(x, dims=(1,2)) # remove mean of noised variables before input
     else
         h1 = x
     end
-    
+    h1 = concatenate_channels(Val(net.context), h1, c)
     h1 = net.layers.conv1(h1)
     h1 = h1 .+ expand_dims(net.layers.dense1(embed), 2)
     h1 = net.layers.gnorm1(h1)
@@ -246,9 +258,9 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
         h = h .- mean(h, dims=(1,2)) # remove mean after output
     end
 
-    # Mean processing
+    # Mean processing of noised variable channels
     if net.mean_bypass
-        hm = net.layers.mean_skip_1(mean(x, dims=(1,2)))
+        hm = net.layers.mean_skip_1(mean(concatenate_channels(Val(net.context), x, c), dims=(1,2)))
         hm = hm .+ expand_dims(net.layers.mean_dense_1(embed), 2)
         if net.gnorm
             hm = net.layers.mean_gnorm_1(hm)
@@ -263,10 +275,20 @@ function (net::NoiseConditionalScoreNetworkVariant)(x, t)
             scale = convert(eltype(x), sqrt(prod(size(x)[1:ndims(x)-2])))
             hm = hm ./ scale
         end
+        # Add back in noised channel mean to noised channel spatial variatons
         return h .+ hm
     else
         return h
     end
+end
+
+
+function concatenate_channels(context::Val{true}, x, c)
+    return cat(x, c, dims = 3)
+end
+
+function concatenate_channels(context::Val{false}, x, c)
+    return x
 end
 
 """

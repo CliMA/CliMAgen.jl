@@ -21,7 +21,7 @@ s₀(𝘹(𝘵), 𝘵) is estimated by a U-Net architecture.
 https://arxiv.org/abs/2011.13456
 https://arxiv.org/abs/1907.05600
 """
-function score_matching_loss(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
+function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c=nothing)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 
@@ -31,7 +31,7 @@ function score_matching_loss(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
     x_t = @. μ_t + σ_t * z
 
     # evaluate model score s₀(𝘹(𝘵), 𝘵)
-    s_t = score(model, x_t, t)
+    s_t = score(model, x_t, t; c= c)
 
     # Assume that λ(t) = σ(t)² and pull it into L₂-norm
     # Below, z / σ_t = -∇ log [𝒫₀ₜ(𝘹(𝘵) | 𝘹(0))
@@ -42,7 +42,7 @@ function score_matching_loss(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
     return loss
 end
 
-function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f-5)
+function score_matching_loss_variant(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c= nothing)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 
@@ -52,7 +52,7 @@ function score_matching_loss_variant(model::AbstractDiffusionModel, x_0, ϵ=1.0f
     x_t = @. μ_t + σ_t * z
 
     # evaluate model score s₀(𝘹(𝘵), 𝘵)
-    s_t = score(model, x_t, t)
+    s_t = score(model, x_t, t; c=c)
 
     # split into spatial averages and deviations
     nspatial = ndims(x_0)-2

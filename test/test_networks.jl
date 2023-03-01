@@ -124,3 +124,37 @@ end
     end
     @test loss isa Real
 end
+
+
+@testset "NCSN Variant  in and out channels" begin
+    # with context
+    net = CliMAgen.NoiseConditionalScoreNetworkVariant(context=true, noised_channels=2, context_channels = 3)
+    ps = Flux.params(net)
+    k = 5
+    x = rand(Float32, 2^k, 2^k, 2, 11)
+    c = rand(Float32, 2^k, 2^k, 3, 11)
+    t = rand(Float32)
+    # forward pass
+    @test net(x, c, t) |> size == (2^k, 2^k, 2, 11)
+
+    # backward pass of dummy loss
+    loss, grad = Flux.withgradient(ps) do
+        sum(net(x, c, t) .^ 2)
+    end
+    @test loss isa Real
+
+    # once without context (default is context=false and context_channels = 0)
+    net2 = CliMAgen.NoiseConditionalScoreNetworkVariant(noised_channels=3)
+    ps = Flux.params(net2)
+    k = 5
+    x = rand(Float32, 2^k, 2^k, 3, 11)
+    t = rand(Float32)
+    # forward pass
+    @test net2(x, nothing, t) |> size == (2^k, 2^k, 3, 11)
+
+    # backward pass of dummy loss
+    loss, grad = Flux.withgradient(ps) do
+        sum(net2(x, c, t) .^ 2)
+    end
+    @test loss isa Real
+end
