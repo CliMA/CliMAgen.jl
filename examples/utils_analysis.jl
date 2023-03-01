@@ -192,6 +192,7 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing
         gen_confidence = (gen_spectrum .- lower_gen_spectrum, upper_gen_spectrum .- gen_spectrum)
         plt = plot(k, data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log, xaxis=:log)
         plot!(plt, k, gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
+        plot!(plt, ylim = (1e-6, 1e-1))
         plot!(plt,
             xlabel="Log(k)",
             ylabel="Log(Power)",
@@ -652,4 +653,11 @@ function diffusion_bridge_simulation(forward_model::CliMAgen.VarianceExplodingSD
                                             t_end=reverse_t_end,
                                             nsave=nsave)
     return forward_solution, reverse_solution
+end
+
+# average instantaneous condensation rate
+function make_icr(batch)
+    τ = 1e-2 # condensation time scale
+    cond = @. batch * (batch > 0) / τ
+    return  mean(cond, dims=(1,2))
 end
