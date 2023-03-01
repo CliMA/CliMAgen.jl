@@ -27,7 +27,7 @@ function run_training(params; FT=Float32, logger=nothing)
     wavenumber::FT = params.data.wavenumber
     fraction::FT = params.data.fraction
     standard_scaling  = params.data.standard_scaling
-    transform_moisture = params.data.transform_moisture
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
@@ -73,8 +73,9 @@ function run_training(params; FT=Float32, logger=nothing)
         wavenumber = wavenumber,
         fraction = fraction,
         standard_scaling = standard_scaling,
-        transform_moisture = transform_moisture,
-        FT=FT
+        FT=FT,
+        save=true,
+        preprocess_params_file=preprocess_params_file
     )
 
     # set up model and optimizers

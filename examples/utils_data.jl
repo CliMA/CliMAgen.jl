@@ -1,6 +1,8 @@
+using JLD2
 using MLDatasets, MLUtils, Images, DataLoaders, Statistics
 using CliMADatasets
 using CliMAgen: expand_dims
+
 """
 Helper function that creates uniform images and returns loaders.
 """
@@ -182,8 +184,11 @@ function get_data_context2dturbulence(batchsize;
                                       wavenumber=0.0,
                                       fraction = 1.0,
                                       standard_scaling = false,
-                                      transform_moisture = true,
-                                      FT=Float32)
+                                      FT=Float32,
+                                      read = false,
+                                      save = false,
+                                      preprocess_params_file)
+    @assert xor(read, save)
     @assert resolution ∈ [512, 64]
     if resolution == 512
         @assert wavenumber ∈ FT.([0, 1, 2, 4, 8, 16])
@@ -199,37 +204,30 @@ function get_data_context2dturbulence(batchsize;
         xtest = CliMADatasets.Turbulence2DContext(:test; fraction = fraction, resolution=resolution, wavenumber = wavenumber, Tx=FT,)[:]
     end
 
-    if standard_scaling
-        # perform a standard minmax scaling
-        maxtrain = maximum(xtrain, dims=(1, 2, 4))
-        mintrain = minimum(xtrain, dims=(1, 2, 4))
-        xtrain = @. 2(xtrain - mintrain) / (maxtrain - mintrain) - 1
-        # apply the same rescaler as on training set
-        xtest = @. 2(xtest - mintrain) / (maxtrain - mintrain) - 1
-    else
-        #scale means and spatial variations separately
-        x̄ = mean(xtrain, dims=(1, 2))
-        maxtrain_mean = maximum(x̄, dims=4)
-        mintrain_mean = minimum(x̄, dims=4)
-        Δ̄ = maxtrain_mean .- mintrain_mean
-        x̄̃ = @. 2(x̄ -  mintrain_mean) / Δ̄ - 1
-        
-        xp = xtrain .- x̄
-        maxtrain_p = maximum(xp, dims=(1, 2, 4))
-        mintrain_p = minimum(xp, dims=(1, 2, 4))
-        Δp = maxtrain_p .- mintrain_p
-        x̃p = @. 2(xp -  mintrain_p) / Δp - 1
-    
-        xtrain = x̄̃ .+ x̃p
-
-         # apply the same rescaler as on training set
-        x̄ = mean(xtest, dims=(1, 2))
-        xp = xtest .- x̄
-        x̄̃ = @. 2(x̄ - mintrain_mean) / Δ̄ - 1
-        x̃p = @. 2(xp - mintrain_p) / Δp - 1
-
-        xtest = x̄̃ .+ x̃p
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            scaling = StandardScaling{FT}(mintrain, maxtrain)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
     end
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
 
     xtrain = MLUtils.shuffleobs(xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)

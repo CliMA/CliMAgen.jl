@@ -24,7 +24,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     wavenumber::FT = params.data.wavenumber
     fraction::FT = params.data.fraction
     standard_scaling  = params.data.standard_scaling
-    transform_moisture = params.data.transform_moisture
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
     noised_channels = params.model.noised_channels
     context_channels = params.model.context_channels
@@ -53,13 +53,11 @@ function run_analysis(params; FT=Float32, logger=nothing)
         wavenumber = wavenumber,
         fraction = fraction,
         standard_scaling = standard_scaling,
-        transform_moisture = transform_moisture,
-        FT=FT
+        FT=FT,
+        read=true,
+        preprocess_params_file=preprocess_params_file
     )
     train = cat([x for x in dl]..., dims=4)
-    # To compare statistics from samples and training data,
-    # cut training data to length nsamples.
-    train = train[:, :, :, 1:nsamples]
     xtrain = train[:,:,1:noised_channels,:]
     ctrain = train[:,:,(noised_channels+1):(noised_channels+context_channels),:]
 
@@ -83,20 +81,20 @@ function run_analysis(params; FT=Float32, logger=nothing)
         num_steps=nsteps,
     )
     if sampler == "euler"
-        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctrain)
+        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctrain[:,:,:,1:nsamples])
     elseif sampler == "pc"
-        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c=ctrain)
+        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c=ctrain[:, :, :, 1:nsamples])
     end
     samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
+    spatial_mean_plot(xtrain[:, :, :, 1:100], samples, savedir, "spatial_mean_distribution.png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtrain[:, :, :, 1:10], samples, savedir, "qq_plot.png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
+    spectrum_plot(xtrain[:, :, :, 1:10], samples, savedir, "mean_spectra.png", logger=logger)
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
