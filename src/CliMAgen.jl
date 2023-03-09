@@ -24,6 +24,7 @@ include("losses.jl")
 include("optimizers.jl")
 include("training.jl")
 include("sampling.jl")
+include("preprocessing.jl")
 
 export struct2dict, dict2nt
 export VarianceExplodingSDE
@@ -33,5 +34,5 @@ export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlock, Att
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler
-
+export MeanSpatialScaling, StandardScaling, apply_preprocessing, invert_preprocessing
 end # module

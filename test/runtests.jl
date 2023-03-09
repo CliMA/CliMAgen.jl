@@ -7,6 +7,7 @@ using Statistics: mean
 
 FT = Float32
 
+include("./test_preprocessing.jl")
 include("./tests_models.jl")
 include("./test_networks.jl")
 include("./tests_optimizers.jl")
