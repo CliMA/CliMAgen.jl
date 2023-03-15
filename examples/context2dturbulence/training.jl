@@ -7,7 +7,7 @@ using TOML
 using CliMAgen
 using CliMAgen: dict2nt
 using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetworkVariant
-using CliMAgen: score_matching_loss_variant
+using CliMAgen: score_matching_loss
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
 
@@ -134,7 +134,7 @@ function run_training(params; FT=Float32, logger=nothing)
     function lossfn(y; noised_channels = noised_channels, context_channels=context_channels)
         x = y[:,:,1:noised_channels,:]
         c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
-        return score_matching_loss_variant(model, x; c = c)
+        return score_matching_loss(model, x; c = c)
     end
 
     # train the model
@@ -164,7 +164,7 @@ function main(; experiment_toml="Experiment.toml")
     # set up directory for saving checkpoints
     !ispath(params.experiment.savedir) && mkpath(params.experiment.savedir)
     logger = nothing
-
+   
     run_training(params; FT=FT, logger=logger)
 
     if :sampling in keys(params)
