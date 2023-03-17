@@ -66,7 +66,7 @@ function generate_samples!(samples, init_x, model, context, time_steps, Δt, sam
     return samples
 end
 
-function main(nbatches, wavenumber; source_toml="experiments/Experiment_resize_64.toml", target_toml="experiments/Experiment_preprocess_mixed.toml")
+function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment_resize_64.toml", target_toml="experiments/Experiment_preprocess_mixed.toml")
     FT = Float32
     device = Flux.gpu
     nsteps = 125
@@ -100,6 +100,8 @@ function main(nbatches, wavenumber; source_toml="experiments/Experiment_resize_6
     @show reverse_t_end
     # Samples with all three channels
     target_samples= zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
+    sample_pixels = reshape(target_samples[:,:, 1:noised_channels, :], (prod(size(target_samples)[1:2]), noised_channels, nsamples))
+
     source_samples = zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
 
     # This only has the noised channels; these are the IC for the reverse process
@@ -115,8 +117,9 @@ function main(nbatches, wavenumber; source_toml="experiments/Experiment_resize_6
     Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
 
     sampler = "euler"
-    filenames = [joinpath(savedir, "tmp_downscale_gen_statistics_ch1_$wavenumber.csv"),
-                 joinpath(savedir, "tmp_downscale_gen_statistics_ch2_$wavenumber.csv")]
+    filenames = [joinpath(savedir, "downscale_gen_statistics_ch1_$wavenumber.csv"),
+                 joinpath(savedir, "downscale_gen_statistics_ch2_$wavenumber.csv")]
+    pixel_filenames = [joinpath(savedir, "downscale_gen_pixels_ch1_$wavenumber.csv"),joinpath(savedir, "downscale_gen_pixels_ch2_$wavenumber.csv")]
 
     indices = 1:1:size(csource)[end]
 
@@ -179,8 +182,17 @@ function main(nbatches, wavenumber; source_toml="experiments/Experiment_resize_6
         # average instant
         sample_icr = make_icr(cpu(target_samples))
 
+        # samples is 512 x 512 x 3 x 10
+        sample_pixels .= reshape(target_samples[:,:, 1:noised_channels, :], (prod(size(target_samples)[1:2]), noised_channels, nsamples))
+        pixel_indices = StatsBase.sample(1:1:size(sample_pixels)[1], npixels)
+
         #save the metrics
         for ch in 1:noised_channels
+            # write pixel vaues to other file
+            open(pixel_filenames[ch],"a") do io
+                writedlm(io, cpu(sample_pixels)[pixel_indices, ch, :], ',')
+            end
+
             if ch == 1
                 output = hcat(sample_means[1,1,ch,:],sample_κ2[1,1,ch,:], sample_κ3[1,1,ch,:],sample_κ4[1,1,ch,:], transpose(sample_spectra[:,1,ch,:]), sample_icr[1,1,ch,:])
             else
@@ -195,5 +207,5 @@ function main(nbatches, wavenumber; source_toml="experiments/Experiment_resize_6
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(parse(Int64, ARGS[1]), parse(Float32, ARGS[2]))
+    main(parse(Int64, ARGS[1]), parse(Int64, ARGS[2]), parse(Float32, ARGS[3]))
 end
