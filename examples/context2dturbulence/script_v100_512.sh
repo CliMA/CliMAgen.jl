@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1 # number of MPI ranks per node
 #SBATCH --gres=gpu:v100:1    # GPUs per node; should equal tasks-per-node
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem=65536MB
 set -euo pipefail # kill the job if anything fails
 set -x # echo script

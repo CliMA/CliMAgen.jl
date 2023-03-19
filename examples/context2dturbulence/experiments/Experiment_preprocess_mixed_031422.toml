@@ -38,8 +38,8 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 320
-freq_chckpt       = 320
+nepochs           = 360
+freq_chckpt       = 360
 
 [sampling]
 nsteps            = 1000
