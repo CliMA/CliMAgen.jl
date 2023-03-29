@@ -142,6 +142,7 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
 
         # samples is 512 x 512 x 3 x 10
         sample_pixels .= reshape(samples[:,:, 1:noised_channels, :], (prod(size(samples)[1:2]), noised_channels, nsamples))
+        # We choose the same random selection of pixels for all in nsamples, but this is OK for this dataset.
         pixel_indices = StatsBase.sample(1:1:size(sample_pixels)[1], npixels)
 
         #save the metrics

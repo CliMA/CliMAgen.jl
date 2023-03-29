@@ -66,6 +66,16 @@ function generate_samples!(samples, init_x, model, context, time_steps, Δt, sam
     return samples
 end
 
+function filter_512_to_64(x)
+    y = Complex{FT}.(x)
+    # Filter.
+    fft!(y, (1,2));
+    y[:,33:479,:,:] .= Complex{FT}(0);
+    y[33:479,:,:,:] .= Complex{FT}(0);
+    ifft!(y, (1,2))
+    return real(y)
+end
+
 function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment_resize_64.toml", target_toml="experiments/Experiment_preprocess_mixed.toml")
     FT = Float32
     device = Flux.gpu
@@ -167,7 +177,9 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
 
         # Save nsamples of the initial and final images in real space
         if batch == 1
-            jldsave("downscaling_images.jld2"; source = cpu(source_samples), target = cpu(target_samples))
+            jldsave("downscaling_images.jld2"; source = cpu(source_samples),
+                    target = cpu(target_samples),
+                    lo_res_target = filter_512_to_64(cpu(target_samples)))
         end
         # Load with
         # source = load("./downscaling_images.jld2")["source"]; e.g.

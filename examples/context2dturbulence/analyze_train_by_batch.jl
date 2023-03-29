@@ -40,7 +40,7 @@ function obtain_train_dl(params, wavenumber, FT)
     return dl
 end
 
-function main(wavenumber, npixels; experiment_toml="Experiment.toml")
+function main(npixels, wavenumber; experiment_toml="Experiment.toml")
     FT = Float32
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
@@ -101,5 +101,5 @@ function main(wavenumber, npixels; experiment_toml="Experiment.toml")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(parse(Float32, ARGS[1]), parse(Int64, ARGS[2]) ; experiment_toml=ARGS[3])
+    main(parse(Int64, ARGS[1]), parse(Float32, ARGS[2]); experiment_toml=ARGS[3])
 end
