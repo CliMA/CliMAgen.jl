@@ -18,6 +18,7 @@ noised_channels   = 2
 context_channels  = 1
 sigma_max         = 1000.0
 sigma_min         = 1e-2
+dropout_p         = 0.0
 mean_bypass       = true
 shift_input       = true
 shift_output      = true

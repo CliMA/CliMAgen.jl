@@ -108,22 +108,23 @@ end
 User Facing API for NoiseConditionalScoreNetwork architecture.
 """
 function NoiseConditionalScoreNetworkVariant(; context=false,
-                                               mean_bypass=false, 
-                                               scale_mean_bypass=false,
-                                               shift_input=false,
-                                               shift_output=false,
-                                               gnorm=false,
-                                               nspatial=2,
-                                               num_residual=8,
-                                               noised_channels=1,
-                                               context_channels=0,
-                                               channels=[32, 64, 128, 256],
-                                               embed_dim=256,
-                                               scale=30.0f0,
-                                               proj_kernelsize = 3,
-                                               outer_kernelsize = 3,
-                                               middle_kernelsize = 3,
-                                               inner_kernelsize = 3)
+                                             mean_bypass=false, 
+                                             scale_mean_bypass=false,
+                                             shift_input=false,
+                                             shift_output=false,
+                                             gnorm=false,
+                                             nspatial=2,
+                                             dropout_p = 0.0f0,
+                                             num_residual=8,
+                                             noised_channels=1,
+                                             context_channels=0,
+                                             channels=[32, 64, 128, 256],
+                                             embed_dim=256,
+                                             scale=30.0f0,
+                                             proj_kernelsize = 3,
+                                             outer_kernelsize = 3,
+                                             middle_kernelsize = 3,
+                                             inner_kernelsize = 3)
     if scale_mean_bypass & !mean_bypass
         @error("Attempting to scale the mean bypass term without adding in a mean bypass connection.")
     end
@@ -186,7 +187,7 @@ function NoiseConditionalScoreNetworkVariant(; context=false,
               
               # Residual Blocks
               resnet_blocks = 
-              [ResnetBlockVariant(channels[end], nspatial, embed_dim, 0.0f0) for _ in range(1, length=num_residual)],
+              [ResnetBlockVariant(channels[end], nspatial, embed_dim; p = dropout_p) for _ in range(1, length=num_residual)],
               
               # Decoding
               gnorm4=GroupNorm(channels[4], 32, swish),
@@ -523,7 +524,7 @@ struct ResnetBlockVariant
     dropout
 end
 
-function ResnetBlockVariant(channels::Int, nspatial::Int, nembed::Int, p=0.1f0, σ=Flux.swish)
+function ResnetBlockVariant(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
     # channels needs to be larger than 4
     @assert channels ÷ 4 > 0
 
