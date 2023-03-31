@@ -67,6 +67,7 @@ function generate_samples!(samples, init_x, model, context, time_steps, Δt, sam
 end
 
 function filter_512_to_64(x)
+    FT = eltype(x)
     y = Complex{FT}.(x)
     # Filter.
     fft!(y, (1,2));
@@ -76,11 +77,13 @@ function filter_512_to_64(x)
     return real(y)
 end
 
-function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment_resize_64.toml", target_toml="experiments/Experiment_preprocess_mixed.toml")
+function main(nbatches, npixels, wavenumber;
+              source_toml="experiments/Experiment_resize_64_031422.toml",
+              target_toml="experiments/Experiment_preprocess_mixed_shorter_run_all_data.toml")
     FT = Float32
     device = Flux.gpu
     nsteps = 125
-    savedir = "./"
+    savedir = "./downscaling_runs/resize_64_031422_preprocess_mixed_shorter_run_all_data"
     nsamples = 10
     tilesize = 512
     context_channels = 1
@@ -90,8 +93,8 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
     reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
 
     # Determine which `k` the two sets of images begin to differ from each other
-    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,[end]], size(xsource)[1])
-    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,[end]], size(xtarget)[1])
+    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,1:10], size(xsource)[1])
+    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,1:10], size(xtarget)[1])
 
     cutoff_idx = Int64(floor(sqrt(2)*wavenumber-1))
     if cutoff_idx > 0
@@ -105,7 +108,7 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
 	reverse_t_end = FT(1)
 	forward_t_end = FT(1)
     end
-
+    forward_t_end = reverse_t_end
     @show forward_t_end
     @show reverse_t_end
     # Samples with all three channels
@@ -177,7 +180,8 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
 
         # Save nsamples of the initial and final images in real space
         if batch == 1
-            jldsave("downscaling_images.jld2"; source = cpu(source_samples),
+	    imgfile = joinpath(savedir, "downscaling_images_$wavenumber.jld2")
+            jldsave(imgfile; source = cpu(source_samples),
                     target = cpu(target_samples),
                     lo_res_target = filter_512_to_64(cpu(target_samples)))
         end
