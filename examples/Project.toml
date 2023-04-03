@@ -21,7 +21,6 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Tullio = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
-Wandb = "ad70616a-06c9-5745-b1f1-6a5f42545108"
 
 [compat]
 julia = "1.7, 1.8"

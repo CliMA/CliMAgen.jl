@@ -3,7 +3,6 @@
 /Manifest.toml
 
 output/
-wandb/
 examples/2dturbulence/*out
 examples/2dturbulence/experiments
 examples/Manifest.toml
