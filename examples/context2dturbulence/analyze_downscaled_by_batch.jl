@@ -83,7 +83,7 @@ function main(nbatches, npixels, wavenumber;
     FT = Float32
     device = Flux.gpu
     nsteps = 125
-    savedir = "./downscaling_runs/resize_64_031422_preprocess_mixed_shorter_run_all_data"
+    stats_savedir = string("512x512/downscale_gen")
     nsamples = 10
     tilesize = 512
     context_channels = 1
@@ -96,7 +96,7 @@ function main(nbatches, npixels, wavenumber;
     source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,1:10], size(xsource)[1])
     target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,1:10], size(xtarget)[1])
 
-    cutoff_idx = Int64(floor(sqrt(2)*wavenumber-1))
+    cutoff_idx = min(6,Int64(floor(sqrt(2)*wavenumber-1)))
     if cutoff_idx > 0
         k_cutoff = FT(k[cutoff_idx])
 
@@ -108,7 +108,6 @@ function main(nbatches, npixels, wavenumber;
 	reverse_t_end = FT(1)
 	forward_t_end = FT(1)
     end
-    forward_t_end = reverse_t_end
     @show forward_t_end
     @show reverse_t_end
     # Samples with all three channels
@@ -130,9 +129,9 @@ function main(nbatches, npixels, wavenumber;
     Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
 
     sampler = "euler"
-    filenames = [joinpath(savedir, "downscale_gen_statistics_ch1_$wavenumber.csv"),
-                 joinpath(savedir, "downscale_gen_statistics_ch2_$wavenumber.csv")]
-    pixel_filenames = [joinpath(savedir, "downscale_gen_pixels_ch1_$wavenumber.csv"),joinpath(savedir, "downscale_gen_pixels_ch2_$wavenumber.csv")]
+    filenames = [joinpath(stats_savedir, "downscale_gen_statistics_ch1_$wavenumber.csv"),
+                 joinpath(stats_savedir, "downscale_gen_statistics_ch2_$wavenumber.csv")]
+    pixel_filenames = [joinpath(stats_savedir, "downscale_gen_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "downscale_gen_pixels_ch2_$wavenumber.csv")]
 
     indices = 1:1:size(csource)[end]
 
@@ -180,7 +179,7 @@ function main(nbatches, npixels, wavenumber;
 
         # Save nsamples of the initial and final images in real space
         if batch == 1
-	    imgfile = joinpath(savedir, "downscaling_images_$wavenumber.jld2")
+	    imgfile = joinpath(stats_savedir, "downscaling_images_$wavenumber.jld2")
             jldsave(imgfile; source = cpu(source_samples),
                     target = cpu(target_samples),
                     lo_res_target = filter_512_to_64(cpu(target_samples)))
@@ -206,7 +205,7 @@ function main(nbatches, npixels, wavenumber;
         for ch in 1:noised_channels
             # write pixel vaues to other file
             open(pixel_filenames[ch],"a") do io
-                writedlm(io, cpu(sample_pixels)[pixel_indices, ch, :], ',')
+                writedlm(io, transpose(cpu(sample_pixels)[pixel_indices, ch, :]), ',')
             end
 
             if ch == 1

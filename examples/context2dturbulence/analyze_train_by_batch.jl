@@ -54,12 +54,14 @@ function main(npixels, wavenumber; experiment_toml="Experiment.toml")
     dl  = obtain_train_dl(params, wavenumber, FT)
     resolution = string(params.data.resolution)
     noised_channels = params.model.noised_channels
-    savedir = string("./data_stats/", resolution,"x", resolution)
+    savedir = params.experiment.savedir
     standard_scaling  = params.data.standard_scaling
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
     scaling = JLD2.load_object(preprocess_params_file)
-    filenames = [joinpath(savedir, "train_statistics_ch1_$wavenumber.csv"),joinpath(savedir, "train_statistics_ch2_$wavenumber.csv")]
-    pixel_filenames = [joinpath(savedir, "train_pixels_ch1_$wavenumber.csv"),joinpath(savedir, "train_pixels_ch2_$wavenumber.csv")]
+
+    stats_savedir = string(resolution,"x", resolution,"/train")
+    filenames = [joinpath(stats_savedir, "train_statistics_ch1_$wavenumber.csv"),joinpath(stats_savedir, "train_statistics_ch2_$wavenumber.csv")]
+    pixel_filenames = [joinpath(stats_savedir, "train_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "train_pixels_ch2_$wavenumber.csv")]
     # The 64x64 resolution images have been enlarged to 512x512
     train_pixels = zeros(FT,(512*512, noised_channels, batchsize))
 
@@ -86,7 +88,7 @@ function main(npixels, wavenumber; experiment_toml="Experiment.toml")
         for ch in 1:noised_channels
             # write pixel vaues to other file
             open(pixel_filenames[ch],"a") do io
-                writedlm(io, train_pixels[pixel_indices, ch, 1:current_batchsize], ',')
+                writedlm(io, transpose(train_pixels[pixel_indices, ch, 1:current_batchsize]), ',')
             end
 
             if ch == 1

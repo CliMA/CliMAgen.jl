@@ -86,8 +86,9 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
     nsamples, nsteps, sampler, tilesize = sampling_params(params)
     noised_channels = params.model.noised_channels
     context_channels = params.model.context_channels
-
+    resolution = params.data.resolution
     savedir = params.experiment.savedir
+    stats_savedir = string(resolution,"x", resolution,"/gen")
     standard_scaling  = params.data.standard_scaling
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
@@ -117,8 +118,8 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
     Δt = time_steps[1] - time_steps[2]
 
     indices = 1:1:size(context)[end]
-    filenames = [joinpath(savedir, "gen_statistics_ch1_$wavenumber.csv"),joinpath(savedir, "gen_statistics_ch2_$wavenumber.csv")]
-    pixel_filenames = [joinpath(savedir, "gen_pixels_ch1_$wavenumber.csv"),joinpath(savedir, "gen_pixels_ch2_$wavenumber.csv")]
+    filenames = [joinpath(stats_savedir, "gen_statistics_ch1_$wavenumber.csv"),joinpath(stats_savedir, "gen_statistics_ch2_$wavenumber.csv")]
+    pixel_filenames = [joinpath(stats_savedir, "gen_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "gen_pixels_ch2_$wavenumber.csv")]
 
     for batch in 1:nbatches
     # Because we do this per wavenumber, all the context values are the same, but
@@ -149,7 +150,7 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
         for ch in 1:noised_channels
             # write pixel vaues to other file
             open(pixel_filenames[ch],"a") do io
-                writedlm(io, cpu(sample_pixels)[pixel_indices, ch, :], ',')
+                writedlm(io, transpose(cpu(sample_pixels)[pixel_indices, ch, :]), ',')
             end
 
             if ch == 1
