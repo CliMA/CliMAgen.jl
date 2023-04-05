@@ -77,14 +77,65 @@ function filter_512_to_64(x)
     return real(y)
 end
 
-function main(nbatches, npixels, wavenumber;
+function vary_t0(wavenumber;
+                 source_toml="experiments/Experiment_resize_64_031422.toml",
+                 target_toml="experiments/Experiment_preprocess_mixed_shorter_run_all_data.toml")
+    FT = Float32
+    device = Flux.gpu
+    tilesize = 512
+    context_channels = 1
+    noised_channels = 2
+    ntimes = 10
+
+    forward_model, xsource, csource, scaling_source = unpack_experiment(source_toml, wavenumber; device = device, FT=FT)
+    reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
+
+    # Samples with all three channels
+    target_samples= zeros(FT, (tilesize, tilesize, context_channels+noised_channels, ntimes)) |> device
+    sampler = "euler"
+    end_times = FT.(0.1:0.1:1)
+    for i in 1:ntimes
+        t_end = end_times[i]
+        @info t_end
+        nsteps = Int64.(round(t_end*500))
+        # Set up timesteps for both forward and reverse
+        t_forward = zeros(FT, 1) .+ t_end |> device
+        time_steps_forward = LinRange(FT(1.0f-5),FT(t_end), nsteps)
+        Δt_forward = time_steps_forward[2] - time_steps_forward[1]
+
+        t_reverse = zeros(FT, 1) .+ t_end |> device
+        time_steps_reverse = LinRange(FT(t_end), FT(1.0f-5), nsteps)
+        Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
+        init_x_reverse = Euler_Maruyama_sampler(forward_model, xsource[:,:,1:noised_channels,[1]], time_steps_forward, Δt_forward;
+                                                c=csource[:,:,:,[1]], forward = true)
+
+        target_samples[:,:,1:noised_channels,[i]] .= Euler_Maruyama_sampler(reverse_model, init_x_reverse, time_steps_reverse, Δt_reverse;
+                                    c=ctarget[:,:,:,[1]], forward = false)
+
+    end
+    target_samples[:,:,[3],:] .= ctarget[:,:,:,[1]];
+    target_samples = invert_preprocessing(cpu(target_samples), scaling_target);
+    for ch in 1:noised_channels
+        plot_array = []
+        clims = (minimum(target_samples[:,:,ch,:]), maximum(target_samples[:,:,ch,:]))
+        for i in 1:ntimes
+            t = end_times[i]
+            push!(plot_array,Plots.heatmap(target_samples[:,:,ch,i], aspect_ratio = :equal, plot_title = "t = $t", legend = :none, xticks = :none, yticks = :none, clims = clims, plot_titlefontsize = 32))
+        end
+    Plots.plot(plot_array..., layout= (1,10), size = (3000,300))
+    Plots.savefig("./vary_t0_ch_$ch.png")
+    end
+end
+
+
+
+function main(wavenumber;
               source_toml="experiments/Experiment_resize_64_031422.toml",
               target_toml="experiments/Experiment_preprocess_mixed_shorter_run_all_data.toml")
     FT = Float32
     device = Flux.gpu
-    nsteps = 125
-    stats_savedir = string("512x512/downscale_gen")
-    nsamples = 10
+    #savedir = "./downscaling_runs/resize_64_031422_preprocess_mixed_shorter_run_all_data"
+    nsamples = 5
     tilesize = 512
     context_channels = 1
     noised_channels = 2
@@ -93,22 +144,18 @@ function main(nbatches, npixels, wavenumber;
     reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
 
     # Determine which `k` the two sets of images begin to differ from each other
-    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,1:10], size(xsource)[1])
-    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,1:10], size(xtarget)[1])
-
+    #invert_preprocessing(cpu(target_samples), scaling_target)
+    source_spectra, k = new_batch_spectra((xsource |> cpu)[:,:,:,1:10])
+    target_spectra, k = new_batch_spectra((xtarget |> cpu)[:,:,:,1:10])
     cutoff_idx = min(3,Int64(floor(sqrt(2)*wavenumber-1)))
     if cutoff_idx > 0
         k_cutoff = FT(k[cutoff_idx])
-    	source_power_at_cutoff = FT(mean(source_spectra[cutoff_idx,:,:]))
-    	forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, forward_model.σ_max, forward_model.σ_min))
     	target_power_at_cutoff = FT(mean(target_spectra[cutoff_idx,:,:]))
-    	reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, reverse_model.σ_max, reverse_model.σ_min))
+    	reverse_t_end = FT(new_t_cutoff(target_power_at_cutoff, k_cutoff, FT(512), reverse_model.σ_max, reverse_model.σ_min))
     else
 	reverse_t_end = FT(1)
-	forward_t_end = FT(1)
     end
-    @show forward_t_end
-    @show reverse_t_end
+
     # Samples with all three channels
     target_samples= zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
     sample_pixels = reshape(target_samples[:,:, 1:noised_channels, :], (prod(size(target_samples)[1:2]), noised_channels, nsamples))
@@ -117,24 +164,26 @@ function main(nbatches, npixels, wavenumber;
 
     # This only has the noised channels; these are the IC for the reverse process
     init_x_reverse =  zeros(FT, (tilesize, tilesize, noised_channels, nsamples)) |> device
-
-    # Set up timesteps for both forward and reverse
-    t_forward = zeros(FT, nsamples) .+ forward_t_end |> device
-    time_steps_forward = LinRange(FT(1.0f-5),FT(forward_t_end), nsteps)
-    Δt_forward = time_steps_forward[2] - time_steps_forward[1]
-
-    t_reverse = zeros(FT, nsamples) .+ reverse_t_end |> device
-    time_steps_reverse = LinRange(FT(reverse_t_end), FT(1.0f-5), nsteps)
-    Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
-
     sampler = "euler"
-    filenames = [joinpath(stats_savedir, "downscale_gen_statistics_ch1_$wavenumber.csv"),
-                 joinpath(stats_savedir, "downscale_gen_statistics_ch2_$wavenumber.csv")]
-    pixel_filenames = [joinpath(stats_savedir, "downscale_gen_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "downscale_gen_pixels_ch2_$wavenumber.csv")]
+    filenames = ["./downscale_cartoon_ch1_$wavenumber.csv",
+                 "./downscale_cartoon_ch2_$wavenumber.csv"]
 
     indices = 1:1:size(csource)[end]
+    end_times = FT.(0.05:0.05:1)
+    for t_end in end_times
+        @info t_end
+        nsteps = Int64.(round(t_end*500))
+       # Set up timesteps for both forward and reverse
+       t_forward = zeros(FT, nsamples) .+ t_end |> device
+       time_steps_forward = LinRange(FT(1.0f-5),FT(t_end), nsteps)
+       Δt_forward = time_steps_forward[2] - time_steps_forward[1]
 
-    for batch in 1:nbatches
+       t_reverse = zeros(FT, nsamples) .+ t_end |> device
+       time_steps_reverse = LinRange(FT(t_end), FT(1.0f-5), nsteps)
+       Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
+
+
+
         selection = StatsBase.sample(indices, nsamples)
         # Integrate forwards to fill init_x_reverse in place
         # The IC for this step are xsource[:,:,1:noised_channels,selection]
@@ -147,9 +196,6 @@ function main(nbatches, npixels, wavenumber;
                                             Δt_forward,
                                             sampler;
                                             forward = true);
-
-        # If the models use different sigma schedules or if the times are different, we need to adjust
-        adapt_x!(init_x_reverse, forward_model, reverse_model, forward_t_end, reverse_t_end);
         
         # Integrate backwards to fill the noised channels of target_samples in place.
         # Since we do this by wavenumber, all the target context are the same
@@ -163,61 +209,34 @@ function main(nbatches, npixels, wavenumber;
                                                               forward = false);
         
 
-        # Carry out the inverse preprocessing transform to go back to real space
-        # Since samples is on the GPU, and invert preprocessing for some reason does not run on GPU,
-        # do this conversion to cpu and back to GPU. TODO: figure out why.
-
-        # Fill in channel info on samples for inverting the preprocessing
-        # Preprocessing acts on both noised and context channels
         target_samples[:,:,[3],:] .= ctarget[:,:,:,1:nsamples];
-        target_samples = invert_preprocessing(cpu(target_samples), scaling_target) |> device;
-
-        source_samples[:,:,1:noised_channels,:] .= xsource[:,:,1:noised_channels,selection];
-        source_samples[:,:,[3],:] .= csource[:,:,:,selection];
-        source_samples = invert_preprocessing(cpu(source_samples), scaling_source) |> device
-
-        # Save nsamples of the initial and final images in real space
-        if batch == 1
-	    imgfile = joinpath(stats_savedir, "downscaling_images_$wavenumber.jld2")
-            jldsave(imgfile; source = cpu(source_samples),
-                    target = cpu(target_samples),
-                    lo_res_target = filter_512_to_64(cpu(target_samples)))
-        end
-        # Load with
-        # source = load("./downscaling_images.jld2")["source"]; e.g.
-
-        # compute metrics of interest
-        sample_means =  mapslices(Statistics.mean, cpu(target_samples), dims=[1, 2])
-        sample_κ2 = Statistics.var(cpu(target_samples), dims = (1,2))
-        sample_κ3 = mapslices(x -> StatsBase.cumulant(x[:],3), cpu(target_samples), dims=[1, 2])
-        sample_κ4 = mapslices(x -> StatsBase.cumulant(x[:],4), cpu(target_samples), dims=[1, 2])
-        sample_spectra = mapslices(x -> hcat(power_spectrum2d(x, 512)[1]), cpu(target_samples), dims =[1,2])
-
-        # average instant
-        sample_icr = make_icr(cpu(target_samples))
-
-        # samples is 512 x 512 x 3 x 10
-        sample_pixels .= reshape(target_samples[:,:, 1:noised_channels, :], (prod(size(target_samples)[1:2]), noised_channels, nsamples))
-        pixel_indices = StatsBase.sample(1:1:size(sample_pixels)[1], npixels)
-
+        sample_spectra = mapslices(x -> hcat(new_power_spectrum2d(x)[1]), cpu(target_samples), dims =[1,2])
         #save the metrics
         for ch in 1:noised_channels
-            # write pixel vaues to other file
-            open(pixel_filenames[ch],"a") do io
-                writedlm(io, transpose(cpu(sample_pixels)[pixel_indices, ch, :]), ',')
-            end
-
-            if ch == 1
-                output = hcat(sample_means[1,1,ch,:],sample_κ2[1,1,ch,:], sample_κ3[1,1,ch,:],sample_κ4[1,1,ch,:], transpose(sample_spectra[:,1,ch,:]), sample_icr[1,1,ch,:])
-            else
-                output = hcat(sample_means[1,1,ch,:],sample_κ2[1,1,ch,:], sample_κ3[1,1,ch,:],sample_κ4[1,1,ch,:], transpose(sample_spectra[:,1,ch,:]))
-            end
+            faithful = sum(Statistics.mean(sample_spectra[1:cutoff_idx,1,ch,:], dims = 2) .- source_spectra[1:cutoff_idx,ch,:][:])
+            realistic = sum(Statistics.mean(sample_spectra[(cutoff_idx+1):length(k),1,ch,:], dims = 2) .- target_spectra[(cutoff_idx+1):length(k),ch,:][:])
+            output = hcat(t_end, faithful, realistic)
             open(filenames[ch], "a") do io
                 writedlm(io, output, ',')
             end
         end
     end
-    
+    for ch in 1:noised_channels
+#        Plots.plot(k, sample_spectra[:,1,ch,1][:], label = "Samples")
+#        Plots.plot!(margin = 20Plots.mm, xlabel = "Wavenumber", ylabel = "Log10(Normalized metric)")
+#        Plots.plot!(k, source_spectra[:,ch,:][:], label = "Source")
+#        Plots.plot!(k, target_spectra[:,ch,:][:], label = "Target")
+#        Plots.plot!(yaxis = :log, xaxis = :log)
+#        Plots.plot!(legend = :bottomleft)
+#        Plots.savefig("spectra_$ch.png")
+        data = readdlm(filenames[ch], ',')
+        Plots.plot(data[:,1], log10.(data[:,2]./maximum(data[:,2])), label = "faithful")
+        Plots.plot!(margin = 20Plots.mm, xlabel = "Time", ylabel = "Log10(Normalized metric)")
+        Plots.plot!(data[:,1], log10.(data[:,3]./maximum(data[:,3])), label = "realistic")
+        Plots.plot!([reverse_t_end,reverse_t_end], log10.([0.1,1]), label = "other method")
+        Plots.savefig("tmp_$ch.png")
+    end
+
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
