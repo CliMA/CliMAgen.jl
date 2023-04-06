@@ -85,7 +85,7 @@ function vary_t0(wavenumber;
     tilesize = 512
     context_channels = 1
     noised_channels = 2
-    ntimes = 10
+    ntimes = 11
 
     forward_model, xsource, csource, scaling_source = unpack_experiment(source_toml, wavenumber; device = device, FT=FT)
     reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
@@ -93,8 +93,8 @@ function vary_t0(wavenumber;
     # Samples with all three channels
     target_samples= zeros(FT, (tilesize, tilesize, context_channels+noised_channels, ntimes)) |> device
     sampler = "euler"
-    end_times = FT.(0.1:0.1:1)
-    for i in 1:ntimes
+    end_times = FT.(0.0:0.1:1)
+    for i in 2:ntimes
         t_end = end_times[i]
         @info t_end
         nsteps = Int64.(round(t_end*500))
@@ -111,19 +111,38 @@ function vary_t0(wavenumber;
 
         target_samples[:,:,1:noised_channels,[i]] .= Euler_Maruyama_sampler(reverse_model, init_x_reverse, time_steps_reverse, Δt_reverse;
                                     c=ctarget[:,:,:,[1]], forward = false)
-
     end
+   
+    target_samples[:,:,1:noised_channels,[1]] .= device(xsource[:,:,1:noised_channels,[1]])
     target_samples[:,:,[3],:] .= ctarget[:,:,:,[1]];
     target_samples = invert_preprocessing(cpu(target_samples), scaling_target);
+    plot_array = []
+    for t in end_times
+        push!(plot_array, Plots.plot(title = "t = $t", border = :none, ticks =nothing,size = (400,50), titlefontsize = 32))
+    end
+
     for ch in 1:noised_channels
-        plot_array = []
         clims = (minimum(target_samples[:,:,ch,:]), maximum(target_samples[:,:,ch,:]))
         for i in 1:ntimes
             t = end_times[i]
-            push!(plot_array,Plots.heatmap(target_samples[:,:,ch,i], aspect_ratio = :equal, plot_title = "t = $t", legend = :none, xticks = :none, yticks = :none, clims = clims, plot_titlefontsize = 32))
+            plt = Plots.plot()
+            Plots.heatmap!(plt, target_samples[:,:,ch,i],clims = clims,size = (400,400))
+            push!(plot_array,plt)
         end
-    Plots.plot(plot_array..., layout= (1,10), size = (3000,300))
-    Plots.savefig("./vary_t0_ch_$ch.png")
+    end
+    heights = [0.03, 0.485,0.485]
+    Plots.plot(plot_array..., layout= grid(3,11, heights = heights), size = (4400,850), colorbar = :none, border = :none, ticks= nothing)
+    Plots.savefig("./vary_t0.png")
+
+    source_spectra, k = new_batch_spectra((xsource |> cpu)[:,:,:,1:20])
+    target_spectra, k = new_batch_spectra((xtarget |> cpu)[:,:,:,1:20])
+    cutoff_idx = min(3,Int64(floor(sqrt(2)*wavenumber-1)))
+    if cutoff_idx > 0
+    k_cutoff = FT(k[cutoff_idx])
+    target_power_at_cutoff = FT(mean(target_spectra[cutoff_idx,:,:]))
+    reverse_t_end = FT(new_t_cutoff(target_power_at_cutoff, k_cutoff, FT(512), reverse_model.σ_max, reverse_model.σ_min))
+    else
+    reverse_t_end = FT(1)
     end
 end
 
