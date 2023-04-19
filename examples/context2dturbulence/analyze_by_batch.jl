@@ -135,7 +135,7 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
         sample_κ2 = Statistics.var(cpu(samples), dims = (1,2))
         sample_κ3 = mapslices(x -> StatsBase.cumulant(x[:],3), cpu(samples), dims=[1, 2])
         sample_κ4 = mapslices(x -> StatsBase.cumulant(x[:],4), cpu(samples), dims=[1, 2])
-        sample_spectra = mapslices(x -> hcat(power_spectrum2d(x, tilesize)[1]), cpu(samples), dims =[1,2])
+        sample_spectra = mapslices(x -> hcat(power_spectrum2d(x)[1]), cpu(samples), dims =[1,2])
 
         # average instant condensation rate
         sample_icr = make_icr(cpu(samples))

@@ -74,8 +74,8 @@ function two_model_bridge(;
     reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
                       
     # Determine which `k` the two sets of images begin to differ from each other
-    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,[end]], size(xsource)[1])
-    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,[end]], size(xtarget)[1])
+    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,[end]])
+    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,[end]])
                       
     # this is manual right now. just eyeball it.
     Plots.plot(Statistics.mean(source_spectra, dims = 2)[:], label = "resized 64x64")
@@ -84,11 +84,11 @@ function two_model_bridge(;
     Plots.savefig("./tmp.png")
     cutoff_idx = 10
     k_cutoff = FT(k[cutoff_idx])
-                      
+    N = FT(size(xsource)[1])
     source_power_at_cutoff = FT(mean(source_spectra[cutoff_idx,:,:]))
-    forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, forward_model.σ_max, forward_model.σ_min))
+    forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, N, forward_model.σ_max, forward_model.σ_min))
     target_power_at_cutoff = FT(mean(target_spectra[cutoff_idx,:,:]))
-    reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, reverse_model.σ_max, reverse_model.σ_min))
+    reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, N, reverse_model.σ_max, reverse_model.σ_min))
 
     # create a bridge plot for a single image.
     idx = [5,10,15, 20, 25, 30]#size(xsource)[end]

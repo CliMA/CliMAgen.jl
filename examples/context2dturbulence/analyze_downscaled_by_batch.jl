@@ -90,17 +90,17 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
     reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
 
     # Determine which `k` the two sets of images begin to differ from each other
-    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,[end]], size(xsource)[1])
-    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,[end]], size(xtarget)[1])
-
+    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,[end]])
+    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,[end]])
+    N = FT(size(xsource)[1])
     cutoff_idx = Int64(floor(sqrt(2)*wavenumber-1))
     if cutoff_idx > 0
         k_cutoff = FT(k[cutoff_idx])
 
     	source_power_at_cutoff = FT(mean(source_spectra[cutoff_idx,:,:]))
-    	forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, forward_model.σ_max, forward_model.σ_min))
+    	forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, N, forward_model.σ_max, forward_model.σ_min))
     	target_power_at_cutoff = FT(mean(target_spectra[cutoff_idx,:,:]))
-    	reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, reverse_model.σ_max, reverse_model.σ_min))
+    	reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, N, reverse_model.σ_max, reverse_model.σ_min))
     else
 	reverse_t_end = FT(1)
 	forward_t_end = FT(1)
@@ -189,7 +189,7 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
         sample_κ2 = Statistics.var(cpu(target_samples), dims = (1,2))
         sample_κ3 = mapslices(x -> StatsBase.cumulant(x[:],3), cpu(target_samples), dims=[1, 2])
         sample_κ4 = mapslices(x -> StatsBase.cumulant(x[:],4), cpu(target_samples), dims=[1, 2])
-        sample_spectra = mapslices(x -> hcat(power_spectrum2d(x, 512)[1]), cpu(target_samples), dims =[1,2])
+        sample_spectra = mapslices(x -> hcat(power_spectrum2d(x)[1]), cpu(target_samples), dims =[1,2])
 
         # average instant
         sample_icr = make_icr(cpu(target_samples))
