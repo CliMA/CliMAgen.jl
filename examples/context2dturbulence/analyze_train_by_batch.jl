@@ -71,7 +71,7 @@ function main(npixels, wavenumber; experiment_toml="Experiment.toml")
         train_κ2 = Statistics.var(batch, dims = (1,2))
         train_κ3 = mapslices(x -> StatsBase.cumulant(x[:],3), batch, dims=[1, 2])
         train_κ4 = mapslices(x -> StatsBase.cumulant(x[:],4), batch, dims=[1, 2])
-        train_spectra = mapslices(x -> hcat(power_spectrum2d(x, resolution)[1]), batch, dims =[1,2])
+        train_spectra = mapslices(x -> hcat(power_spectrum2d(x)[1]), batch, dims =[1,2])
 
         # average instant condensation rate
         train_icr = make_icr(batch)

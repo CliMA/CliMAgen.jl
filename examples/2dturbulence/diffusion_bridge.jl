@@ -73,17 +73,17 @@ function two_model_bridge(;
 
     # Determine which `k` the two sets of images begin to differ from each other
     
-    source_spectra, k = batch_spectra(xsource |> cpu, size(xsource)[1])
-    target_spectra, k = batch_spectra(xtarget |> cpu, size(xtarget)[1])
+    source_spectra, k = batch_spectra(xsource |> cpu)
+    target_spectra, k = batch_spectra(xtarget |> cpu)
 
     # this is manual right now. just eyeball it.
     cutoff_idx = 3
     k_cutoff = FT(k[cutoff_idx])
-
+    N = FT(size(xsource)[1])
     source_power_at_cutoff = FT(mean(source_spectra[cutoff_idx,:,:]))
-    forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, forward_model.σ_max, forward_model.σ_min))
+    forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, N, forward_model.σ_max, forward_model.σ_min))
     target_power_at_cutoff = FT(mean(target_spectra[cutoff_idx,:,:]))
-    reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, reverse_model.σ_max, reverse_model.σ_min))
+    reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, N, reverse_model.σ_max, reverse_model.σ_min))
 
     # create a bridge plot for a single image.
     init_x = xsource[:,:,:,[3]]
@@ -127,21 +127,19 @@ function three_model_bridge(;m1_toml="experiments/Experiment256_larger_bias_and_
 
 
     # Determine which `k` the images begin to differ from each other
-    spectra1, k = batch_spectra(x1[:,:,:,1:nsamples] |> cpu, size(x1)[1])
-    spectra2, k = batch_spectra(x2[:,:,:,1:nsamples] |> cpu, size(x2)[1])
-    spectra3, k = batch_spectra(x3[:,:,:,1:nsamples] |> cpu, size(x3)[1])
-   # plot(k, spectra3[:,1,:][:], yaxis = :log, label = "truth")
-   # plot!(k, spectra2[:,1,:][:], label = "blurry truth")
-   # plot!(k, spectra1[:,1,:][:], label = "biased/blurry truth")
-   # savefig(joinpath(savepath, "original_spectra.png"))
+    spectra1, k = batch_spectra(x1[:,:,:,1:nsamples] |> cpu)
+    spectra2, k = batch_spectra(x2[:,:,:,1:nsamples] |> cpu)
+    spectra3, k = batch_spectra(x3[:,:,:,1:nsamples] |> cpu)
     
     # Debiasing Bridge
     # The models use the same noising schedule, so the t_end is the same for each.
+    N = FT(size(x1)[1])
+
     cutoff_idx = 3
     k_cutoff = FT(k[cutoff_idx])
     # This takes a mean over channels
     power_at_cutoff = FT(mean(spectra2[cutoff_idx,:,:]))
-    t_end = FT(t_cutoff(power_at_cutoff, k_cutoff, model2.σ_max, model2.σ_min))
+    t_end = FT(t_cutoff(power_at_cutoff, k_cutoff, N, model2.σ_max, model2.σ_min))
     
     init_x = x1[:,:,:,[3]]
     sol_m1_12, sol_m2_12 = diffusion_bridge_simulation(model1,
@@ -161,7 +159,7 @@ function three_model_bridge(;m1_toml="experiments/Experiment256_larger_bias_and_
     k_cutoff = FT(k[cutoff_idx])
     # This takes a mean over channels
     power_at_cutoff = FT(mean(spectra2[cutoff_idx,:,:]))
-    t_end = FT(t_cutoff(power_at_cutoff, k_cutoff, model2.σ_max, model2.σ_min))
+    t_end = FT(t_cutoff(power_at_cutoff, k_cutoff, N, model2.σ_max, model2.σ_min))
 
     sol_m2_23, sol_m3_23 = diffusion_bridge_simulation(model2,
                                                        model3,
@@ -192,8 +190,8 @@ function three_model_bridge(;m1_toml="experiments/Experiment256_larger_bias_and_
     img_plot(images23, savepath, "superresolve.png"; ncolumns = size(images23)[end])
  
     # Take a look at the spectra of all the "truth" images and the ones that we generated 
-    s_debias, k = batch_spectra(sol_m2_12.u[end][:,:,[channel],:] |> cpu, size(init_x)[1])
-    s_sr, k = batch_spectra(sol_m3_23.u[end][:,:,[channel],:]|> cpu, size(init_x)[1])
+    s_debias, k = batch_spectra(sol_m2_12.u[end][:,:,[channel],:] |> cpu)
+    s_sr, k = batch_spectra(sol_m3_23.u[end][:,:,[channel],:]|> cpu)
     plot(k, spectra3[:,channel,:][:], yaxis = :log, xaxis = :log, label = "truth")
     plot!(k, spectra2[:,channel,:][:], label = "blurry truth")
     plot!(k, spectra1[:,channel,:][:], label = "biased/blurry truth")

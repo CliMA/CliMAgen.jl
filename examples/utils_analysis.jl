@@ -143,18 +143,20 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
 end
 
 """
-    batch_spectra(data, L::Int)
+    batch_spectra(data)
 
-Computes and returns the mean radially average power 
+Computes and returns the mean azimuthally averaged power 
 spectrum for the data, where the mean is taken
-over the batch dimension, not the channel dimension,
-as well as the spatial frequencies `k`.
+over the batch dimension,
+as well as over the spatial frequencies `k`,
+but not over the channel dimension.
 
 This has issues with memory for large images.
+
 Revisit!
 """
-function batch_spectra(data, L::Int)
-    statistics = x -> hcat(power_spectrum2d(x, L)...)
+function batch_spectra(data)
+    statistics = x -> hcat(power_spectrum2d(x)...)
     data = data |> Flux.cpu
     results = mapslices(statistics, data, dims=[1, 2])
     k = results[:, 2, 1, 1]
@@ -169,7 +171,7 @@ Helper function to make a spectrum plot.
 """
 function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing) 
     L = FT(1) # Eventually a physical size
-    statistics = x -> hcat(power_spectrum2d(x, L)...)
+    statistics = x -> hcat(power_spectrum2d(x)...)
     inchannels = size(data)[end-1]
 
     data_results = mapslices(statistics, data, dims=[1, 2])
@@ -190,12 +192,11 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing
         lower_gen_spectrum = mapslices(x -> percentile(x[:], 10), gen_results[:, channel, :], dims=2)
         upper_gen_spectrum = mapslices(x -> percentile(x[:], 90), gen_results[:, channel, :], dims=2)
         gen_confidence = (gen_spectrum .- lower_gen_spectrum, upper_gen_spectrum .- gen_spectrum)
-        plt = plot(k, data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log, xaxis=:log)
-        plot!(plt, k, gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
-        plot!(plt, ylim = (1e-6, 1e-1))
+        plt = plot(log2.(k), data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log)
+        plot!(plt, log2.(k), gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
         plot!(plt,
-            xlabel="Log(k)",
-            ylabel="Log(Power)",
+            xlabel="Log2(k)",
+            ylabel="Log10(Power)",
             title=string("Ch:", string(channel)),
             tickfontsize=4)
         push!(plot_array, plt)
@@ -260,19 +261,21 @@ function convert_to_animation(x, time_stride)
 end
 
 """
-    power_spectrum2d(img, L, dim)
+    power_spectrum2d(img)
 
 Adapted from https://github.com/CliMA/ClimateMachine.jl/blob/master/src/Common/Spectra/power_spectrum_les.jl
 for two spatial dimensions.
 
-Inputs
-need to be equi-spaced and the domain is assumed to be the same size and
+Inputs need to be equi-spaced and the domain is assumed to be the same size and
 have the same number of points in all directions.
+
 # Arguments
 - img: a 2 dimension matrix of size (N, N).
-- L: physical size domain
+
+# Returns
+ - spectrum, wavenumber
 """
-function power_spectrum2d(img, L)
+function power_spectrum2d(img)
     @assert size(img)[1] == size(img)[2]
     dim = size(img)[1]
     img_fft = abs.(fft(img .- mean(img)))
@@ -294,15 +297,14 @@ function power_spectrum2d(img, L)
     for i in 1:size(rx, 1), j in 1:size(ry, 1)
         r[i, j] = sqrt(R_x[i]^2 + R_y[j]^2)
     end
-    dx = 2 * pi / L
-    k = range(1, stop=k_nyq, step=1) .* dx
+    k = range(1, stop=k_nyq, step=1)
     endk = size(k, 1)
     contribution = zeros(endk)
     spectrum = zeros(endk)
     for N in 2:Int64(k_nyq - 1)
         for i in 1:size(rx, 1), j in 1:size(ry, 1)
-            if (r[i, j] * dx <= (k'[N+1] + k'[N]) / 2) &&
-               (r[i, j] * dx > (k'[N] + k'[N-1]) / 2)
+            if (r[i, j] <= (k'[N+1] + k'[N]) / 2) &&
+               (r[i, j] > (k'[N] + k'[N-1]) / 2)
                 spectrum[N] =
                     spectrum[N] + m[i, j]^2
                 contribution[N] = contribution[N] + 1
@@ -310,21 +312,21 @@ function power_spectrum2d(img, L)
         end
     end
     for i in 1:size(rx, 1), j in 1:size(ry, 1)
-        if (r[i, j] * dx <= (k'[2] + k'[1]) / 2)
+        if (r[i, j] <= (k'[2] + k'[1]) / 2)
             spectrum[1] =
                 spectrum[1] + m[i, j]^2
             contribution[1] = contribution[1] + 1
         end
     end
     for i in 1:size(rx, 1), j in 1:size(ry, 1)
-        if (r[i, j] * dx <= k'[endk]) &&
-           (r[i, j] * dx > (k'[endk] + k'[endk-1]) / 2)
+        if (r[i, j] <= k'[endk]) &&
+           (r[i, j] > (k'[endk] + k'[endk-1]) / 2)
             spectrum[endk] =
                 spectrum[endk] + m[i, j]^2
             contribution[endk] = contribution[endk] + 1
         end
     end
-    spectrum = spectrum .* 2 .* pi .* k .^ 2 ./ (contribution .* dx .^ 2)
+    spectrum = spectrum ./ contribution
 
     return spectrum, k
 end
@@ -473,22 +475,15 @@ function model_gif(model::CliMAgen.AbstractDiffusionModel, init_x, nsteps::Int, 
 end
 
 """
-    t_cutoff(power::FT, k::FT, σ_max::FT, σ_min::FT) where {FT}
+    t_cutoff(power::FT, k::FT, N::FT, σ_max::FT, σ_min::FT) where {FT}
 
 Computes and returns the time `t` at which the power of 
-the radially averaged Fourier spectrum of white noise, 
+the radially averaged Fourier spectrum of white noise of size NxN, 
 with variance σ_min^2(σ_max/σ_min)^(2t), at wavenumber `k`,
 is equal to `power`.
-
-If `power` is the power of the radially averaged Fourier spectrum
-of a source image, at wavenumber `k`, this time corresponds to the 
-approximate time at which the signal to noise at `k` is 1.
-This is because the radial power(k) for white noise is: k^2*σ^2/2π,
-and the forward diffusion process for a VE difussion mode 
-satisfies dx = g(t) dw, with ∫_0^t g(s)^2 ds) = σ_min^2(σ_max/σ_min)^(2t).
 """
-function t_cutoff(power::FT, k::FT, σ_max::FT, σ_min::FT) where {FT}
-    return 1/2*log(2 * pi * power/k^2/σ_min^2)/log(σ_max/σ_min)
+function t_cutoff(power::FT, k::FT, N::FT, σ_max::FT, σ_min::FT) where {FT}
+    return 1/2*log(power*N^2/σ_min^2)/log(σ_max/σ_min)
 end
 
 """
