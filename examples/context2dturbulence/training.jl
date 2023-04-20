@@ -13,7 +13,6 @@ using CliMAgen: train!, load_model_and_optimizer
 
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
-include(joinpath(package_dir,"examples/utils_wandb.jl")) # for wandb logging, needs correct Python install
 include("analysis.jl") # for analysis
 
 function run_training(params; FT=Float32, logger=nothing)
@@ -164,17 +163,7 @@ function main(; experiment_toml="Experiment.toml")
 
     # set up directory for saving checkpoints
     !ispath(params.experiment.savedir) && mkpath(params.experiment.savedir)
-
-    # start logging if applicable
-    if params.experiment.logging
-        logger = Wandb.WandbLogger(
-            project=params.experiment.project,
-            name="$(params.experiment.name)-$(Dates.now())",
-            config=struct2dict(params), # need this otherwise wandb doesn't log the config
-        )
-    else
-        logger = nothing
-    end
+    logger = nothing
 
     run_training(params; FT=FT, logger=logger)
 
