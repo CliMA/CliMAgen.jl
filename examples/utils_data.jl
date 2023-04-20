@@ -47,58 +47,24 @@ end
 """
 Helper function that loads FashionMNIST images and returns loaders.
 """
-function get_data_fashion_mnist(batchsize;
-                                tilesize=32,
-                                FT=Float32,
-                                standard_scaling = false,
-                                read = false,
-                                save = false,
-                                preprocess_params_file)
-    @assert xor(read, save)
-
+function get_data_fashion_mnist(batchsize; tilesize=32, FT=Float32)
     xtrain, _ = MLDatasets.FashionMNIST(:train; Tx=FT)[:]
-    xtrain = Images.imresize(xtrain, (tilesize, tilesize))
-    xtrain = reshape(xtrain, tilesize, tilesize, 1, :)
-    xtest, _ = MLDatasets.FashionMNIST(:test; Tx=FT)[:]
-    xtest = Images.imresize(xtest, (tilesize, tilesize))
-    xtest = reshape(xtest, tilesize, tilesize, 1, :)
-
-    if save
-        if standard_scaling
-            maxtrain = maximum(xtrain, dims=(1, 2, 4))
-            mintrain = minimum(xtrain, dims=(1, 2, 4))
-            Δ = maxtrain .- mintrain
-            # To prevent dividing by zero
-            Δ[Δ .== 0] .= FT(1)
-            scaling = StandardScaling{FT}(mintrain, Δ)
-        else
-            #scale means and spatial variations separately
-            x̄ = mean(xtrain, dims=(1, 2))
-            maxtrain_mean = maximum(x̄, dims=4)
-            mintrain_mean = minimum(x̄, dims=4)
-            Δ̄ = maxtrain_mean .- mintrain_mean
-            xp = xtrain .- x̄
-            maxtrain_p = maximum(xp, dims=(1, 2, 4))
-            mintrain_p = minimum(xp, dims=(1, 2, 4))
-            Δp = maxtrain_p .- mintrain_p
-
-            # To prevent dividing by zero
-            Δ̄[Δ̄ .== 0] .= FT(1)
-            Δp[Δp .== 0] .= FT(1)
-            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
-        end
-        JLD2.save_object(preprocess_params_file, scaling)
-    elseif read
-        scaling = JLD2.load_object(preprocess_params_file)
-    end
-    xtrain .= apply_preprocessing(xtrain, scaling)
-    # apply the same rescaler as on training set
-    xtest .= apply_preprocessing(xtest, scaling)
-
-    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    xtrain = reshape(xtrain, size(xtrain)[1], size(xtrain)[2], 1, :)
+    xtrain = @. 2xtrain - 1
+    xtrain = MLUtils.shuffleobs(xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+
+    xtest, _ = MLDatasets.FashionMNIST(:test; Tx=FT)[:]
+    xtest = reshape(xtest, size(xtest)[1], size(xtest)[1], 1, :)
+    xtest = @. 2xtest - 1
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
-    
+
+    # wrap iterators for resizing
+    ratio_x = tilesize/size(xtrain)[1]
+    ratio_y = tilesize/size(xtrain)[2]
+    loader_train = Iterators.map(x -> mapslices(y -> Images.imresize(y, ratio=(ratio_x, ratio_y)), x, dims=(1,2)), loader_train)
+    loader_test = Iterators.map(x -> mapslices(y -> Images.imresize(y, ratio=(ratio_x, ratio_y)), x, dims=(1,2)), loader_test)
+
     return (; loader_train, loader_test)
 end
 
