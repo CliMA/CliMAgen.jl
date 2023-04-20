@@ -229,7 +229,10 @@ function get_data_context2dturbulence(batchsize;
         if standard_scaling
             maxtrain = maximum(xtrain, dims=(1, 2, 4))
             mintrain = minimum(xtrain, dims=(1, 2, 4))
-            scaling = StandardScaling{FT}(mintrain, maxtrain)
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
         else
             #scale means and spatial variations separately
             x̄ = mean(xtrain, dims=(1, 2))
@@ -240,6 +243,10 @@ function get_data_context2dturbulence(batchsize;
             maxtrain_p = maximum(xp, dims=(1, 2, 4))
             mintrain_p = minimum(xp, dims=(1, 2, 4))
             Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
             scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
         end
         JLD2.save_object(preprocess_params_file, scaling)
