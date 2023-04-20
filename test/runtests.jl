@@ -3,7 +3,7 @@ using CUDA
 using Flux
 using Test
 using Random
-using Statistics: mean
+using Statistics
 
 FT = Float32
 
