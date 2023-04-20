@@ -30,7 +30,7 @@ function unpack_experiment(experiment_toml, wavenumber; device = Flux.gpu, FT=Fl
 
     if resolution == 64
         wavenumber = 0
-        # Our coarse res data essentially has flat context. If we did have nonzero context fields,
+        # Our coarse res data has flat context. If we did have nonzero context fields,
         # we'd have to be careful to get the right wavenumber
         # so that the diffusion bridge is done for the same context in both directions.
     end
@@ -66,21 +66,29 @@ function generate_samples!(samples, init_x, model, context, time_steps, Δt, sam
     return samples
 end
 
-function filter_512_to_64(x)
+function hard_filter(x, k)
+    d = size(x)[1]
+    if iseven(k)
+        k_ny = Int64(k/2+1)
+    else
+        k_ny = Int64((k+1)/2)
+    end
+    FT = eltype(x)
     y = Complex{FT}.(x)
     # Filter.
     fft!(y, (1,2));
-    y[:,33:479,:,:] .= Complex{FT}(0);
-    y[33:479,:,:,:] .= Complex{FT}(0);
+    y[:,k_ny:(d-k_ny),:,:] .= Complex{FT}(0);
+    y[k_ny:(d-k_ny),:,:,:] .= Complex{FT}(0);
     ifft!(y, (1,2))
     return real(y)
 end
 
-function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment_resize_64.toml", target_toml="experiments/Experiment_preprocess_mixed.toml")
+function main(nbatches, npixels, wavenumber;
+              source_toml="experiments/Experiment_resize_64_dropout_preprocess_041023.toml",
+              target_toml="experiments/Experiment_all_data_centered_dropout_05_vanilla_loss_unet_mean.toml")
     FT = Float32
     device = Flux.gpu
-    nsteps = 125
-    savedir = "./"
+    stats_savedir = string("stats/512x512/downscale_gen")
     nsamples = 10
     tilesize = 512
     context_channels = 1
@@ -90,26 +98,41 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
     reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
 
     # Determine which `k` the two sets of images begin to differ from each other
-    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,[end]])
-    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,[end]])
+    source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,1:20])
+    target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,1:20])
     N = FT(size(xsource)[1])
-    cutoff_idx = Int64(floor(sqrt(2)*wavenumber-1))
+    # Previous version
+    cutoff_idx = min(3,Int64(floor(sqrt(2)*wavenumber-1)))
+    # New version
+    #=
+    if wavenumber ==16
+        cutoff_idx = 5
+    elseif wavenumber == 8
+        cutoff_idx = 5
+    elseif wavenumber == 4
+        cutoff_idx = 2
+    elseif wavenumber == 2
+        cutoff_idx = 1
+    end
+    =#
+
     if cutoff_idx > 0
         k_cutoff = FT(k[cutoff_idx])
-
     	source_power_at_cutoff = FT(mean(source_spectra[cutoff_idx,:,:]))
-    	forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, N, forward_model.σ_max, forward_model.σ_min))
     	target_power_at_cutoff = FT(mean(target_spectra[cutoff_idx,:,:]))
-    	reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, N, reverse_model.σ_max, reverse_model.σ_min))
+        reverse_t_end = FT(t_cutoff(target_power_at_cutoff, k_cutoff, N, reverse_model.σ_max, reverse_model.σ_min))
+        forward_t_end = FT(t_cutoff(source_power_at_cutoff, k_cutoff, N, reverse_model.σ_max, reverse_model.σ_min))
     else
 	reverse_t_end = FT(1)
 	forward_t_end = FT(1)
     end
-
     @show forward_t_end
     @show reverse_t_end
+    nsteps =  Int64.(round(forward_t_end*500))
     # Samples with all three channels
     target_samples= zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
+    lo_res_target_samples = zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
+
     sample_pixels = reshape(target_samples[:,:, 1:noised_channels, :], (prod(size(target_samples)[1:2]), noised_channels, nsamples))
 
     source_samples = zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
@@ -127,12 +150,12 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
     Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
 
     sampler = "euler"
-    filenames = [joinpath(savedir, "downscale_gen_statistics_ch1_$wavenumber.csv"),
-                 joinpath(savedir, "downscale_gen_statistics_ch2_$wavenumber.csv")]
-    pixel_filenames = [joinpath(savedir, "downscale_gen_pixels_ch1_$wavenumber.csv"),joinpath(savedir, "downscale_gen_pixels_ch2_$wavenumber.csv")]
+    filenames = [joinpath(stats_savedir, "downscale_gen_statistics_ch1_$wavenumber.csv"),
+                 joinpath(stats_savedir, "downscale_gen_statistics_ch2_$wavenumber.csv")]
+    pixel_filenames = [joinpath(stats_savedir, "downscale_gen_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "downscale_gen_pixels_ch2_$wavenumber.csv")]
+    L2_filenames = [joinpath(stats_savedir, "downscale_gen_L2_ch1_$wavenumber.csv"),joinpath(stats_savedir, "downscale_gen_L2_ch2_$wavenumber.csv")]
 
     indices = 1:1:size(csource)[end]
-
     for batch in 1:nbatches
         selection = StatsBase.sample(indices, nsamples)
         # Integrate forwards to fill init_x_reverse in place
@@ -174,12 +197,11 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
         source_samples[:,:,1:noised_channels,:] .= xsource[:,:,1:noised_channels,selection];
         source_samples[:,:,[3],:] .= csource[:,:,:,selection];
         source_samples = invert_preprocessing(cpu(source_samples), scaling_source) |> device
-
         # Save nsamples of the initial and final images in real space
         if batch == 1
-            jldsave("downscaling_images.jld2"; source = cpu(source_samples),
-                    target = cpu(target_samples),
-                    lo_res_target = filter_512_to_64(cpu(target_samples)))
+	    imgfile = joinpath(stats_savedir, "downscaling_images_$wavenumber.jld2")
+            jldsave(imgfile; source = cpu(source_samples),
+                    target = cpu(target_samples))
         end
         # Load with
         # source = load("./downscaling_images.jld2")["source"]; e.g.
@@ -190,6 +212,20 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
         sample_κ3 = mapslices(x -> StatsBase.cumulant(x[:],3), cpu(target_samples), dims=[1, 2])
         sample_κ4 = mapslices(x -> StatsBase.cumulant(x[:],4), cpu(target_samples), dims=[1, 2])
         sample_spectra = mapslices(x -> hcat(power_spectrum2d(x)[1]), cpu(target_samples), dims =[1,2])
+        #Difference between filtered high res and true low res source
+        # Since the lo res is biased, especially in the tracer, we cant
+        # just compare hi res to low res. so first we normalize.
+        # We assume the statistics over all pixels in 10 images is sufficient.
+        μ_target = Statistics.mean(target_samples, dims = (1,2,4))
+        μ_source = Statistics.mean(source_samples, dims = (1,2,4))
+        σ_target = Statistics.std(target_samples, dims = (1,2,4))
+        σ_source = Statistics.std(source_samples, dims = (1,2,4))
+        lo_res_target_samples .= hard_filter((target_samples .- μ_target) ./ σ_target , k[cutoff_idx])
+        source_samples .= hard_filter((source_samples .- μ_source) ./ σ_source, k[cutoff_idx])
+
+        L2_hi_true_lo =sqrt.(Statistics.mean(cpu((source_samples[:,:,1:noised_channels,:] .- lo_res_target_samples[:,:,1:noised_channels,:]).^2), dims = [1,2]));
+        # Difference between filtered high res and random low res
+        L2_hi_random_lo =sqrt.(Statistics.mean(cpu((source_samples[:,:,1:noised_channels,randcycle(nsamples)] .- lo_res_target_samples[:,:,1:noised_channels,:]).^2), dims = [1,2]));
 
         # average instant
         sample_icr = make_icr(cpu(target_samples))
@@ -200,9 +236,14 @@ function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment
 
         #save the metrics
         for ch in 1:noised_channels
-            # write pixel vaues to other file
+            # write pixel vaues to pixel file
             open(pixel_filenames[ch],"a") do io
-                writedlm(io, cpu(sample_pixels)[pixel_indices, ch, :], ',')
+                writedlm(io, transpose(cpu(sample_pixels)[pixel_indices, ch, :]), ',')
+            end
+            # write L2 vaues to L2 file
+            open(L2_filenames[ch],"a") do io
+                output = hcat(L2_hi_true_lo[1,1,ch,:], L2_hi_random_lo[1,1,ch,:])
+                writedlm(io, output, ',')
             end
 
             if ch == 1
