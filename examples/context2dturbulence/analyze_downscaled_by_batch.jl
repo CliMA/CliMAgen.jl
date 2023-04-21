@@ -85,11 +85,11 @@ end
 
 function main(nbatches, npixels, wavenumber;
               source_toml="experiments/Experiment_resize_64_dropout_preprocess_041023.toml",
-              target_toml="experiments/Experiment_all_data_centered_dropout_05_vanilla_loss_unet_mean.toml")
+              target_toml="experiments/Experiment_all_data_centered_dropout_05.toml")
     FT = Float32
     device = Flux.gpu
     stats_savedir = string("stats/512x512/downscale_gen")
-    nsamples = 10
+    nsamples = 25
     tilesize = 512
     context_channels = 1
     noised_channels = 2

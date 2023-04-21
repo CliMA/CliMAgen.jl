@@ -93,18 +93,52 @@ function (net::NoiseConditionalScoreNetwork)(x, t)
     return h
 end
 
+"""
+    NoiseConditionalScoreNetworkVariant
 
+The struct containing the parameters and layers
+of the Noise Conditional Score Network architecture.
+
+# References
+Unet: https://arxiv.org/abs/1505.04597
+"""
 struct NoiseConditionalScoreNetworkVariant
+    "The layers of the network"
     layers::NamedTuple
+    "A boolean indicating if non-noised context channels are present"
     context::Bool
+    "A boolean indicating if a mean-bypass layer should be used"
     mean_bypass::Bool
+    "A boolean indicating if the output of the mean-bypass layer should be scaled"
     scale_mean_bypass::Bool
+    "A boolean indicating if the input is demeaned before being passed to the U-net"
     shift_input::Bool
+    "A boolean indicating if the output of the Unet is demeaned"
     shift_output::Bool
+    "A boolean indicating if a groupnorm should be used in the mean-bypass layer"
     gnorm::Bool
 end
 
 """
+    NoiseConditionalScoreNetworkVariant(; context=false,
+                                          mean_bypass=false, 
+                                          scale_mean_bypass=false,
+                                          shift_input=false,
+                                          shift_output=false,
+                                          gnorm=false,
+                                          nspatial=2,
+                                          dropout_p = 0.0f0,
+                                          num_residual=8,
+                                          noised_channels=1,
+                                          context_channels=0,
+                                          channels=[32, 64, 128, 256],
+                                          embed_dim=256,
+                                          scale=30.0f0,
+                                          proj_kernelsize = 3,
+                                          outer_kernelsize = 3,
+                                          middle_kernelsize = 3,
+                                          inner_kernelsize = 3)
+
 User Facing API for NoiseConditionalScoreNetwork architecture.
 """
 function NoiseConditionalScoreNetworkVariant(; context=false,
@@ -630,16 +664,26 @@ each location and batch.
 apply_attention_weights(w, v, ::Val{2}) =
     @tullio v_weighted[h2, w2, c, b] := w[h1, w1, h2, w2, b] * v[h1, w1, c, b]
 
+"""
+    CliMAgen.Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
 
+Downsampling using convolutional kernels; where `channels = inchannels => outchannels`,
+`nspatial` is the number of spatial dimensions of the image, `factor` indicates the
+downsampling factor, and `kernel_size` is in the kernel size.
+"""
 function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
     return Conv(conv_kernel, channels, stride=factor, pad=SamePad())
 end
 
 """
-    CliMAgen.Upsampling(nspatial::Int, nchannels::Int, factor::Int=2, kernel_size::Int=3)
+    CliMAgen.Upsampling(channels::Pair{S,S}, nspatial::Int; factor::Int=2, kernel_size::Int=3) where {S}
 
-Checkerboard-save upsampling using nearest neighbor interpolation and convolution.
+Checkerboard-save upsampling using nearest neighbor interpolation and convolution,
+where `channels = inchannels => outchannels`,
+`nspatial` is the number of spatial dimensions of the image, `factor` indicates the
+upsampling factor, and `kernel_size` is in the kernel size.
+where
 
 References:
 https://distill.pub/2016/deconv-checkerboard/

@@ -58,7 +58,12 @@ end
 
 
 """
-Helper function to make an image plot.
+    img_plot(samples, savepath, plotname; ncolumns = 10,FT=Float32, logger=nothing)
+
+Creates a grid of images with `ncolumns`,
+from `samples` and saves at joinpath(savepath,plotname).
+
+Note that the samples are clipped to lie within the [0,1] range prior to plotting.
 """
 function img_plot(samples, savepath, plotname; ncolumns = 10,FT=Float32, logger=nothing)
     # clip samples to [0, 1] range
@@ -74,7 +79,11 @@ function img_plot(samples, savepath, plotname; ncolumns = 10,FT=Float32, logger=
 end
 
 """
-Helper function to make analyze the means of the samples.
+    spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
+
+Creates and saves histogram plots of the spatial means of `data` and `gen`;
+the plot is saved at joinpath(savepath, plotname). Both `data` and `gen`
+are assumed to be of size (Nx, Ny, Nchannels, Nbatch).
 """
 function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
     inchannels = size(data)[end-1]
@@ -102,7 +111,11 @@ function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, logger=not
 end
 
 """
-Helper function to make a Q-Q plot.
+    qq_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
+
+Creates and saves qq plots of the higher order cumulants of `data` and `gen`;
+the plot is saved at joinpath(savepath, plotname). Both `data` and `gen`
+are assumed to be of size (Nx, Ny, Nchannels, Nbatch).
 """
 function qq_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
     statistics = (Statistics.var, x -> StatsBase.cumulant(x[:], 3), x -> StatsBase.cumulant(x[:], 4))
@@ -148,12 +161,7 @@ end
 Computes and returns the mean azimuthally averaged power 
 spectrum for the data, where the mean is taken
 over the batch dimension,
-as well as over the spatial frequencies `k`,
 but not over the channel dimension.
-
-This has issues with memory for large images.
-
-Revisit!
 """
 function batch_spectra(data)
     statistics = x -> hcat(power_spectrum2d(x)...)
@@ -167,10 +175,16 @@ end
 
 
 """
-Helper function to make a spectrum plot.
+    spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
+
+Creates and saves power spectral density plots by channel for `data` and `gen`;
+the plot is saved at joinpath(savepath, plotname). 
+
+Both `data` and `gen` are assumed to be of size (Nx, Ny, Nchannels, Nbatch).
+Confidence intervals are computed using the difference batch members as different
+samples.
 """
 function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing) 
-    L = FT(1) # Eventually a physical size
     statistics = x -> hcat(power_spectrum2d(x)...)
     inchannels = size(data)[end-1]
 
