@@ -384,29 +384,3 @@ function superposition(;source_toml="experiments/Experiment_resize_64_dropout_pr
     Plots.plot(plot_array..., layout= grid(2,3, heights = heights), size = (2400,900), colorbar = :none)
     Plots.savefig("./superposition_context.png")
 end
-
-
-# Since we have the data loaded, make the spectrum plot for vorticity
-source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,1:20])
-target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,1:20])
-values = [0.01,0.2, 3, 50]
-times = [0,0.25,0.5,0.75]
-ch = 2
-plt = Plots.plot(size = (1150,720))
-Plots.plot!(plt,log2.(k), source_spectra[:,ch,1], label = "Low res",linewidth=3, color = "green",plot_titlefontfamily = "TeX Gyre Heros")
-Plots.plot!(plt, log2.(k), target_spectra[:,ch,1], label = "High res",linewidth=3, color = "orange",plot_titlefontfamily = "TeX Gyre Heros")
-xpos = 5.8
-ypos = 2*3.1415/512/512 .* values.^2
-for i in 1:length(values)
-v = values[i]
-t = times[i]
-white_noise = randn(512,512);
-noisy_spectra, k = power_spectrum2d(white_noise*v)
-Plots.plot!(plt, log2.(k), noisy_spectra, label = "",linewidth=3, linecolor = :gray)
-Plots.annotate!(plt, xpos, ypos[i], (L"σ(%$t)=%$v",18, :black))
-end
-Plots.plot!(plt,guidefontsize = 25,legendfontsize =20, tickfontsize = 18,margin = 13Plots.mm, legend =:bottomleft, xlabel = "Wavenumber", ylabel = "Power spectral density", yaxis = :log,fontfamily = "TeX Gyre Heros", fontcolor =:black)
-Plots.plot!(plt, xlim = [0,8], xticks = ([0,2,4,6], [L"2^0", L"2^2", L"2^4", L"2^6"]),tickfontcolor = :black)
-Plots.plot!(plt, ylim = [1e-20,1], yticks = ([1e-20,1e-15,1e-10,1e-5,1], [L"10^{-20}", L"10^{-15}", L"10^{-10}", L"10^{-5}", L"10^{0}"]),tickfontcolor = :black)
-Plots.savefig("./psd_white_noise_tracer.png")
-end
