@@ -80,7 +80,7 @@ function filter_512_to_64(x)
 end
 
 function vary_t0(;source_toml="experiments/Experiment_resize_64_dropout_preprocess_041023.toml",
-                  target_toml="experiments/Experiment_all_data_centered_dropout_05_vanilla_loss_unet_mean.toml",
+                  target_toml="experiments/Experiment_all_data_centered_dropout_05.toml",
                   use_context = false, FT = Float32, wavenumber = 16)
     wavenumber = FT(wavenumber)
     device = Flux.gpu
@@ -169,7 +169,7 @@ end
 
 
 function diffusion_bridge_with_context(;source_toml="experiments/Experiment_resize_64_dropout_preprocess_041023.toml",
-                                       target_toml="experiments/Experiment_all_data_centered_dropout_05_vanilla_loss_unet_mean.toml")
+                                       target_toml="experiments/Experiment_all_data_centered_dropout_05.toml")
     FT = Float32
     device = Flux.gpu
     nsteps = 125
@@ -286,12 +286,12 @@ function L2plot(; stats_savedir = "stats/512x512/downscale_gen")
             L2_data = readdlm(L2_filenames[ch], ',')
             int_wavenumber = Int64(wavenumber)
             if wavenumber == 2.0 && ch ==1
-                boxplot!(plots[ch],["$int_wavenumber" "$int_wavenumber"],L2_data,outliers = false, whisker_width = :half, fillalpha=0.5, linewidth=2,linecolor=[:purple :green], color=[:purple  :green], label=["True lo-res" "Random lo-res"], fontfamily = "TeX Gyre Heros",fontsize = 28)
+                StatsPlots.boxplot!(plots[ch],["$int_wavenumber" "$int_wavenumber"],L2_data,outliers = false, whisker_width = :half, fillalpha=0.5, linewidth=2,linecolor=[:purple :green], color=[:purple  :green], label=["True lo-res" "Random lo-res"], fontfamily = "TeX Gyre Heros",fontsize = 28)
             else
-                boxplot!(plots[ch],["$int_wavenumber" "$int_wavenumber"],L2_data,outliers = false, whisker_width = :half, fillalpha=0.5, linewidth=2,linecolor=[:purple :green], label = "", color=[:purple  :green],fontfamily = "TeX Gyre Heros",fontsize = 28)
+                StatsPlots.boxplot!(plots[ch],["$int_wavenumber" "$int_wavenumber"],L2_data,outliers = false, whisker_width = :half, fillalpha=0.5, linewidth=2,linecolor=[:purple :green], label = "", color=[:purple  :green],fontfamily = "TeX Gyre Heros",fontsize = 28)
             end
             Plots.plot!(plots[ch],title = titles[ch],fontfamily = "TeX Gyre Heros", fontsize = 28)
-            Plots.plot!(plots[ch], ylim = [0,8], xlabel = string("Wavenumber ", L"k_x=k_y"),fontfamily = "TeX Gyre Heros",fontsize = 28)
+            Plots.plot!(plots[ch], ylim = [0,1], xlabel = string("Wavenumber ", L"k_x=k_y"),fontfamily = "TeX Gyre Heros",fontsize = 28)
             if ch == 1
                 Plots.plot!(plots[ch], leftmargin = 10Plots.mm, bottom_margin = 5Plots.mm, ylabel = "L² of hi-res and lo-res",fontfamily = "TeX Gyre Heros",fontsize = 28)
             else
@@ -301,4 +301,112 @@ function L2plot(; stats_savedir = "stats/512x512/downscale_gen")
     end
     Plots.plot(plot1,plot2)
     Plots.savefig("L2_conditional.png")
+end
+
+function superposition(;source_toml="experiments/Experiment_resize_64_dropout_preprocess_041023.toml",
+                        target_toml="experiments/Experiment_all_data_centered_dropout_05.toml",
+                        FT = Float32)
+    device = Flux.gpu
+    tilesize = 512
+    context_channels = 1
+    noised_channels = 2
+
+    forward_model, xsource, csource, scaling_source = unpack_experiment(source_toml, 0; device = device, FT=FT)
+    reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, 0; device = device,FT=FT)
+    amp = 1.0;
+    n = 512;
+    k1 = 16.0;
+    k2 = 32.0
+    L = 2π
+    xx = ones(n) * LinRange(0,L,n)' 
+    yy = LinRange(0,L,n) * ones(n)'
+    context1 = @. amp * sin(2π * k1 * xx / L) * sin(2π *  k1 * yy / L)
+    context2 = @. amp * sin(2π * k2 * xx / L) * sin(2π *  k2 * yy / L)
+    context_raw = context1 .* (xx .> π) + context2 .* (xx .<= π);
+
+    params = TOML.parsefile(target_toml)
+    params = CliMAgen.dict2nt(params)
+    # unpack params
+    savedir = params.experiment.savedir
+    standard_scaling  = params.data.standard_scaling
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
+    scaling = JLD2.load_object(preprocess_params_file)
+    context_scaling = CliMAgen.MeanSpatialScaling([scaling.mintrain_mean[3]],
+                                                       [scaling.Δ̄[3]],
+                                                       [scaling.mintrain_p[3]],
+                                                       [scaling.Δp[3]])
+    
+    context_preprocessed = apply_preprocessing(context_raw, context_scaling) |> device
+    context_preprocessed = reshape(context_preprocessed, (512,512,1,1));
+    # Samples with all three channels
+    sampler = "euler"
+    t_end = FT(0.47)
+    nsteps = Int64.(round(t_end*500))
+    # Set up timesteps for both forward and reverse
+    t_forward = zeros(FT, 1) .+ t_end |> device
+    time_steps_forward = LinRange(FT(1.0f-5),FT(t_end), nsteps)
+    Δt_forward = time_steps_forward[2] - time_steps_forward[1]
+
+    t_reverse = zeros(FT, 1) .+ t_end |> device
+    time_steps_reverse = LinRange(FT(t_end), FT(1.0f-5), nsteps)
+    Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
+    init_x_reverse = Euler_Maruyama_sampler(forward_model, xsource[:,:,1:noised_channels,[1]], time_steps_forward, Δt_forward;
+                                            c=csource[:,:,:,[1]], forward = true)
+
+    target_samples = Euler_Maruyama_sampler(reverse_model, init_x_reverse, time_steps_reverse, Δt_reverse;
+                                                                        c=context_preprocessed, forward = false)
+
+    target_samples = cat(target_samples, context_preprocessed, dims = (3));
+    target_samples = invert_preprocessing(cpu(target_samples), scaling);
+    schemes = (:blues, :bluesreds)
+    ch = 1
+    clims = (minimum(target_samples[:,:,ch,:]), maximum(target_samples[:,:,ch,:]))
+    clims_c = (minimum(target_samples[:,:,3,:]), maximum(target_samples[:,:,3,:]))
+    spectrum, k = batch_spectra(target_samples[:,:,1,1])
+    plt = Plots.plot(size = (600,600))
+    Plots.plot!(plt,log2.(k), spectrum[:], label = "",linewidth=3, color = "black",plot_titlefontfamily = "TeX Gyre Heros")
+    Plots.plot!(plt,guidefontsize = 18,legendfontsize =18, tickfontsize = 14,bottom_margin = 20Plots.mm,left_margin = 13Plots.mm, legend =:bottomleft, xlabel = "Wavenumber", ylabel = "Power spectral density", yaxis = :log,fontfamily = "TeX Gyre Heros", fontcolor =:black)
+    Plots.plot!(plt, xlim = [0,8], xticks = ([0,2,4,6], [L"2^0", L"2^2", L"2^4", L"2^6"]),tickfontcolor = :black)
+    Plots.plot!(plt, ylim = [1e-8,1], yticks = ([1e-8,1e-4,1], [ L"10^{-8}", L"10^{-4}", L"10^{0}"]),tickfontcolor = :black)
+    Plots.plot!(plt, [log2.(sqrt(2)*16), log2.(sqrt(2)*16)], [1e-8, 1], linestyle = :dot, color = "gray", label = "")
+    Plots.plot!(plt, [log2.(sqrt(2)*32), log2.(sqrt(2)*32)], [1e-8, 1], linestyle = :dot, color = "gray", label = "")
+
+    plot_array = []
+    push!(plot_array, Plots.plot(title = "Generated sample", border = :none, ticks =nothing,size = (800,30), titlefontsize = 28,fontfamily = "TeX Gyre Heros"))
+    push!(plot_array, Plots.plot(title = "Context", border = :none, ticks =nothing,size = (800,30), titlefontsize = 28,fontfamily = "TeX Gyre Heros"))
+    push!(plot_array, Plots.plot(title = "Spectrum", border = :none, ticks = nothing,size = (800,30), titlefontsize = 28,fontfamily = "TeX Gyre Heros"))
+
+    push!(plot_array, Plots.heatmap(target_samples[:,:,ch,1],clims = clims,size = (800,800),border = :box, c = schemes[ch], ticks = nothing))
+    push!(plot_array, Plots.heatmap(target_samples[:,:,3,1],clims = clims_c,size = (800,800),border = :box, c = schemes[ch], ticks =nothing))
+    push!(plot_array, plt)
+
+    heights = [0.05,0.95]
+    Plots.plot(plot_array..., layout= grid(2,3, heights = heights), size = (2400,900), colorbar = :none)
+    Plots.savefig("./superposition_context.png")
+end
+
+
+# Since we have the data loaded, make the spectrum plot for vorticity
+source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,1:20])
+target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,1:20])
+values = [0.01,0.2, 3, 50]
+times = [0,0.25,0.5,0.75]
+ch = 2
+plt = Plots.plot(size = (1150,720))
+Plots.plot!(plt,log2.(k), source_spectra[:,ch,1], label = "Low res",linewidth=3, color = "green",plot_titlefontfamily = "TeX Gyre Heros")
+Plots.plot!(plt, log2.(k), target_spectra[:,ch,1], label = "High res",linewidth=3, color = "orange",plot_titlefontfamily = "TeX Gyre Heros")
+xpos = 5.8
+ypos = 2*3.1415/512/512 .* values.^2
+for i in 1:length(values)
+v = values[i]
+t = times[i]
+white_noise = randn(512,512);
+noisy_spectra, k = power_spectrum2d(white_noise*v)
+Plots.plot!(plt, log2.(k), noisy_spectra, label = "",linewidth=3, linecolor = :gray)
+Plots.annotate!(plt, xpos, ypos[i], (L"σ(%$t)=%$v",18, :black))
+end
+Plots.plot!(plt,guidefontsize = 25,legendfontsize =20, tickfontsize = 18,margin = 13Plots.mm, legend =:bottomleft, xlabel = "Wavenumber", ylabel = "Power spectral density", yaxis = :log,fontfamily = "TeX Gyre Heros", fontcolor =:black)
+Plots.plot!(plt, xlim = [0,8], xticks = ([0,2,4,6], [L"2^0", L"2^2", L"2^4", L"2^6"]),tickfontcolor = :black)
+Plots.plot!(plt, ylim = [1e-20,1], yticks = ([1e-20,1e-15,1e-10,1e-5,1], [L"10^{-20}", L"10^{-15}", L"10^{-10}", L"10^{-5}", L"10^{0}"]),tickfontcolor = :black)
+Plots.savefig("./psd_white_noise_tracer.png")
 end
