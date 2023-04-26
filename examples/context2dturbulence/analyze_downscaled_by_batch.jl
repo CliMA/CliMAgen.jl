@@ -89,7 +89,7 @@ function main(nbatches, npixels, wavenumber;
     FT = Float32
     device = Flux.gpu
     stats_savedir = string("stats/512x512/downscale_gen")
-    nsamples = 10
+    nsamples = 25
     tilesize = 512
     context_channels = 1
     noised_channels = 2
