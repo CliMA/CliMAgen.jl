@@ -36,6 +36,11 @@ mutable struct ExponentialMovingAverage{FT} <: Flux.Optimise.AbstractOptimiser
     rate::FT
 end
 
+"""
+    Flux.update!(opt::ExponentialMovingAverage, ps_smooth::Flux.Params, ps::Flux.Params)
+
+Updates the exponential-moving-average parameters in place.
+"""
 function Flux.update!(opt::ExponentialMovingAverage, ps_smooth::Flux.Params, ps::Flux.Params)
     for (xs, x) in zip(ps_smooth, ps)
         @. xs = opt.rate * xs + (1 - opt.rate) * x
