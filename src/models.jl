@@ -1,7 +1,7 @@
 abstract type AbstractDiffusionModel end
 
 """
-    ClimaGen.drift
+    CliMAgen.drift
 
 An extensible function which returns the drift term of
 the diffusion model forward SDE.
@@ -9,7 +9,7 @@ the diffusion model forward SDE.
 function drift end
 
 """
-    ClimaGen.diffusion
+    CliMAgen.diffusion
 
 An extensible function which returns the diffusion term of
 the diffusion model forward SDE.
@@ -18,7 +18,7 @@ function diffusion end
 
 
 """
-    ClimaGen.marginal_prob
+    CliMAgen.marginal_prob
 
 An extensible function which returns mean and standard
 deviation of the marginal probability P(x(t)).
@@ -27,7 +27,7 @@ deviation of the marginal probability P(x(t)).
 function marginal_prob end
 
 """
-    ClimaGen.score
+    CliMAgen.score
 
 Returns the score(m, x(t), t, c) given the diffusion model `m`.
 """
@@ -37,7 +37,7 @@ function score(m::AbstractDiffusionModel, x, t; c = nothing)
 end
 
 """
-    ClimaGen.forward_sde
+    CliMAgen.forward_sde
 
 Returns the drift (f) and diffusion (g) terms
 for the forward SDE as functions which are amenable for
@@ -59,7 +59,7 @@ function forward_sde(m::AbstractDiffusionModel)
 end
 
 """
-    ClimaGen.reverse_sde
+    CliMAgen.reverse_sde
 
 Returns the drift (f) and diffusion (g) terms 
 for the reverse SDE as functions which are amenable for
@@ -80,7 +80,7 @@ function reverse_sde(m::AbstractDiffusionModel)
 end
 
 """
-    ClimaGen.probability_flow_ode
+    CliMAgen.probability_flow_ode
 
 Returns the tendency  
 for the reverse ODE as a function which is amenable for
@@ -103,7 +103,7 @@ Base.deepcopy(m::M) where {M <: AbstractDiffusionModel} =
     M((deepcopy(getfield(m, f)) for f in fieldnames(M))...)
 
 """
-    ClimaGen.VarianceExplodingSDE
+    CliMAgen.VarianceExplodingSDE
 
 A concrete type of AbstractDiffusionModel with a
 prescribed variance schedule of
@@ -122,17 +122,19 @@ end
 @functor VarianceExplodingSDE
 
 """
-    ClimaGen.drift(::VarianceExplodingSDE,t)
+    CliMAgen.drift(::VarianceExplodingSDE,t)
 
 Returns the drift term of the VarianceExplodingSDE
 diffusion model's forward SDE.
 """
 function drift(::VarianceExplodingSDE, t)
-    return similar(t) .* 0
+    # similar(t) .* 0 occasionally results in NaN
+    # This won't
+    return t .* 0
 end
 
 """
-    ClimaGen.diffusion(::VarianceExplodingSDE,t)
+    CliMAgen.diffusion(::VarianceExplodingSDE,t)
 
 Returns the diffusion term of the VarianceExplodingSDE
 diffusion model's forward SDE.
@@ -142,7 +144,7 @@ function diffusion(m::VarianceExplodingSDE, t)
 end
 
 """
-    ClimaGen.marginal_prob(m::VarianceExplodingSDE, x_0, t)
+    CliMAgen.marginal_prob(m::VarianceExplodingSDE, x_0, t)
 
 Returns the mean and standard deviatio of the marginal probability
 for the VarianceExplodingSDE diffusion model.
