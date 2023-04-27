@@ -179,7 +179,37 @@ function get_data_2dturbulence(batchsize;
 end
 
 """
-Helper function that loads 2d turbulence images with context and returns loaders.
+    get_data_context2dturbulence(batchsize;
+                                 rng=Random.GLOBAL_RNG,
+                                 resolution = 512,
+                                 wavenumber = 0.0,
+                                 fraction = 1.0,
+                                 standard_scaling = false,
+                                 FT = Float32,
+                                 read = false,
+                                 save = false,
+                                 preprocess_params_file)
+
+Obtains the raw data from the 2D turbulence with context dataset,
+carries out a scaling of the data, and loads the data into train and test
+dataloders, which are returned.
+
+The user can pick:
+- resolution:       (64 or 512)
+- wavenumber:       (0 = all wavenumbers, supported for both resolutions
+                    or, 2,4,8,16, supported only for 512 resolution.)
+- fraction:         the amount of the data to use. Must be of the form 1/integer.
+- standard_scaling: boolean indicating if standard minmax scaling is used
+                    or if minmax scaling of the mean and spatial variations
+                    are both implemented.
+- FT:               the float type of the model
+- read:             a boolean indicating if the preprocessing parameters should be read
+- save:             a boolean indicating if the preprocessing parameters should be
+                    computed and read.
+- preprocess_params:filename where preprocessing parameters are stored or read from.
+
+If a resolution of 64 is chosen, the raw data is upsampled to 512x512 using
+nearest-neighbors, and then low-pass filtered.
 """
 function get_data_context2dturbulence(batchsize;
                                       rng=Random.GLOBAL_RNG,
@@ -270,7 +300,8 @@ end
 Helper function that tiles an array in the first two spatial dimensions.
 
 Tiles wrap around periodically if input width is larger than spatial size of array.
-TODO!: make work generally for any spatial dimenionality.
+
+This is currently hardcoded for two spatial dimensions.
 """
 function tile_array(A::AbstractArray, xwidth::Int, ywidth::Int, xstride::Int, ystride::Int)
     @assert ndims(A) == 4

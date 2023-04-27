@@ -1,10 +1,23 @@
 """
-Sample from a diffusion model using the Euler-Maruyama method.
+    Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
+                           init_x::A,
+                           time_steps,
+                           Δt;
+                           c=nothing,
+                           forward = false
+                           )::A where {A}
 
+Generate a sample from a diffusion model using the Euler-Maruyama method.
 # References
 https://arxiv.org/abs/1505.04597
 """
-function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x::A, time_steps, Δt; c=nothing, forward = false)::A where {A}
+function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
+                                init_x::A,
+                                time_steps,
+                                Δt;
+                                c=nothing,
+                                forward = false
+                                )::A where {A}
     x = mean_x = init_x
 
     @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
@@ -22,12 +35,23 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel, init_x::
 end
 
 """
-Sample from a diffusion model using the Predictor-Corrector method.
-
+    predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel,
+                                init_x::A,
+                                time_steps,
+                                Δt;
+                                snr=0.16f0,
+                                c=nothing
+                                )::A where{A}
 # References
 https://yang-song.github.io/blog/2021/score/#how-to-solve-the-reverse-sde
 """
-function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, init_x::A, time_steps, Δt; snr=0.16f0, c=nothing)::A where{A}
+function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel,
+                                     init_x::A,
+                                     time_steps,
+                                     Δt;
+                                     snr=0.16f0,
+                                     c=nothing
+                                     )::A where{A}
     x = mean_x = init_x
 
     @showprogress "Predictor Corrector Sampling" for time_step in time_steps
@@ -56,9 +80,23 @@ function predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel, ini
 end
 
 """
+    setup_sampler(model::CliMAgen.AbstractDiffusionModel,
+                  device,
+                  tilesize,
+                  noised_channels;
+                  num_images = 5,
+                  num_steps=500,
+                  ϵ=1.0f-3)
+
 Helper function that generates inputs to a sampler.
 """
-function setup_sampler(model::CliMAgen.AbstractDiffusionModel, device, tilesize, noised_channels; num_images = 5, num_steps=500, ϵ=1.0f-3)
+function setup_sampler(model::CliMAgen.AbstractDiffusionModel,
+                       device,
+                       tilesize,
+                       noised_channels;
+                       num_images = 5,
+                       num_steps=500,
+                       ϵ=1.0f-3)
 
     t = ones(Float32, num_images) |> device
     init_z = randn(Float32, (tilesize, tilesize, noised_channels, num_images)) |> device
