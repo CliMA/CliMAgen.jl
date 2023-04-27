@@ -1,5 +1,5 @@
 """
-    ClimaGen.score_matching_loss
+    ClimaGen.vanilla_score_matching_loss
 
 # Notes
 Denoising score matching objective:
@@ -21,7 +21,7 @@ s₀(𝘹(𝘵), 𝘵) is estimated by a U-Net architecture.
 https://arxiv.org/abs/2011.13456
 https://arxiv.org/abs/1907.05600
 """
-function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c=nothing)
+function vanilla_score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c=nothing)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 
@@ -42,7 +42,16 @@ function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c=no
     return loss
 end
 
-function score_matching_loss_variant(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c= nothing)
+
+"""
+    ClimaGen.score_matching_loss
+
+# Notes
+Splits the vanilla score matching loss into a contribution
+from the mean score and from the spatial variations in the score
+about the mean.
+"""
+function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c= nothing)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 

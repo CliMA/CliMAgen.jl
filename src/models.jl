@@ -29,7 +29,7 @@ function marginal_prob end
 """
     ClimaGen.score
 
-Returns the score(x(t), t, c) given the diffusion model `m`.
+Returns the score(m, x(t), t, c) given the diffusion model `m`.
 """
 function score(m::AbstractDiffusionModel, x, t; c = nothing)
     _, σ_t = marginal_prob(m, x, t)
@@ -122,13 +122,13 @@ end
 @functor VarianceExplodingSDE
 
 """
-    ClimaGen.drift(::VarianceExplodingSDE{FT},t) where {FT}
+    ClimaGen.drift(::VarianceExplodingSDE,t)
 
 Returns the drift term of the VarianceExplodingSDE
 diffusion model's forward SDE.
 """
-function drift(::VarianceExplodingSDE{FT}, t) where {FT}
-    return similar(t) .* FT(0)
+function drift(::VarianceExplodingSDE, t)
+    return similar(t) .* 0
 end
 
 """
