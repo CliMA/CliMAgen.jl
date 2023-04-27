@@ -52,7 +52,7 @@ function obtain_model(params)
 end
 
 function sampling_params(params)
-    nsamples = params.sampling.nsamples
+    nsamples = 25#params.sampling.nsamples
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
@@ -84,6 +84,7 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
     context = obtain_context(params, wavenumber, FT)
     model = obtain_model(params)
     nsamples, nsteps, sampler, tilesize = sampling_params(params)
+
     noised_channels = params.model.noised_channels
     context_channels = params.model.context_channels
     resolution = params.data.resolution

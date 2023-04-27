@@ -3,6 +3,7 @@ using FFTW
 using MLDatasets, MLUtils, Images, DataLoaders, Statistics
 using CliMADatasets
 using CliMAgen: expand_dims
+using Random
 
 """
 Helper function that creates uniform images and returns loaders.
@@ -181,6 +182,7 @@ end
 Helper function that loads 2d turbulence images with context and returns loaders.
 """
 function get_data_context2dturbulence(batchsize;
+                                      rng=Random.GLOBAL_RNG,
                                       resolution=512,
                                       wavenumber=0.0,
                                       fraction = 1.0,
@@ -257,7 +259,7 @@ function get_data_context2dturbulence(batchsize;
     # apply the same rescaler as on training set
     xtest .= apply_preprocessing(xtest, scaling)
 
-    xtrain = MLUtils.shuffleobs(xtrain)
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
