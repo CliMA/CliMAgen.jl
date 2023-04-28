@@ -8,7 +8,7 @@ abstract type AbstractPreprocessing{FT<:AbstractFloat} end
 """
     StandardScaling{FT} <: AbstractPreprocessing{FT}
 
-A struct that holds the minimum and maximum by channel, over pixels and 
+A struct that holds the minimum and range by channel, over pixels and 
 over all samples, for the training data.
 """
 struct StandardScaling{FT} <: AbstractPreprocessing{FT}

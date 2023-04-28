@@ -1,6 +1,8 @@
 """
-    ClimaGen.vanilla_score_matching_loss
+    ClimaGen.vanilla_score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c=nothing)
 
+Computes and returns the score matching loss given
+a model `model` and batch `x_0`.
 # Notes
 Denoising score matching objective:
 ```julia
@@ -44,12 +46,21 @@ end
 
 
 """
-    ClimaGen.score_matching_loss
+    ClimaGen.score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c= nothing)
+
+Computes and returns the score matching loss for the
+spatial mean score and for the variations about the spatial mean score
+given a model `model` and batch `x_0`.
 
 # Notes
 Splits the vanilla score matching loss into a contribution
 from the mean score and from the spatial variations in the score
-about the mean.
+about the mean. This assumes that the two are uncorrelated
+which should hold when the model is well-trained.
+
+# References:
+https://arxiv.org/abs/2011.13456
+https://arxiv.org/abs/1907.05600
 """
 function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c= nothing)
     # sample times

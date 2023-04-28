@@ -2,7 +2,8 @@
     NoiseConditionalScoreNetwork
 
 The struct containing the parameters and layers
-of the Noise Conditional Score Network architecture.
+of the Noise Conditional Score Network architecture,
+with the option to include a mean-bypass layer.
 
 # References
 Unet: https://arxiv.org/abs/1505.04597
@@ -42,9 +43,28 @@ end
                                  proj_kernelsize = 3,
                                  outer_kernelsize = 3,
                                  middle_kernelsize = 3,
-                                  inner_kernelsize = 3)
+                                 inner_kernelsize = 3)
 
-User Facing API for NoiseConditionalScoreNetwork architecture.
+Returns a NoiseConditionalScoreNetwork, given
+- context: boolean indicating whether or not contextual information is present
+- mean_bypass: boolean indicating if a mean-bypass layer should be used
+- scale_mean_bypass: boolean indicating if the output of the mean-bypass layer should be scaled
+- shift_input: boolean indicating if the input is demeaned before being passed to the U-net
+- shift_output: boolean indicating if the output of the Unet is demeaned
+- gnorm: boolean indicating if a groupnorm should be used in the mean-bypass layer
+- nspatial: integer giving the number of spatial dimensions; images are assumed to be square.
+- dropout_p: float giving the dropout probability
+- num_residual: integer giving the the number of residual blocks in the center of the Unet
+- noised_channels: integer giving the number of channels that are being noised
+- context_channels: integer giving the number of context channels (not noised)
+- channels: array of integers containing the number of channels for each layer of the Unet 
+            during downsampling
+- embed_dim: integer of the time-embedding dimension
+- scale: float giving the scale of the time-embedding layers
+- proj_kernelsize: integer giving the kernel size in projection layers
+- outer_kernelsize: integer giving the kernel size in the outermost down/upsample layers
+- middle_kernelsize: integer giving the kernel size in the middle down/upsample layers
+- inner_kernelsize: integer giving the kernel size in the innermost down/upsample layers
 """
 function NoiseConditionalScoreNetwork(; context=false,
                                       mean_bypass=false, 
@@ -232,19 +252,21 @@ function concatenate_channels(context::Val{false}, x, c)
 end
 
 """
-Projection of Gaussian Noise onto a time vector
+    GaussianFourierProjection{FT}
 
-# Notes
-This layer will help embed random times onto the frequency domain. \n
-W is not trainable and is sampled once upon construction - see assertions below.
-
-# References
-https://arxiv.org/abs/2006.10739
+Concrete type used in the projection of Gaussian Noise onto a time vector.
 """
 struct GaussianFourierProjection{FT}
     W::AbstractArray{FT}
 end
 
+"""
+    GaussianFourierProjection(embed_dim::Int, scale::FT) where {FT}
+
+Outer constructor for the GaussianFourierProjection.
+
+W is not trainable and is sampled once upon construction.
+"""
 function GaussianFourierProjection(embed_dim::Int, scale::FT) where {FT}
     W = randn(FT, embed_dim ÷ 2) .* scale
     return GaussianFourierProjection(W)
@@ -252,6 +274,15 @@ end
 
 @functor GaussianFourierProjection
 
+"""
+    (gfp::GaussianFourierProjection{FT})(t) where {FT}
+
+
+Embeds random times onto the frequency domain.
+
+# References
+https://arxiv.org/abs/2006.10739
+"""
 function (gfp::GaussianFourierProjection{FT})(t) where {FT}
     t_proj = t' .* gfp.W .* FT(2π)
     return [sin.(t_proj); cos.(t_proj)]
@@ -261,10 +292,10 @@ end
 Flux.params(::GaussianFourierProjection) = nothing
 
 """
-    ClimaGen.DenoisingDiffusionNetwork\n
+    ClimaGen.DenoisingDiffusionNetwork
 
 # Notes
-Images stored in (spatial..., channels, batch) order. \n
+Images stored in (spatial..., channels, batch) order. 
 
 # References
 Ho, Jain, Abbeel: Denoising diffusion probabilistic models.
@@ -463,7 +494,13 @@ struct ResnetBlockNCSN
     dense
     dropout
 end
+"""
+     ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
 
+Constructor for the ResnetBlockNCSN, which preserves the `channel` number and image
+size. Here, `nspatial` is the number of spatial dimensions, `nembed` is the embedding
+size, `p` is the dropout probability, and `σ` is the nonlinearity.
+"""
 function ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
     # channels needs to be larger than 4
     @assert channels ÷ 4 > 0
@@ -483,6 +520,11 @@ end
 
 @functor ResnetBlockNCSN
 
+"""
+   (net::ResnetBlockNCSN)(x, tembed)
+
+Applies the ResnetBlockNCSN to (x,t).
+"""
 function (net::ResnetBlockNCSN)(x, tembed)
     # add on temporal embeddings to condition on time
     h = net.norm1(x)
@@ -583,18 +625,17 @@ function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size:
 end
 
 """
-    CliMAgen.Upsampling(channels::Pair{S,S}, nspatial::Int; factor::Int=2, kernel_size::Int=3) where {S}
+    CliMAgen.Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
 
 Checkerboard-save upsampling using nearest neighbor interpolation and convolution,
 where `channels = inchannels => outchannels`,
 `nspatial` is the number of spatial dimensions of the image, `factor` indicates the
 upsampling factor, and `kernel_size` is in the kernel size.
-where
 
 References:
 https://distill.pub/2016/deconv-checkerboard/
 """
-function Upsampling(channels::Pair{S,S}, nspatial::Int; factor::Int=2, kernel_size::Int=3) where {S}
+function Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
     return Chain(
         Flux.Upsample(factor, :nearest),

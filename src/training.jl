@@ -1,7 +1,35 @@
 """
-    ClimaGen.train!
+    train!(model,
+           model_smooth,
+           lossfn,
+           dataloaders,
+           opt,
+           opt_smooth,
+           nepochs,
+           device::Function;
+           start_epoch=1,
+           savedir="./output/",
+           logger=nothing,
+           freq_chckpt=Inf)
+Carries out the training process by iterating over all batches of the training data `nepochs` times.
+
+The `model` parameters are updated via gradient descent of `lossfn`, while the `model_smooth`
+parameters are updated using an exponential moving average. After each epoch, the models are
+saved, and the loss is computed on both the training and test data and saved in `savedir`.
+If restarting from a previous run, start_epoch is no longer 1. 
 """
-function train!(model, model_smooth, lossfn, dataloaders, opt, opt_smooth, nepochs, device::Function; start_epoch=1, savedir="./output/", logger=nothing, freq_chckpt=Inf)
+function train!(model,
+                model_smooth,
+                lossfn,
+                dataloaders,
+                opt,
+                opt_smooth,
+                nepochs,
+                device::Function;
+                start_epoch=1,
+                savedir="./output/",
+                logger=nothing,
+                freq_chckpt=Inf)
     # model parameters
     ps = Flux.params(model)
 
@@ -48,7 +76,10 @@ function train!(model, model_smooth, lossfn, dataloaders, opt, opt_smooth, nepoc
 end
 
 """
-    ClimaGen.update_step!
+    ClimaGen.update_step!(ps, ps_smooth, opt, opt_smooth, loader_train, lossfn::Function, device::Function)
+
+Updates the parameters `ps` and the exponential-moving averaged set `ps_smooth) by computing
+a gradient of the `lossfn` evaluated on each batch of `loader_train`. 
 """
 function update_step!(ps, ps_smooth, opt, opt_smooth, loader_train, lossfn::Function, device::Function)
     progress = ProgressMeter.Progress(length(loader_train); showspeed=true)
@@ -67,7 +98,11 @@ function update_step!(ps, ps_smooth, opt, opt_smooth, loader_train, lossfn::Func
 end
 
 """
-    ClimaGen.compute_losses
+    ClimaGen.compute_losses(lossfn, dataloaders, device::Function)
+
+Computes and returns the value of the `lossfn` on the training
+and test data stored in `dataloaders`. The computation
+is carried out on the GPU or CPU according to `device`.
 """
 function compute_losses(lossfn, dataloaders, device::Function)
     loader_train, loader_test, = dataloaders
@@ -78,7 +113,11 @@ function compute_losses(lossfn, dataloaders, device::Function)
 end
 
 """
-    ClimaGen.save_model_and_optimizer
+    ClimaGen.save_model_and_optimizer(model, model_smooth, opt, opt_smooth, path::String)
+
+Saves the model parameters and optimizer 
+for both the instantaneous model
+as well as the exponentially-averaged one to `path`.
 """
 function save_model_and_optimizer(model, model_smooth, opt, opt_smooth, path::String)
     BSON.@save path model model_smooth opt opt_smooth
@@ -86,7 +125,11 @@ function save_model_and_optimizer(model, model_smooth, opt, opt_smooth, path::St
 end
 
 """
-    ClimaGen.load_model_and_optimizer
+    ClimaGen.load_model_and_optimizer(path::String)
+
+Loads and returns the model parameters and optimizer 
+for both the instantaneous model
+as well as the exponentially-averaged one.
 """
 function load_model_and_optimizer(path::String)
     BSON.@load path model model_smooth opt opt_smooth
