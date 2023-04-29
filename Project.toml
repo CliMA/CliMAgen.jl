@@ -22,6 +22,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 [compat]
 ArgParse = "1.1"
 BSON = "0.3"
+BenchmarkTools = "1"
 CUDA = "3.12"
 Flux = "0.13"
 ProgressMeter = "1.7"
