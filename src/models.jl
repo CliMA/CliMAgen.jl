@@ -3,7 +3,7 @@ abstract type AbstractDiffusionModel end
 """
     CliMAgen.drift
 
-An extensible function which returns the drift term of
+An extendable function which returns the drift term of
 the diffusion model forward SDE.
 """
 function drift end
@@ -11,7 +11,7 @@ function drift end
 """
     CliMAgen.diffusion
 
-An extensible function which returns the diffusion term of
+An extendable function which returns the diffusion term of
 the diffusion model forward SDE.
 """
 function diffusion end
@@ -20,7 +20,7 @@ function diffusion end
 """
     CliMAgen.marginal_prob
 
-An extensible function which returns mean and standard
+An extendable function which returns mean and standard
 deviation of the marginal probability P(x(t)).
 
 """
@@ -44,9 +44,9 @@ Returns the drift (f) and diffusion (g) terms
 for the forward SDE as functions which are amenable for
 use with DifferentialEquations.jl.
 
-Note: These functions expect the input `t` to be a scalar,
-and require the argument `p`, which is not used in our 
-tendency terms.
+Note: The DifferentialEquations.jl API expects the input 
+`t` to be a scalar and requires the argument `p`, which is 
+not used in our tendency terms.
 """
 function forward_sde(m::AbstractDiffusionModel)
     function f(x, p, t)
@@ -68,9 +68,9 @@ Returns the drift (f) and diffusion (g) terms
 for the reverse SDE as functions which are amenable for
 use with DifferentialEquations.jl.
 
-Note: These functions expect the input `t` to be a scalar,
-and require the argument `p`, which is not used in our 
-tendency terms.
+Note: The DifferentialEquations.jl API expects the input 
+`t` to be a scalar and requires the argument `p`, which is 
+not used in our tendency terms.
 """
 function reverse_sde(m::AbstractDiffusionModel)
     function f(x, p, t) 
@@ -91,9 +91,9 @@ Returns the tendency
 for the reverse ODE as a function which is amenable for
 use with DifferentialEquations.jl.
 
-Note: These functions expect the input `t` to be a scalar,
-and require the argument `p`, which is not used in our 
-tendency terms.
+Note: The DifferentialEquations.jl API expects the input 
+`t` to be a scalar and requires the argument `p`, which is 
+not used in our tendency terms.
 """
 function probability_flow_ode(m::AbstractDiffusionModel)
     function f(x, p, t) 
@@ -103,9 +103,18 @@ function probability_flow_ode(m::AbstractDiffusionModel)
     return f
 end
 
-# only the neural network is trainable within the diffusion model
+"""
+    Flux.params(m::AbstractDiffusionModel)
+
+Returns the trainable parameters of the diffusion model.
+"""
 Flux.params(m::AbstractDiffusionModel) = Flux.params(m.net)
 
+"""
+    Base.deepcopy(m::M)
+Carries out a deepcopy of `m` which has abstract type
+`AbstractDiffusionModel`.
+"""
 Base.deepcopy(m::M) where {M <: AbstractDiffusionModel} = 
     M((deepcopy(getfield(m, f)) for f in fieldnames(M))...)
 
@@ -135,11 +144,11 @@ end
     CliMAgen.drift(::VarianceExplodingSDE,t)
 
 Returns the drift term of the VarianceExplodingSDE
-diffusion model(`m`)'s forward SDE at time `t`
+diffusion model(`m`)'s forward SDE at time `t`.
 """
 function drift(::VarianceExplodingSDE, t)
-    # similar(t) .* 0 occasionally results in NaN
-    # This won't
+    # Note: similar(t) .* 0 occasionally results
+    # in NaN, so this is a workaround.
     return t .* 0
 end
 
@@ -147,7 +156,7 @@ end
     CliMAgen.diffusion(::VarianceExplodingSDE,t)
 
 Returns the diffusion term of the VarianceExplodingSDE
-diffusion model(`m`)'s forward SDE at time `t`
+diffusion model(`m`)'s forward SDE at time `t`.
 """
 function diffusion(m::VarianceExplodingSDE, t)
     return @. m.σ_min * (m.σ_max/m.σ_min)^t*sqrt(2*log(m.σ_max/m.σ_min))

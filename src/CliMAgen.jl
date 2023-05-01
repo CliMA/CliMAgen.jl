@@ -1,5 +1,9 @@
 """
-    ClimaGen.CliMAgen
+    CliMAgen.CliMAgen
+
+Code for preprocesssing data, training a score-based 
+diffusion model, and generating samples using the learned 
+score function.
 """
 module CliMAgen
 
@@ -35,4 +39,4 @@ export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler
 export MeanSpatialScaling, StandardScaling, apply_preprocessing, invert_preprocessing
-end # module
+end

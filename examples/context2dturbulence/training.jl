@@ -163,6 +163,7 @@ function main(; experiment_toml="Experiment.toml")
 
     # set up directory for saving checkpoints
     !ispath(params.experiment.savedir) && mkpath(params.experiment.savedir)
+    # Logging is not currently supported.
     logger = nothing
 
     run_training(params; FT=FT, logger=logger)

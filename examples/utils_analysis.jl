@@ -13,10 +13,13 @@ using DelimitedFiles
     loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::Bool=true)
 
 Creates and saves a plot of the training and test loss values, for both the spatial
-and mean loss terms. Whether or not the axes are linear or logarithmic is controlled
-by the `xlog` and `ylog` boolean keyword arguments.
+and mean loss terms; creates a saves a plot of the training and test loss values
+for the total loss, if using the vanilla loss function. Which option is carried out
+depends on the number of columns in the data file: 5 for the split loss function, and 3
+for the vanilla loss function.
 
-The saved plot can be found at `joinpath(savepath,plotname)`.
+Whether or not the axes are linear or logarithmic is controlled
+by the `xlog` and `ylog` boolean keyword arguments. The saved plot can be found at `joinpath(savepath,plotname)`.
 """
 function loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::Bool=true)
     path = joinpath(savepath,plotname)
@@ -60,8 +63,8 @@ end
 """
     img_plot(samples, savepath, plotname; ncolumns = 10,FT=Float32, logger=nothing)
 
-Creates a grid of images with `ncolumns`,
-from `samples` and saves at joinpath(savepath,plotname).
+Creates a grid of images with `ncolumns` using the data`samples`. 
+Saves the resulting plot at joinpath(savepath,plotname).
 
 Note that the samples are clipped to lie within the [0,1] range prior to plotting.
 """
@@ -348,7 +351,7 @@ end
 """
     timewise_score_matching_loss(model, x_0, ϵ=1.0f-5)
 
-Compute the loss term for a single realization of data
+Compute the total loss term for a single realization of data
 as a function of time. This is different from the true loss 
 term optimized by the network, which takes the expectation of this
 quantity over time, training data x(0), and samples from P(x(t)|x(0)).
@@ -663,9 +666,13 @@ function diffusion_bridge_simulation(forward_model::CliMAgen.VarianceExplodingSD
     return forward_solution, reverse_solution
 end
 
-# average instantaneous condensation rate
+"""
+    make_icr(batch)
+
+Computes and returns the mean condensation rate of the data `batch`.
+"""
 function make_icr(batch)
-    τ = 1e-2 # condensation time scale
+    τ = 1e-2 # condensation time scale which was set in the fluid simulations
     cond = @. batch * (batch > 0) / τ
     return  mean(cond, dims=(1,2))
 end

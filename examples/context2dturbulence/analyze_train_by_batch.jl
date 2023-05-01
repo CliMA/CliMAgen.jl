@@ -1,5 +1,7 @@
 using BSON
 using CUDA
+## Script for computing metrics of interest on the training data ##
+
 using Flux
 using ProgressMeter
 using Plots
@@ -13,6 +15,7 @@ using CliMAgen
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
+
 function obtain_train_dl(params, wavenumber, FT)
     # unpack params
     savedir = params.experiment.savedir
@@ -58,13 +61,13 @@ function main(npixels, wavenumber; experiment_toml="Experiment.toml")
     standard_scaling  = params.data.standard_scaling
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
     scaling = JLD2.load_object(preprocess_params_file)
-
+    
+    # The 64x64 resolution images have been enlarged to 512x512
+    imgsize = 512
     stats_savedir = string("stats/",resolution,"x", resolution,"/train")
     filenames = [joinpath(stats_savedir, "train_statistics_ch1_$wavenumber.csv"),joinpath(stats_savedir, "train_statistics_ch2_$wavenumber.csv")]
     pixel_filenames = [joinpath(stats_savedir, "train_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "train_pixels_ch2_$wavenumber.csv")]
-    # The 64x64 resolution images have been enlarged to 512x512
-    # This is hardcoded
-    train_pixels = zeros(FT,(512*512, noised_channels, batchsize))
+    train_pixels = zeros(FT,(imgsize*imgsize, noised_channels, batchsize))
 
     for batch in dl
         # revert to real space using the inverse preprocessing step
@@ -80,7 +83,7 @@ function main(npixels, wavenumber; experiment_toml="Experiment.toml")
         # average instant condensation rate
         train_icr = make_icr(batch)
 
-        # batch is 512 x 512 x 3 x batchsize/nsamples, except possibly on the last batch. 
+        # batch is imgsize x imgsize x nchannels x batchsize, except possibly on the last batch which might be smaller.
         current_batchsize = size(batch)[end]
         train_pixels[:,:,1:current_batchsize] .= reshape(batch[:,:, 1:noised_channels, :], (prod(size(batch)[1:2]), noised_channels, current_batchsize))
         pixel_indices = StatsBase.sample(1:1:size(train_pixels)[1], npixels)

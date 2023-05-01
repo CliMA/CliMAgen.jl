@@ -33,38 +33,47 @@ end
                                  shift_output=false,
                                  gnorm=false,
                                  nspatial=2,
-                                 dropout_p = 0.0f0,
+                                 dropout_p=0.0f0,
                                  num_residual=8,
                                  noised_channels=1,
                                  context_channels=0,
                                  channels=[32, 64, 128, 256],
                                  embed_dim=256,
                                  scale=30.0f0,
-                                 proj_kernelsize = 3,
-                                 outer_kernelsize = 3,
-                                 middle_kernelsize = 3,
-                                 inner_kernelsize = 3)
+                                 proj_kernelsize=3,
+                                 outer_kernelsize=3,
+                                 middle_kernelsize=3,
+                                 inner_kernelsize=3)
 
 Returns a NoiseConditionalScoreNetwork, given
-- context: boolean indicating whether or not contextual information is present
+- context: boolean indicating whether or not contextual information is 
+           present
 - mean_bypass: boolean indicating if a mean-bypass layer should be used
-- scale_mean_bypass: boolean indicating if the output of the mean-bypass layer should be scaled
-- shift_input: boolean indicating if the input is demeaned before being passed to the U-net
+- scale_mean_bypass: boolean indicating if the output of the mean-bypass 
+                     layer should be scaled
+- shift_input: boolean indicating if the input is demeaned before being 
+               passed to the U-net
 - shift_output: boolean indicating if the output of the Unet is demeaned
-- gnorm: boolean indicating if a groupnorm should be used in the mean-bypass layer
-- nspatial: integer giving the number of spatial dimensions; images are assumed to be square.
+- gnorm: boolean indicating if a groupnorm should be used in the mean-bypass 
+         layer
+- nspatial: integer giving the number of spatial dimensions; images are assumed 
+            to be square.
 - dropout_p: float giving the dropout probability
-- num_residual: integer giving the the number of residual blocks in the center of the Unet
+- num_residual: integer giving the the number of residual blocks in the center of 
+                the Unet
 - noised_channels: integer giving the number of channels that are being noised
 - context_channels: integer giving the number of context channels (not noised)
-- channels: array of integers containing the number of channels for each layer of the Unet 
-            during downsampling
+- channels: array of integers containing the number of channels for each layer of 
+            the Unet during downsampling/upsampling
 - embed_dim: integer of the time-embedding dimension
 - scale: float giving the scale of the time-embedding layers
 - proj_kernelsize: integer giving the kernel size in projection layers
-- outer_kernelsize: integer giving the kernel size in the outermost down/upsample layers
-- middle_kernelsize: integer giving the kernel size in the middle down/upsample layers
-- inner_kernelsize: integer giving the kernel size in the innermost down/upsample layers
+- outer_kernelsize: integer giving the kernel size in the outermost down/upsample 
+                    layers
+- middle_kernelsize: integer giving the kernel size in the middle down/upsample 
+                     layers
+- inner_kernelsize: integer giving the kernel size in the innermost down/upsample 
+                    layers
 """
 function NoiseConditionalScoreNetwork(; context=false,
                                       mean_bypass=false, 
@@ -73,17 +82,17 @@ function NoiseConditionalScoreNetwork(; context=false,
                                       shift_output=false,
                                       gnorm=false,
                                       nspatial=2,
-                                      dropout_p = 0.0f0,
+                                      dropout_p=0.0f0,
                                       num_residual=8,
                                       noised_channels=1,
                                       context_channels=0,
                                       channels=[32, 64, 128, 256],
                                       embed_dim=256,
                                       scale=30.0f0,
-                                      proj_kernelsize = 3,
-                                      outer_kernelsize = 3,
-                                      middle_kernelsize = 3,
-                                      inner_kernelsize = 3)
+                                      proj_kernelsize=3,
+                                      outer_kernelsize=3,
+                                      middle_kernelsize=3,
+                                      inner_kernelsize=3)
     if scale_mean_bypass & !mean_bypass
         @error("Attempting to scale the mean bypass term without adding in a mean bypass connection.")
     end
@@ -172,6 +181,13 @@ end
 
 @functor NoiseConditionalScoreNetwork
 
+"""
+    (net::NoiseConditionalScoreNetwork)(x, c, t)
+
+Evaluates the neural network of the NoiseConditionalScoreNetwork
+model on (x,c,t), where `x` is the tensor of noised input,
+`c` is the tensor of contextual input, and `t` is a tensor of times.
+"""
 function (net::NoiseConditionalScoreNetwork)(x, c, t)
     # Embedding
     embed = net.layers.gaussfourierproj(t)
@@ -242,11 +258,21 @@ function (net::NoiseConditionalScoreNetwork)(x, c, t)
     end
 end
 
+"""
+    concatenate_channels(context::Val{true}, x, c)
 
+Concatenates the context channels `c` with the noised data
+channels `x` if `context` is true.
+"""
 function concatenate_channels(context::Val{true}, x, c)
     return cat(x, c, dims = 3)
 end
 
+"""
+    concatenate_channels(context::Val{false}, x, c)
+
+Returns `x` if `context` is false.
+"""
 function concatenate_channels(context::Val{false}, x, c)
     return x
 end
@@ -254,9 +280,11 @@ end
 """
     GaussianFourierProjection{FT}
 
-Concrete type used in the projection of Gaussian Noise onto a time vector.
+Concrete type used in the Gaussian Fourier Projection method
+of embedding a continuous time variable.
 """
 struct GaussianFourierProjection{FT}
+    "Array used to scale and embed the time variable."
     W::AbstractArray{FT}
 end
 
@@ -278,7 +306,8 @@ end
     (gfp::GaussianFourierProjection{FT})(t) where {FT}
 
 
-Embeds random times onto the frequency domain.
+Embeds a continuous time `t`  into a periodic domain
+using a random vector of Gaussian noise `gfp.W`.
 
 # References
 https://arxiv.org/abs/2006.10739
@@ -288,7 +317,12 @@ function (gfp::GaussianFourierProjection{FT})(t) where {FT}
     return [sin.(t_proj); cos.(t_proj)]
 end
 
-# layer is not trainable
+"""
+    Flux.params(::GaussianFourierProjection)
+
+Returns the trainable parameters of the GaussianFourierProjection,
+which are `nothing`.
+"""
 Flux.params(::GaussianFourierProjection) = nothing
 
 """
@@ -480,29 +514,41 @@ end
 """
     CliMAgen.ResnetBlockNCSN
 
-ResNet block with GroupNorm and GaussianFourierProjection.
+Struct holding the layers of the ResNet block 
+used in the NoiseConditionalScoreNetwork model,
+using GroupNorm and GaussianFourierProjection.
 
 References:
 https://arxiv.org/abs/1505.04597
 https://arxiv.org/abs/1712.09763
 """
 struct ResnetBlockNCSN
+    "The group-normalization layer for the input"
     norm1
+    "The first convolutional layer"
     conv1
+    "The second group-normalization layer"
     norm2
+    "The second convolutional layer"
     conv2
+    "A dense layer for handling the time variable"
     dense
+    "A dropout layer"
     dropout
 end
 """
      ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
 
 Constructor for the ResnetBlockNCSN, which preserves the `channel` number and image
-size. Here, `nspatial` is the number of spatial dimensions, `nembed` is the embedding
-size, `p` is the dropout probability, and `σ` is the nonlinearity.
+size of the input.
+
+Here, `nspatial` is the number of spatial dimensions, `nembed` is the embedding
+size used in the GaussianFourierProjection,
+`p` is the dropout probability, and `σ` is the nonlinearity used in the group
+norms and the dense layer.
 """
 function ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
-    # channels needs to be larger than 4
+    # channels needs to be larger than 4 for group norms
     @assert channels ÷ 4 > 0
 
     # Require same input and output spatial size
@@ -523,7 +569,7 @@ end
 """
    (net::ResnetBlockNCSN)(x, tembed)
 
-Applies the ResnetBlockNCSN to (x,t).
+Applies the ResnetBlockNCSN to (x,tembed).
 """
 function (net::ResnetBlockNCSN)(x, tembed)
     # add on temporal embeddings to condition on time
@@ -615,9 +661,13 @@ apply_attention_weights(w, v, ::Val{2}) =
 """
     CliMAgen.Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
 
-Downsampling using convolutional kernels; where `channels = inchannels => outchannels`,
-`nspatial` is the number of spatial dimensions of the image, `factor` indicates the
-downsampling factor, and `kernel_size` is in the kernel size.
+Creates a downsampling layer using convolutional kernels.
+
+Here, 
+- `channels = inchannels => outchannels` is the pair of incoming and outgoing channels,
+- `nspatial` is the number of spatial dimensions of the image,
+- `factor` indicates the downsampling factor, and 
+- `kernel_size` is in the kernel size.
 """
 function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
     conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
@@ -627,10 +677,14 @@ end
 """
     CliMAgen.Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
 
-Checkerboard-save upsampling using nearest neighbor interpolation and convolution,
-where `channels = inchannels => outchannels`,
-`nspatial` is the number of spatial dimensions of the image, `factor` indicates the
-upsampling factor, and `kernel_size` is in the kernel size.
+Creates an upsampling layer using nearest-neighbor interpolation and 
+convolutional kernels, so that checkerboard artifacts are avoided.
+
+Here, 
+- `channels = inchannels => outchannels` is the pair of incoming and outgoing channels,
+- `nspatial` is the number of spatial dimensions of the image,
+- `factor` indicates the downsampling factor, and 
+- `kernel_size` is in the kernel size.
 
 References:
 https://distill.pub/2016/deconv-checkerboard/

@@ -93,29 +93,18 @@ function main(nbatches, npixels, wavenumber;
     tilesize = 512
     context_channels = 1
     noised_channels = 2
+    sampler = "euler"
 
     forward_model, xsource, csource, scaling_source = unpack_experiment(source_toml, wavenumber; device = device, FT=FT)
     reverse_model, xtarget, ctarget, scaling_target = unpack_experiment(target_toml, wavenumber; device = device,FT=FT)
 
-    # Determine which `k` the two sets of images begin to differ from each other
+    # Determine the turnaround time for the diffusion bridge,
+    # corresponding to the power spectral density at which
+    # the two sets of images begin to differ from each other
     source_spectra, k = batch_spectra((xsource |> cpu)[:,:,:,1:20])
     target_spectra, k = batch_spectra((xtarget |> cpu)[:,:,:,1:20])
     N = FT(size(xsource)[1])
-    # Previous version
     cutoff_idx = min(3,Int64(floor(sqrt(2)*wavenumber-1)))
-    # New version
-    #=
-    if wavenumber ==16
-        cutoff_idx = 5
-    elseif wavenumber == 8
-        cutoff_idx = 5
-    elseif wavenumber == 4
-        cutoff_idx = 2
-    elseif wavenumber == 2
-        cutoff_idx = 1
-    end
-    =#
-
     if cutoff_idx > 0
         k_cutoff = FT(k[cutoff_idx])
     	source_power_at_cutoff = FT(mean(source_spectra[cutoff_idx,:,:]))
@@ -128,16 +117,17 @@ function main(nbatches, npixels, wavenumber;
     end
     @show forward_t_end
     @show reverse_t_end
+    # We've been taking 500 steps for the entire (0,1] timespan, so scale
+    # accordingly.
     nsteps =  Int64.(round(forward_t_end*500))
-    # Samples with all three channels
+
+    # Allocate memory for the samples and their pixel values
     target_samples= zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
     lo_res_target_samples = zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
-
     sample_pixels = reshape(target_samples[:,:, 1:noised_channels, :], (prod(size(target_samples)[1:2]), noised_channels, nsamples))
-
     source_samples = zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
 
-    # This only has the noised channels; these are the IC for the reverse process
+    # Allocate memory for the noised channels at t = t_end
     init_x_reverse =  zeros(FT, (tilesize, tilesize, noised_channels, nsamples)) |> device
 
     # Set up timesteps for both forward and reverse
@@ -149,12 +139,14 @@ function main(nbatches, npixels, wavenumber;
     time_steps_reverse = LinRange(FT(reverse_t_end), FT(1.0f-5), nsteps)
     Δt_reverse = time_steps_reverse[1] - time_steps_reverse[2]
 
-    sampler = "euler"
+    # Filenames for saving
     filenames = [joinpath(stats_savedir, "downscale_gen_statistics_ch1_$wavenumber.csv"),
                  joinpath(stats_savedir, "downscale_gen_statistics_ch2_$wavenumber.csv")]
     pixel_filenames = [joinpath(stats_savedir, "downscale_gen_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "downscale_gen_pixels_ch2_$wavenumber.csv")]
     L2_filenames = [joinpath(stats_savedir, "downscale_gen_L2_ch1_$wavenumber.csv"),joinpath(stats_savedir, "downscale_gen_L2_ch2_$wavenumber.csv")]
 
+    # Obtain the indices of the source data.
+    # We'll randomly sample from this for the initial conditions of the forward model.
     indices = 1:1:size(csource)[end]
     for batch in 1:nbatches
         selection = StatsBase.sample(indices, nsamples)
@@ -186,25 +178,13 @@ function main(nbatches, npixels, wavenumber;
         
 
         # Carry out the inverse preprocessing transform to go back to real space
-        # Since samples is on the GPU, and invert preprocessing for some reason does not run on GPU,
-        # do this conversion to cpu and back to GPU. TODO: figure out why.
-
-        # Fill in channel info on samples for inverting the preprocessing
         # Preprocessing acts on both noised and context channels
-        target_samples[:,:,[3],:] .= ctarget[:,:,:,1:nsamples];
+        target_samples[:,:,(noised_channels+1):(noised_channels+context_channels),:] .= ctarget[:,:,:,1:nsamples];
         target_samples = invert_preprocessing(cpu(target_samples), scaling_target) |> device;
 
         source_samples[:,:,1:noised_channels,:] .= xsource[:,:,1:noised_channels,selection];
-        source_samples[:,:,[3],:] .= csource[:,:,:,selection];
+        source_samples[:,:,(noised_channels+1):(noised_channels+context_channels),:] .= csource[:,:,:,selection];
         source_samples = invert_preprocessing(cpu(source_samples), scaling_source) |> device
-        # Save nsamples of the initial and final images in real space
-        if batch == 1
-	    imgfile = joinpath(stats_savedir, "downscaling_images_$wavenumber.jld2")
-            jldsave(imgfile; source = cpu(source_samples),
-                    target = cpu(target_samples))
-        end
-        # Load with
-        # source = load("./downscaling_images.jld2")["source"]; e.g.
 
         # compute metrics of interest
         sample_means =  mapslices(Statistics.mean, cpu(target_samples), dims=[1, 2])
@@ -212,9 +192,9 @@ function main(nbatches, npixels, wavenumber;
         sample_κ3 = mapslices(x -> StatsBase.cumulant(x[:],3), cpu(target_samples), dims=[1, 2])
         sample_κ4 = mapslices(x -> StatsBase.cumulant(x[:],4), cpu(target_samples), dims=[1, 2])
         sample_spectra = mapslices(x -> hcat(power_spectrum2d(x)[1]), cpu(target_samples), dims =[1,2])
-        #Difference between filtered high res and true low res source
+        # Difference between filtered high res and true low res source
         # Since the lo res is biased, especially in the tracer, we cant
-        # just compare hi res to low res. so first we normalize.
+        # just compare hi res to low res. so first we filter & normalize.
         # We assume the statistics over all pixels in 10 images is sufficient.
         μ_target = Statistics.mean(target_samples, dims = (1,2,4))
         μ_source = Statistics.mean(source_samples, dims = (1,2,4))
@@ -227,10 +207,10 @@ function main(nbatches, npixels, wavenumber;
         # Difference between filtered high res and random low res
         L2_hi_random_lo =sqrt.(Statistics.mean(cpu((source_samples[:,:,1:noised_channels,randcycle(nsamples)] .- lo_res_target_samples[:,:,1:noised_channels,:]).^2), dims = [1,2]));
 
-        # average instant
+        # average instant condensation rate
         sample_icr = make_icr(cpu(target_samples))
 
-        # samples is 512 x 512 x 3 x 10
+        # samples pixels
         sample_pixels .= reshape(target_samples[:,:, 1:noised_channels, :], (prod(size(target_samples)[1:2]), noised_channels, nsamples))
         pixel_indices = StatsBase.sample(1:1:size(sample_pixels)[1], npixels)
 
