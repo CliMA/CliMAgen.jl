@@ -1,15 +1,16 @@
 """
     AbstractPreprocessing{FT<:AbstractFloat}
 
-An abstract type for all preprocessing transformations.
+An abstract type for preprocessing transformations.
 """
 abstract type AbstractPreprocessing{FT<:AbstractFloat} end
 
 """
     StandardScaling{FT} <: AbstractPreprocessing{FT}
 
-A struct that holds the minimum and maximum by channel, over pixels and 
-over all samples, for the training data.
+A struct that holds the minimum and range by channel, 
+where the minimum and range are taken over pixels and 
+over all samples of the training data.
 """
 struct StandardScaling{FT} <: AbstractPreprocessing{FT}
     mintrain::Array{FT}
@@ -19,9 +20,10 @@ end
 """
     MeanSpatialScaling{FT} <: AbstractPreprocessing{FT}
 
-A struct that holds the minimum and range 
-both by spatial and mean component, and by channel, over pixels and 
-over all samples, for the training data.
+A struct that holds the minimum and range by spatial 
+(denoted `p`) and mean component (denoted with overbars),
+ and by channel, where the minimum and range are taken over 
+pixels and over all samples of the training data.
 """
 struct MeanSpatialScaling{FT} <: AbstractPreprocessing{FT}
     mintrain_mean::Array{FT}
@@ -58,8 +60,7 @@ end
 """
     apply_preprocessing(x, scaling::StandardScaling)
 
-Computes the preprocessing transform of the data x, given a
-scaling of type `StandardScaling`.
+Preprocesses the data x, given a scaling of type `StandardScaling`.
 """
 function apply_preprocessing(x, scaling::StandardScaling)
     (; mintrain, Δ) = scaling
@@ -69,8 +70,8 @@ end
 """
     apply_preprocessing(x, scaling::MeanSpatialScaling)
 
-Computes the preprocessing transform of the data x, given a
-scaling of type `MeanSpatialScaling`.
+
+Preprocesses the data x, given a scaling of type `MeanSpatialScaling`.
 """
 function apply_preprocessing(x, scaling::MeanSpatialScaling)
     (; mintrain_mean, Δ̄, mintrain_p, Δp) = scaling

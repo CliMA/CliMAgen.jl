@@ -7,7 +7,16 @@
                            forward = false
                            )::A where {A}
 
-Generate a sample from a diffusion model using the Euler-Maruyama method.
+Generate a sample from a diffusion model using the Euler-Maruyama method,
+with 
+- `model` the diffusion model,
+- `init_x` as the initial condition,
+- `time_steps` the vector of times at which a solution is computed,
+   which should advance in ascending order for the forward SDE
+   and descending order for the reverse SDE,
+- `Δt` the absolute value of the timestep,
+- `c` the contextual fields,
+- `forward` a boolean indicating if the forward or reverse SDE is used.
 # References
 https://arxiv.org/abs/1505.04597
 """
@@ -88,7 +97,15 @@ end
                   num_steps=500,
                   ϵ=1.0f-3)
 
-Helper function that generates inputs to a sampler.
+Helper function that generates the required input 
+for generating samples from a diffusion model using the
+the reverse SDE.
+
+Constructs and returns the `time_steps` array,
+timestep `Δt`, and the the initial condition
+for the diffusion model `model` at t=1. The returned
+initial condition is either on the GPU or CPU, according
+to the passed function `device  = Flux.gpu` or `device = Flux.cpu`.
 """
 function setup_sampler(model::CliMAgen.AbstractDiffusionModel,
                        device,

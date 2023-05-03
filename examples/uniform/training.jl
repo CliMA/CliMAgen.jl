@@ -6,8 +6,8 @@ using TOML
 
 using CliMAgen
 using CliMAgen: dict2nt
-using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetworkVariant
-using CliMAgen: score_matching_loss_variant
+using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetwork
+using CliMAgen: score_matching_loss
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
 
@@ -71,14 +71,14 @@ function run_training(params; FT=Float32, logger=nothing)
         loss_data = DelimitedFiles.readdlm(loss_file, ',', skipstart = 1)
         start_epoch = loss_data[end,1]+1
     else
-        net = NoiseConditionalScoreNetworkVariant(; 
-            inchannels = inchannels,
-            shift_input = shift_input,
-            shift_output = shift_output,
-            mean_bypass = mean_bypass,
-            scale_mean_bypass = scale_mean_bypass,
-            gnorm = gnorm,
-        )
+        net = NoiseConditionalScoreNetwork(; 
+                                           inchannels = inchannels,
+                                           shift_input = shift_input,
+                                           shift_output = shift_output,
+                                           mean_bypass = mean_bypass,
+                                           scale_mean_bypass = scale_mean_bypass,
+                                           gnorm = gnorm,
+                                           )
         model = VarianceExplodingSDE(sigma_max, sigma_min, net)
         model = device(model)
         model_smooth = deepcopy(model)
@@ -106,7 +106,7 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up loss function
-    lossfn = x -> score_matching_loss_variant(model, x)
+    lossfn = x -> score_matching_loss(model, x)
 
     # train the model
     train!(

@@ -1,3 +1,5 @@
+## Script for generating metrics of interest on the generated images ##
+
 using BSON
 using CUDA
 using Flux
@@ -19,7 +21,6 @@ function obtain_context(params, wavenumber, FT)
     savedir = params.experiment.savedir
     batchsize = params.data.batchsize
     resolution = params.data.resolution
-   # wavenumber::FT = params.data.wavenumber
     fraction::FT = params.data.fraction
     standard_scaling  = params.data.standard_scaling
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
@@ -52,11 +53,10 @@ function obtain_model(params)
 end
 
 function sampling_params(params)
-    nsamples = 25#params.sampling.nsamples
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
-    return nsamples, nsteps, sampler, tilesize_sampling
+    return nsteps, sampler, tilesize_sampling
 end
 
 function generate_samples!(samples, init_x, model, context, σ_T, time_steps, Δt, sampler)
@@ -81,10 +81,6 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
-    context = obtain_context(params, wavenumber, FT)
-    model = obtain_model(params)
-    nsamples, nsteps, sampler, tilesize = sampling_params(params)
-
     noised_channels = params.model.noised_channels
     context_channels = params.model.context_channels
     resolution = params.data.resolution
@@ -92,8 +88,8 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
     stats_savedir = string("stats/",resolution,"x", resolution,"/gen")
     standard_scaling  = params.data.standard_scaling
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
-
     nogpu = params.experiment.nogpu
+    
     # set up device
     if !nogpu && CUDA.has_cuda()
         device = Flux.gpu
@@ -102,31 +98,38 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
         device = Flux.cpu
         @info "Sampling on CPU"
     end
-
+    context = obtain_context(params, wavenumber, FT) |> device
+    model = obtain_model(params)
+    nsamples = 25
+    nsteps, sampler, tilesize = sampling_params(params)
     model = device(model)
-
     scaling = JLD2.load_object(preprocess_params_file)
-    # make these once, here
+    
+    # Allocate memory for the generated samples and pixel values.
     samples = zeros(FT, (tilesize, tilesize, context_channels+noised_channels, nsamples)) |> device
     sample_pixels = reshape(samples[:,:, 1:noised_channels, :], (prod(size(samples)[1:2]), noised_channels, nsamples))
 
+    # Initial condition array
     init_x =  zeros(FT, (tilesize, tilesize, noised_channels, nsamples)) |> device
-    context = context |> device
 
+    # Setup timestepping simulations
     t = ones(FT, nsamples) |> device
     _, σ_T = CliMAgen.marginal_prob(model, init_x, t)
     time_steps = LinRange(FT(1.0), FT(1.0f-5), nsteps)
     Δt = time_steps[1] - time_steps[2]
 
-    indices = 1:1:size(context)[end]
+    # Filenames for output
     filenames = [joinpath(stats_savedir, "gen_statistics_ch1_$wavenumber.csv"),joinpath(stats_savedir, "gen_statistics_ch2_$wavenumber.csv")]
     pixel_filenames = [joinpath(stats_savedir, "gen_pixels_ch1_$wavenumber.csv"),joinpath(stats_savedir, "gen_pixels_ch2_$wavenumber.csv")]
 
-    for batch in 1:nbatches
+    # the indices of the context field for random samples.
     # Because we do this per wavenumber, all the context values are the same, but
-    # we still need an array of size resolutionxresolutionx1xnsamples for sampling
-    # If we were doing for all wavenumbers, we'd need a random sample for each batch, below.
+    # this code is more general.
+    indices = 1:1:size(context)[end]
+    for batch in 1:nbatches
+        # Random selection of contexts
         selection = StatsBase.sample(indices, nsamples)
+        # Sample generation only fills in the noised channels; the contextual channels are left untouched.
         samples[:,:,1:noised_channels,:] .= generate_samples!(samples[:,:,1:noised_channels,:],init_x,model, context[:,:,:,selection], σ_T, time_steps, Δt, sampler)
         
         # Carry out the inverse preprocessing transform to go back to real space
@@ -141,8 +144,8 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
 
         # average instant condensation rate
         sample_icr = make_icr(cpu(samples))
-
-        # samples is 512 x 512 x 3 x 10
+        
+        # Random selection of pixels for looking at distributions of pixel values
         sample_pixels .= reshape(samples[:,:, 1:noised_channels, :], (prod(size(samples)[1:2]), noised_channels, nsamples))
         # We choose the same random selection of pixels for all in nsamples, but this is OK for this dataset.
         pixel_indices = StatsBase.sample(1:1:size(sample_pixels)[1], npixels)

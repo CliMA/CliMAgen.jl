@@ -1,19 +1,13 @@
 """
-    ClimaGen.log_config
-"""
-function log_config end
-
-"""
     ClimaGen.log_dict
+
+Extendable method for logging dictionaries.
 """
 function log_dict end
 
 """
-    ClimaGen.log_image
-"""
-function log_image end
-
-"""
     ClimaGen.log_checkpoint
+
+Extendable method for logging model checkpoints.
 """
 function log_artifact end
