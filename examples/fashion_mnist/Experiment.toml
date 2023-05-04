@@ -8,6 +8,7 @@ nogpu             = false
 
 [data]
 batchsize         = 64
+standard_scaling  = false
 
 [model]
 inchannels        = 1

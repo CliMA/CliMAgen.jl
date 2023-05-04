@@ -21,6 +21,9 @@ function run_training(params; FT=Float32, logger=nothing)
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
+    standard_scaling  = params.data.standard_scaling
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
+    
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
     inchannels = params.model.inchannels
@@ -54,7 +57,10 @@ function run_training(params; FT=Float32, logger=nothing)
     # set up dataset
     dataloaders = get_data_fashion_mnist(
         batchsize;
-        FT=FT
+        FT=FT,
+        standard_scaling = standard_scaling,
+        save = true,
+        preprocess_params_file)
     )
 
     # set up model and optimizers
