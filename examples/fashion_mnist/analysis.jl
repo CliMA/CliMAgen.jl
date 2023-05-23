@@ -19,9 +19,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
-    standard_scaling  = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
-    inchannels = params.model.inchannels
+    noised_channels = params.model.noised_channels
     nsamples = params.sampling.nsamples
     nimages = params.sampling.nimages
     nsteps = params.sampling.nsteps
@@ -42,11 +40,9 @@ function run_analysis(params; FT=Float32, logger=nothing)
 
     # set up dataset
     dl, _ = get_data_fashion_mnist(
+        tilesize = tilesize_sampling, 
         batchsize;
         FT=FT,
-        standard_scaling = standard_scaling,
-        read = true,
-        preprocess_params_file)
     )
     xtrain = cat([x for x in dl]..., dims=4)
     # To use Images.Gray, we need the input to be between 0 and 1.
@@ -68,7 +64,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
         model,
         device,
         tilesize_sampling,
-        inchannels;
+        noised_channels;
         num_images=nsamples,
         num_steps=nsteps,
     )
@@ -86,7 +82,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
+    #spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain

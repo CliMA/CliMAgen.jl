@@ -81,7 +81,7 @@ s₀(𝘹(𝘵), 𝘵) is estimated by a U-Net architecture.
 https://arxiv.org/abs/2011.13456
 https://arxiv.org/abs/1907.05600
 """
-function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c= nothing)
+function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c=nothing, avg_weight=1, dev_weight=1)
     # sample times
     t = rand!(similar(x_0, size(x_0)[end])) .* (1 - ϵ) .+ ϵ
 
@@ -107,12 +107,12 @@ function score_matching_loss(model::AbstractDiffusionModel, x_0; ϵ=1.0f-5, c= n
     # We have retained the 1/n in front of the avg loss in order to compare with original net
     loss_avg = @. (z_star + √n * σ_t * s_t_avg)^2 # squared deviations from real score
     loss_avg = mean(loss_avg, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
-    loss_avg = 1/n * Statistics.mean(loss_avg) # mean over samples/batches
+    loss_avg = avg_weight * 1/n * Statistics.mean(loss_avg) # mean over samples/batches
 
     # spatial deviation component of loss
     loss_dev = @. (z_dev + σ_t * s_t_dev)^2 # squared deviations from real score
     loss_dev = mean(loss_dev, dims=1:(ndims(x_0)-1)) # spatial & channel mean 
-    loss_dev = Statistics.mean(loss_dev) # mean over samples/batches    
+    loss_dev = dev_weight * Statistics.mean(loss_dev) # mean over samples/batches    
 
     return [loss_avg, loss_dev]
 end

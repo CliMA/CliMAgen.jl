@@ -21,12 +21,11 @@ function run_training(params; FT=Float32, logger=nothing)
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
-    standard_scaling  = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
-    
+    tilesize = params.data.tilesize
+    dropout_p::FT = params.model.dropout_p
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
-    inchannels = params.model.inchannels
+    noised_channels = params.model.noised_channels
     shift_input = params.model.shift_input
     shift_output = params.model.shift_output
     mean_bypass = params.model.mean_bypass
@@ -41,6 +40,8 @@ function run_training(params; FT=Float32, logger=nothing)
     ema_rate::FT = params.optimizer.ema_rate
     nepochs = params.training.nepochs
     freq_chckpt = params.training.freq_chckpt
+    avg_weight::FT = params.loss.avg_weight
+    dev_weight::FT = params.loss.dev_weight
 
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -56,11 +57,9 @@ function run_training(params; FT=Float32, logger=nothing)
 
     # set up dataset
     dataloaders = get_data_fashion_mnist(
+        tilesize = tilesize,
         batchsize;
         FT=FT,
-        standard_scaling = standard_scaling,
-        save = true,
-        preprocess_params_file)
     )
 
     # set up model and optimizers
@@ -75,13 +74,14 @@ function run_training(params; FT=Float32, logger=nothing)
         start_epoch = loss_data[end,1]+1
     else
         net = NoiseConditionalScoreNetwork(; 
-                                           inchannels = inchannels,
-                                           shift_input = shift_input,
-                                           shift_output = shift_output,
-                                           mean_bypass = mean_bypass,
-                                           scale_mean_bypass = scale_mean_bypass,
-                                           gnorm = gnorm,
-                                           )
+                                            dropout_p = dropout_p,
+                                            noised_channels = noised_channels,
+                                            shift_input = shift_input,
+                                            shift_output = shift_output,
+                                            mean_bypass = mean_bypass,
+                                            scale_mean_bypass = scale_mean_bypass,
+                                            gnorm = gnorm,
+                                            )
         model = VarianceExplodingSDE(sigma_max, sigma_min, net)
         model = device(model)
         model_smooth = deepcopy(model)
@@ -109,7 +109,7 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up loss function
-    lossfn = x -> score_matching_loss(model, x)
+    lossfn = x -> score_matching_loss(model, x, avg_weight = avg_weight, dev_weight = dev_weight)
 
     # train the model
     train!(
