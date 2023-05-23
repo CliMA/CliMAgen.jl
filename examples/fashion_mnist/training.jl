@@ -60,9 +60,6 @@ function run_training(params; FT=Float32, logger=nothing)
         tilesize = tilesize,
         batchsize;
         FT=FT,
-        standard_scaling = standard_scaling,
-        save = true,
-        preprocess_params_file)
     )
 
     # set up model and optimizers

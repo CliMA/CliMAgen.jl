@@ -43,9 +43,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
         tilesize = tilesize_sampling, 
         batchsize;
         FT=FT,
-        standard_scaling = standard_scaling,
-        read = true,
-        preprocess_params_file)
     )
     xtrain = cat([x for x in dl]..., dims=4)
     # To use Images.Gray, we need the input to be between 0 and 1.
