@@ -260,5 +260,5 @@ function main(nbatches, npixels, wavenumber;
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(parse(Int64, ARGS[1]), parse(Int64, ARGS[2]), parse(Float32, ARGS[3]))
+    main(parse(Int64, ARGS[1]), parse(Int64, ARGS[2]), parse(Float32, ARGS[3]); target_toml = ARGS[4])
 end

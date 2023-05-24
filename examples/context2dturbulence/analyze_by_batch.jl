@@ -14,9 +14,8 @@ package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
-function obtain_context(params, wavenumber, FT)
+function obtain_context(params, savedir, wavenumber, FT)
     # unpack params
-    savedir = params.experiment.savedir
     batchsize = params.data.batchsize
     resolution = params.data.resolution
    # wavenumber::FT = params.data.wavenumber
@@ -44,11 +43,15 @@ function obtain_context(params, wavenumber, FT)
     return ctrain
 end
 
-function obtain_model(params)
-    savedir = params.experiment.savedir
+function obtain_model(params, savedir; smooth = smooth)
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
-    return model
+    if smooth
+        return model_smooth
+    else
+        return model
+    end
+
 end
 
 function sampling_params(params)
@@ -71,7 +74,7 @@ function generate_samples!(samples, init_x, model, context, σ_T, time_steps, Δ
     return samples
 end
 
-function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
+function main(nbatches, npixels, wavenumber, experiment_toml, savedir, stats_savedir; smooth = false)
     FT = Float32
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
@@ -81,15 +84,15 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
-    context = obtain_context(params, wavenumber, FT)
-    model = obtain_model(params)
+    context = obtain_context(params, savedir, wavenumber, FT)
+    model = obtain_model(params, savedir; smooth = smooth)
     nsamples, nsteps, sampler, tilesize = sampling_params(params)
 
     noised_channels = params.model.noised_channels
     context_channels = params.model.context_channels
     resolution = params.data.resolution
-    savedir = params.experiment.savedir
-    stats_savedir = string("stats/",resolution,"x", resolution,"/gen")
+    #savedir = params.experiment.savedir
+    #stats_savedir = string("stats/",resolution,"x", resolution,"/gen")
     standard_scaling  = params.data.standard_scaling
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
@@ -167,5 +170,5 @@ function main(nbatches, npixels, wavenumber; experiment_toml="Experiment.toml")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(parse(Int64, ARGS[1]), parse(Int64, ARGS[2]),  parse(Float32, ARGS[3]); experiment_toml=ARGS[4])
+    main(parse(Int64, ARGS[1]), parse(Int64, ARGS[2]),  parse(Float32, ARGS[3]), ARGS[4], ARGS[5], ARGS[6];smooth= parse(Bool, ARGS[7]))
 end
