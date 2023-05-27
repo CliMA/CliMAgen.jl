@@ -123,7 +123,7 @@ function run_training(params; FT=Float32, logger=nothing)
     # set up loss function
     function lossfn(y; noised_channels = noised_channels)
         x = y[:,:,1:noised_channels,:]
-        return score_matching_loss(model, x; c = c)
+        return score_matching_loss(model, x)
     end
 
     # train the model
