@@ -8,7 +8,7 @@ nogpu             = false
 
 [data]
 batchsize         = 1
-resolution        = 32
+tilesize          = 32
 
 [model]
 noised_channels   = 2
