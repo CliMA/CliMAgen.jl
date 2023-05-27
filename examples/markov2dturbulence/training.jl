@@ -157,9 +157,9 @@ function main(; experiment_toml="Experiment.toml")
 
     run_training(params; FT=FT, logger=logger)
 
-    if :sampling in keys(params)
-        run_analysis(params; FT=FT, logger=logger)
-    end
+    # if :sampling in keys(params)
+    #     run_analysis(params; FT=FT, logger=logger)
+    # end
 
     # close the logger after the run to avoid hanging logger
     if params.experiment.logging
