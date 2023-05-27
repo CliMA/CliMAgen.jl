@@ -8,12 +8,12 @@ nogpu             = false
 
 [data]
 batchsize         = 1
-tilesize          = 32
+tilesize          = 128
 
 [model]
 noised_channels   = 2
 context_channels  = 0
-sigma_max         = 60.0
+sigma_max         = 240.0
 sigma_min         = 1e-2
 dropout_p         = 0.0
 mean_bypass       = true
