@@ -22,7 +22,7 @@ function run_training(params; FT=Float32, logger=nothing)
     nogpu = params.experiment.nogpu
 
     batchsize = params.data.batchsize
-    resolution = params.data.resolution
+    tilesize = params.data.tilesize
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
@@ -65,7 +65,7 @@ function run_training(params; FT=Float32, logger=nothing)
     # set up dataset
     dataloaders = get_data_markov2dturbulence(
         batchsize;
-        tilesize = resolution,
+        tilesize = tilesize,
         FT=FT,
     )
 

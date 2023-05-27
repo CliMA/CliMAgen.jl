@@ -20,9 +20,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nogpu = params.experiment.nogpu
 
     batchsize = params.data.batchsize
-    resolution = params.data.resolution
-    wavenumber::FT = params.data.wavenumber
-    fraction::FT = params.data.fraction
+    tilesize = params.data.tilesize
 
     noised_channels = params.model.noised_channels
     context_channels = params.model.context_channels
@@ -47,7 +45,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # set up dataset
     dl, _ =  get_data_markov2dturbulence(
         batchsize;
-        tilesize = resolution,
+        tilesize = tilesize,
         FT=FT,
     )
     train = cat([x for x in dl]..., dims=4)
