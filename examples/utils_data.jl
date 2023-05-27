@@ -182,7 +182,7 @@ function get_data_2dturbulence(batchsize;
     return (; loader_train, loader_test)
 end
 
-function get_data_2dturbulence_coherence(batchsize; tilesize=32, FT=Float32)
+function get_data_markov2dturbulence(batchsize; tilesize=32, FT=Float32)
     xtrain = CliMADatasets.Turbulence2D(:train; resolution=:high, Tx=FT)[:]
     xtest = CliMADatasets.Turbulence2D(:test; resolution=:high, Tx=FT)[:]
     nsamp_train = size(xtrain)[4]
