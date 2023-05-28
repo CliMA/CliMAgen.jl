@@ -77,7 +77,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain[:, :, :, 1:100], samples, savedir, "spatial_mean_distribution.png", logger=logger)
+    spatial_mean_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "spatial_mean_distribution.png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
     # qq_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "qq_plot.png", logger=logger)
