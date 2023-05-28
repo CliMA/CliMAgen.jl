@@ -28,7 +28,6 @@ function run_training(params; FT=Float32, logger=nothing)
     sigma_max::FT = params.model.sigma_max
     dropout_p::FT = params.model.dropout_p
     noised_channels = params.model.noised_channels
-    context_channels = params.model.context_channels
     shift_input = params.model.shift_input
     shift_output = params.model.shift_output
     mean_bypass = params.model.mean_bypass
