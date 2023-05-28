@@ -84,7 +84,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # qq_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "qq_plot.png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "mean_spectra.png", logger=logger)
+    #spectrum_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "mean_spectra.png", logger=logger)
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
