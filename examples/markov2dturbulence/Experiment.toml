@@ -7,7 +7,7 @@ logging           = true
 nogpu             = false
 
 [data]
-batchsize         = 1
+batchsize         = 64
 tilesize          = 128
 
 [model]
@@ -44,4 +44,3 @@ nsteps            = 500
 nsamples          = 100
 nimages           = 25
 sampler           = "euler"
-tilesize          = 128

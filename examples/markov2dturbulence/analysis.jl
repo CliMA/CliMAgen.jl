@@ -28,7 +28,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nimages = params.sampling.nimages
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
-    tilesize_sampling = params.sampling.tilesize
 
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -65,7 +64,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     time_steps, Δt, init_x = setup_sampler(
         model,
         device,
-        tilesize_sampling,
+        tilesize,
         noised_channels;
         num_images=nsamples,
         num_steps=nsteps,
