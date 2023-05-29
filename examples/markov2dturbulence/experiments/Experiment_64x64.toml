@@ -1,7 +1,7 @@
 [experiment]
 project           = "CliMAgen.jl"
 name              = "markov2dturbulence"
-savedir           = "/central/groups/esm/bischtob/output/markov2dturbulence/Experiment_64x64_dropout0.5/"
+savedir           = "/central/groups/esm/bischtob/output/markov2dturbulence/Experiment_64x64_dropout0.9/"
 rngseed           = 123
 logging           = true
 nogpu             = false
@@ -15,7 +15,7 @@ noised_channels   = 2
 context_channels  = 0
 sigma_max         = 120.0
 sigma_min         = 1e-2
-dropout_p         = 0.5
+dropout_p         = 0.9
 mean_bypass       = true
 shift_input       = true
 shift_output      = true
