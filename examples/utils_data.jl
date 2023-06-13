@@ -6,7 +6,7 @@ using CliMAgen: expand_dims
 using Random
 
 """
-    get_data_correlated_out(batchsize;
+    get_data_correlated_ou2d(batchsize;
                             pairs_per_τ = 1,
                             f = 1.0,
                             resolution=32,
