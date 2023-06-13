@@ -8,6 +8,20 @@ using Random
 using FFTW
 using DifferentialEquations
 using DelimitedFiles
+"""
+
+"""
+function compute_sigma_max(x; )
+    n_obs = size(x)[end]
+    max_distance = 0
+    for i in 1:n_obs
+        for j in i+1:n_obs
+            distance = sqrt(sum((x[:,:,:,i] .- x[:,:,:,j]).^2))
+            max_distance = max(max_distance, distance)
+        end
+    end
+    return max_distance
+end
 
 """
     loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::Bool=true)
