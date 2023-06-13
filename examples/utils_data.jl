@@ -6,6 +6,120 @@ using CliMAgen: expand_dims
 using Random
 
 """
+    get_data_correlated_out(batchsize;
+                            pairs_per_τ = 1,
+                            f = 1.0,
+                            resolution=32,
+                            FT=Float32,
+                            standard_scaling = false,
+                            read = false,
+                            save = false,
+                            preprocess_params_file,
+                            rng=Random.GLOBAL_RNG)
+
+Obtains the raw data from the 2D spatially correlated OU dataset,
+reshapes into pairs of subquent images (increasing the channel number by
+a factor of two), carries out a scaling of the data, and loads the data into train and test
+dataloders, which are returned.
+
+The raw data consists of an array of size [32,32,999900], where the individual
+images are order in time and generated via numerical simulation. The correlation
+time `τ` of the data is stored in the metadata field along with the time interval
+between each saved image `dt_save`, as well as the timestep of the model `dt`. The
+returned data is of size [32,32,2, pairs_per_τ * N/(τ/dt_save)].
+
+The user can pick:
+- pairs_per_τ:     the number of adjacent pairs to use per autocorrelation time τ
+- resolution:       Spatial size of the images - only 32 is supported currently.
+- fraction:         the amount of the data to use.
+- standard_scaling: boolean indicating if standard minmax scaling is used
+                    or if minmax scaling of the mean and spatial variations
+                    are both implemented.
+- FT:               the float type of the model
+- read:             a boolean indicating if the preprocessing parameters should be read
+- save:             a boolean indicating if the preprocessing parameters should be
+                    computed and read.
+- preprocess_params:filename where preprocessing parameters are stored or read from.
+
+"""
+function get_data_correlated_ou2d(batchsize;
+                                 pairs_per_τ = 1,
+                                 f = 1.0,
+                                 resolution=32,
+                                 FT=Float32,
+                                 standard_scaling = false,
+                                 read = false,
+                                 save = false,
+                                 preprocess_params_file,
+                                 rng=Random.GLOBAL_RNG)
+                                 
+    @assert xor(read, save)
+
+    rawtrain = CliMADatasets.CorrelatedOU2D(:train; f = f, resolution=resolution, Tx=FT);
+    samp_per_τ = Int(round(rawtrain.metadata["τ"]/ rawtrain.metadata["dt_save"]))
+    rawtrain = rawtrain.features
+    rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f, resolution=resolution, Tx=FT)[:]
+
+    # Create train and test datasets
+
+    @assert pairs_per_τ <= samp_per_τ/2
+    stride = Int(floor(samp_per_τ/pairs_per_τ))
+    
+    nsamp_train = size(rawtrain)[end]
+    npairs_train = length(Array(1:stride:(nsamp_train-1)))
+    xtrain  = zeros(FT, (resolution, resolution, 2, npairs_train))
+    xtrain[:,:,1,:] .= rawtrain[:,:,1:stride:(nsamp_train-1)]
+    xtrain[:,:,2,:] .= rawtrain[:,:,2:stride:nsamp_train]
+
+    nsamp_test = size(rawtest)[end]
+    npairs_test = length(Array(1:stride:(nsamp_test-1)))
+    xtest  = zeros(FT, (resolution, resolution, 2, npairs_test))
+    xtest[:,:,1,:] .= rawtest[:,:,1:stride:(nsamp_test-1)]
+    xtest[:,:,2,:] .= rawtest[:,:,2:stride:nsamp_test]
+
+    # Scaling
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+    
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+
+"""
 Helper function that creates uniform images and returns loaders.
 """
 function get_data_uniform(batchsize, std, ndata; size=32, FT=Float32)
