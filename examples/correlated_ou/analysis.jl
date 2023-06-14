@@ -15,7 +15,6 @@ include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
 function run_analysis(params; FT=Float32, logger=nothing)
     # unpack params
-    # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
@@ -33,6 +32,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     tilesize_sampling = params.sampling.tilesize
+    sample_channels = params.sampling.sample_channels
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
@@ -58,7 +58,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
         preprocess_params_file,
         rng=Random.GLOBAL_RNG
     )
-
+    # compute max/min using map reduce, then generate a single batch = nsamples
     xtrain = cat([x for x in dl]..., dims=4)
     # To use Images.Gray, we need the input to be between 0 and 1.
     # Obtain max and min here using the whole data set
@@ -79,25 +79,26 @@ function run_analysis(params; FT=Float32, logger=nothing)
         model,
         device,
         tilesize_sampling,
-        inchannels;
+        sample_channels;
         num_images=nsamples,
         num_steps=nsteps,
     )
+    # assert sample channels  = half the total channels?
     if sampler == "euler"
-        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
+        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c = xtrain[:,:,sample_channels+1:end, :])
     elseif sampler == "pc"
-        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
+        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c = xtrain[:,:,sample_channels+1:end, :])
     end
     samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
+    spatial_mean_plot(xtrain[:,:,1:sample_channels, :], samples, savedir, "spatial_mean_distribution.png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtrain[:,:,1:sample_channels, :], samples, savedir, "qq_plot.png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
+    spectrum_plot(xtrain[:,:,1:sample_channels, :], samples, savedir, "mean_spectra.png", logger=logger)
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
@@ -106,12 +107,10 @@ function run_analysis(params; FT=Float32, logger=nothing)
 
     img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
     img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
-    img_plot(samples[:, :, [2], 1:nimages], savedir, "$(sampler)_images_ch2.png")
-    img_plot(xtrain[:, :, [2], 1:nimages], savedir, "train_images_ch2.png")
     loss_plot(savedir, "losses.png"; xlog = false, ylog = true)    
 end
 
-function main(; experiment_toml="Experiment.toml")
+function main(; experiment_toml="Experiment_all_data.toml")
     FT = Float32
 
     # read experiment parameters from file

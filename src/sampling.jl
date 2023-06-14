@@ -64,7 +64,7 @@ function Euler_Maruyama_sampler(model::CliMAgen.VarianceExplodingSDE{Conditional
             z = randn!(similar(c))
             μ_t, σ_t = marginal_prob(model, c, t)
             c_t = @. μ_t + σ_t * z
-            z = cat([x, c_t], dims = 3)
+            z = cat(x, c_t, dims = 3)
             
             score = CliMAgen.score(model, z, batch_time_step) # = (s_x, s_c)
             
