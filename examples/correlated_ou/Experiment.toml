@@ -15,8 +15,6 @@ standard_scaling  = false
 
 [model]
 noised_channels   = 2
-context_channels  = 0
-outchannels       = 1
 sigma_max         = 80.0
 sigma_min         = 1e-2
 dropout_p         = 0.0
@@ -40,7 +38,7 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 100
+nepochs           = 1
 freq_chckpt       = 200
 
 [sampling]

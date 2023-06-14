@@ -31,7 +31,6 @@ function run_training(params; FT=Float32, logger=nothing)
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
     inchannels = params.model.noised_channels
-    outchannels = params.model.outchannels
     shift_input = params.model.shift_input
     shift_output = params.model.shift_output
     mean_bypass = params.model.mean_bypass
@@ -92,7 +91,6 @@ function run_training(params; FT=Float32, logger=nothing)
     else
         net = NoiseConditionalScoreNetwork(;
                                            noised_channels = inchannels,
-                                           outchannels = outchannels,
                                            shift_input = shift_input,
                                            shift_output = shift_output,
                                            mean_bypass = mean_bypass,
@@ -103,7 +101,7 @@ function run_training(params; FT=Float32, logger=nothing)
                                            middle_kernelsize = middle_kernelsize,
                                            inner_kernelsize = inner_kernelsize
                                            )
-        model = VarianceExplodingSDE(sigma_max, sigma_min, net)
+        model = VarianceExplodingSDE(sigma_max, sigma_min, net; condition = CliMAgen.ConditionalDiffusiveEstimator())
         model = device(model)
         model_smooth = deepcopy(model)
     

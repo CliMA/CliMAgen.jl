@@ -86,7 +86,6 @@ function NoiseConditionalScoreNetwork(; context=false,
                                       num_residual=8,
                                       noised_channels=1,
                                       context_channels=0,
-                                      outchannels=nothing,
                                       channels=[32, 64, 128, 256],
                                       embed_dim=256,
                                       scale=30.0f0,
@@ -108,7 +107,7 @@ function NoiseConditionalScoreNetwork(; context=false,
     end
     
     inchannels = noised_channels+context_channels
-    outchannels = outchannels isa Nothing ? noised_channels : outchannels
+    outchannels = noised_channels
     
     # Mean processing as indicated by boolean mean_bypass
     if mean_bypass

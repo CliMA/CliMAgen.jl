@@ -20,7 +20,7 @@ with
 # References
 https://arxiv.org/abs/1505.04597
 """
-function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
+function Euler_Maruyama_sampler(model::CliMAgen.VarianceExplodingSDE,
                                 init_x::A,
                                 time_steps,
                                 Δt;
@@ -42,6 +42,40 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
     end
     return x
 end
+
+function Euler_Maruyama_sampler(model::CliMAgen.VarianceExplodingSDE{ConditionalDiffusiveEstimator},
+                                init_x::A,
+                                time_steps,
+                                Δt;
+                                c::A,
+                                forward = false
+                                )::A where {A}
+    x = mean_x = init_x
+    t = time_steps[1]
+    x_channels = size(init_x)[end-1]
+    @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
+        batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
+        g = CliMAgen.diffusion(model, batch_time_step)
+        
+        if forward
+            x = x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
+        else
+            # Noise the context to the current time t
+            z = randn!(similar(c))
+            μ_t, σ_t = marginal_prob(model, c, t)
+            c_t = @. μ_t + σ_t * z
+            z = cat([x, c_t], dims = 3)
+            
+            score = CliMAgen.score(model, z, batch_time_step) # = (s_x, s_c)
+            
+            mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score[:,:,1:x_channels,:] .* Δt
+            x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
+            t = t - Δt
+        end
+    end
+    return x
+end
+
 
 """
     predictor_corrector_sampler(model::CliMAgen.AbstractDiffusionModel,

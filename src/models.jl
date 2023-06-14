@@ -1,4 +1,8 @@
 abstract type AbstractDiffusionModel end
+abstract type AbstractConditioning end
+
+struct UnconditionalEstimator <: AbstractConditioning end
+struct ConditionalDiffusiveEstimator <: AbstractConditioning end
 
 """
     CliMAgen.drift
@@ -129,14 +133,20 @@ prescribed variance schedule of
 Yang Song and Stefano Ermon. Generative modeling by estimating gradients of the data distribution.
 https://arxiv.org/abs/1907.05600
 """
-Base.@kwdef struct VarianceExplodingSDE{FT,N} <: AbstractDiffusionModel
+struct VarianceExplodingSDE{C,FT,N} <: AbstractDiffusionModel
     "The value of σ(t=1)"
     σ_max::FT
     "The value of σ(t=0)"
     σ_min::FT
     "The convolutional neural network"
     net::N
+    "conditioning approach"
+    conditional::C
 end
+function VarianceExplodingSDE(σ_max::FT,σ_min::FT, net::N; condition= UnconditionalEstimator()) where {FT, N}
+    return VarianceExplodingSDE{typeof(condition), FT, N}(σ_max,σ_min, net, condition)
+end
+
 
 @functor VarianceExplodingSDE
 
