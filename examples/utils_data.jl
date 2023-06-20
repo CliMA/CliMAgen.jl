@@ -68,14 +68,14 @@ function get_data_correlated_ou2d(batchsize;
     nsamp_train = size(rawtrain)[end]
     npairs_train = length(Array(1:stride:(nsamp_train-1)))
     xtrain  = zeros(FT, (resolution, resolution, 2, npairs_train))
-    xtrain[:,:,1,:] .= rawtrain[:,:,1:stride:(nsamp_train-1)]
-    xtrain[:,:,2,:] .= rawtrain[:,:,2:stride:nsamp_train]
-
+    xtrain[:,:,1,:] .= rawtrain[:,:,2:stride:nsamp_train]
+    xtrain[:,:,2,:] .= rawtrain[:,:,1:stride:(nsamp_train-1)]
+    
     nsamp_test = size(rawtest)[end]
     npairs_test = length(Array(1:stride:(nsamp_test-1)))
     xtest  = zeros(FT, (resolution, resolution, 2, npairs_test))
-    xtest[:,:,1,:] .= rawtest[:,:,1:stride:(nsamp_test-1)]
-    xtest[:,:,2,:] .= rawtest[:,:,2:stride:nsamp_test]
+    xtest[:,:,1,:] .= rawtest[:,:,2:stride:nsamp_test]
+    xtest[:,:,2,:] .= rawtest[:,:,1:stride:(nsamp_test-1)]
 
     # Scaling
     if save

@@ -278,14 +278,15 @@ end
 """
 Helper to make an animation from a batch of images.
 """
-function convert_to_animation(x, time_stride)
-    init_frames = length(x)
-    x = x[1:time_stride:init_frames]
-    frames = length(x)
+function convert_to_animation(x, time_stride, clims)
+    init_frames = size(x)[end]
+    x = x[:,:,1, 1:time_stride:init_frames]
+    frames = size(x)[3]
     animation = @animate for i = 1:frames
             heatmap(
-                image_grid(x[i]),
+                x[:,:,i],
                 xaxis = false, yaxis = false, xticks = false, yticks = false,
+                clims = clims
             )
     end
     return animation
