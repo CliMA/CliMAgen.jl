@@ -46,10 +46,10 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dl, _  = get_data_correlated_ou2d(
+    dl, dl_test  = get_data_correlated_ou2d(
         batchsize;
         pairs_per_τ = npairs_per_τ,
-        f = fraction,
+        f = 0.1,
         resolution=resolution,
         FT=Float32,
         standard_scaling = standard_scaling,
@@ -59,22 +59,28 @@ function run_analysis(params; FT=Float32, logger=nothing)
         rng=Random.GLOBAL_RNG
     )
     # compute max/min using map reduce, then generate a single batch = nsamples
-    xtrain = cat([x for x in dl]..., dims=4)
+    xtest = cat([x for x in dl_test]..., dims=4)
     # To use Images.Gray, we need the input to be between 0 and 1.
     # Obtain max and min here using the whole data set
-    maxtrain = maximum(xtrain, dims=(1, 2, 4))
-    mintrain = minimum(xtrain, dims=(1, 2, 4))
+    maxtest = maximum(xtest, dims=(1, 2, 4))
+    mintest = minimum(xtest, dims=(1, 2, 4))
     
-    # To compare statistics from samples and training data,
-    # cut training data to length nsamples.
-    xtrain = xtrain[:, :, :, 1:nsamples]
+    # To compare statistics from samples and testing data,
+    # cut testing data to length nsamples.
+    nsamples = 100
+    xtest = xtest[:, :, :, 1:nsamples]
 
+
+    # Movie to make sure
+    clims= (percentile(xtest[:],0.1), percentile(xtest[:], 99.9))
+    anim = convert_to_animation(xtest, 1, clims)
+    gif(anim, string("anim_test_data.gif"), fps = 10)
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model)
     
-    # sample from the trained model
+    # sample from the model
     time_steps, Δt, init_x = setup_sampler(
         model,
         device,
@@ -85,28 +91,28 @@ function run_analysis(params; FT=Float32, logger=nothing)
     )
     # assert sample channels  = half the total channels?
     if sampler == "euler"
-        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c = xtrain[:,:,sample_channels+1:end, :])
+        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :] |> device)
     elseif sampler == "pc"
-        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c = xtrain[:,:,sample_channels+1:end, :])
+        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :] |> device)
     end
     samples = cpu(samples)
 
     # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain[:,:,1:sample_channels, :], samples, savedir, "spatial_mean_distribution.png", logger=logger)
+    spatial_mean_plot(xtest[:,:,1:sample_channels, :], samples, savedir, "spatial_mean_distribution.png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain[:,:,1:sample_channels, :], samples, savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtest[:,:,1:sample_channels, :], samples, savedir, "qq_plot.png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain[:,:,1:sample_channels, :], samples, savedir, "mean_spectra.png", logger=logger)
+    spectrum_plot(xtest[:,:,1:sample_channels, :], samples, savedir, "mean_spectra.png", logger=logger)
 
-    # create plots with nimages images of sampled data and training data
-    # Rescale now using mintrain and maxtrain
-    xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
-    samples = @. (samples - mintrain) / (maxtrain - mintrain)
+    # create plots with nimages images of sampled data and testing data
+    # Rescale now using mintest and maxtest
+    xtest = @. (xtest - mintest) / (maxtest - mintest)
+    samples = @. (samples - mintest) / (maxtest - mintest)
 
     img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
-    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
+    img_plot(xtest[:, :, [1], 1:nimages], savedir, "test_images_ch1.png")
     loss_plot(savedir, "losses.png"; xlog = false, ylog = true)    
 end
 

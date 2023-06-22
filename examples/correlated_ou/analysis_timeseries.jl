@@ -50,7 +50,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     dl, _  = get_data_correlated_ou2d(
         batchsize;
         pairs_per_τ = npairs_per_τ,
-        f = fraction,
+        f = 0.1,
         resolution=resolution,
         FT=Float32,
         standard_scaling = standard_scaling,
@@ -66,10 +66,11 @@ function run_analysis(params; FT=Float32, logger=nothing)
     maxtrain = maximum(xtrain, dims=(1, 2, 4))
     mintrain = minimum(xtrain, dims=(1, 2, 4))
     
-    # To compare statistics from samples and training data,
+    # To compare statistics from samples and training data
     # cut training data to length nsamples.
+    nsamples = 200
     xtrain = xtrain[:, :, :, 1:nsamples]
-
+    
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth

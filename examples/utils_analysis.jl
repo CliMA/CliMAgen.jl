@@ -283,7 +283,7 @@ function convert_to_animation(x, time_stride, clims)
     x = x[:,:,1, 1:time_stride:init_frames]
     frames = size(x)[3]
     animation = @animate for i = 1:frames
-            heatmap(
+            Plots.heatmap(
                 x[:,:,i],
                 xaxis = false, yaxis = false, xticks = false, yticks = false,
                 clims = clims
@@ -292,6 +292,31 @@ function convert_to_animation(x, time_stride, clims)
     return animation
 end
 
+"""
+    autocorrelation(x, ch)
+
+Computes and returns the autocorrelation coefficient
+of `x`, an array of dimension
+[N, N, C, nsteps], representing a timeseries of 
+images of size [N, N, C], at channel `ch`. The lag
+is also returned.
+
+Lags are reported in units of steps. The autocorrelation is 
+computed by taking the mean over the autocorrelation of
+pixels in a single row of the image.
+"""
+function autocorrelation(x, ch)
+    nsteps = size(x)[end]
+    N = size(x)[1]
+    row = Int(round(N/2))
+    values = zeros(nsteps,N)
+    for i in 1:nsteps
+        values[i,:] .= x[row,: , ch, i]
+    end
+    lags = Array(1:1:nsteps-1) # in units of steps
+    ac = StatsBase.autocor(values, lags; demean = true)
+    mean_ac = mean(ac, dims = 2)[:]
+    return mean_ac, lags
 """
     power_spectrum2d(img)
 
