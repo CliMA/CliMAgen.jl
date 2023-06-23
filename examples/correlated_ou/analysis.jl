@@ -48,7 +48,7 @@ function run_analysis(params; FT=Float32)
     # set up dataset
     dl, dl_test  = get_data_correlated_ou2d(
         batchsize;
-        pairs_per_τ = npairs_per_τ,
+        pairs_per_τ = :all,
         f = 0.1,
         resolution=resolution,
         FT=Float32,
@@ -93,12 +93,17 @@ function run_analysis(params; FT=Float32)
     #gif(anim, string("anim_samples.gif"), fps = 10)
 
     dt_save = 1.0
-    ac, ac_σ, lag = autocorrelation(samples, 1)
-    ac_sg, ac_sg_σ, lag = autocorrelation(samples_self_generating, 1)
-    ac_truth, ac_truth_σ, lag = autocorrelation(xtest, 1) # this is a portion of the timeseries if stride = 1
-    Plots.plot(lag*dt_save, ac,  ribbon = ac_σ, label = "Generated", ylabel = "Autocorrelation Coeff", xlabel = "Lag (time)", margin = 10Plots.mm)
-    Plots.plot!(lag*dt_save, ac_sg, ribbon = ac_sg_σ, label = "Generated (Self Generating)")
-    Plots.plot!(lag*dt_save, ac_truth, ribbon = ac_truth_σ, label = "Training")
+    ac, lag, npairs = autocorr(samples, 1, 16, 16)
+    ac_l = autocorr_inverse_cdf.(0.05, npairs, ac)
+    ac_up = autocorr_inverse_cdf.(0.95, npairs, ac)
+    Plots.plot(lag*dt_save, ac,  ribbon = (ac .- ac_l, ac_up .- ac), label = "Generated", ylabel = "Autocorrelation Coeff", xlabel = "Lag (time)", margin = 10Plots.mm)
+
+    #ac_sg, ac_sg_σ, lag = autocorr(samples_self_generating, 1)
+    ac_truth, lag = autocorr(xtest, 1, 16, 16) # this is a portion of the timeseries if stride = 1
+    ac_truth_l = autocorr_inverse_cdf.(0.05, npairs, ac_truth)
+    ac_truth_up = autocorr_inverse_cdf.(0.95, npairs, ac_truth)
+    #Plots.plot!(lag*dt_save, ac_sg, ribbon = ac_sg_σ, label = "Generated (Self Generating)")
+    Plots.plot!(lag*dt_save, ac_truth, ribbon = (ac_truth .- ac_truth_l, ac_truth_up .- ac_truth), label = "Training")
     Plots.savefig("autocorr_samples_$nsamples.png")
 
 

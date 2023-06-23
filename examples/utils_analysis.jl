@@ -321,9 +321,10 @@ end
 
 function autocorr(x, ch, ix, iy)
     nsteps = size(x)[end]
-    lags = Array(1:1:nsteps-1) # in units of steps
+    lags = Array(1:1:nsteps-3) # in units of steps
     ac = StatsBase.autocor(x[ix, iy, ch, :], lags; demean = true)
-    return ac, lags
+    npairs = Array((nsteps-1):-1:3)
+    return ac, lags, npairs
 end
 
 function autocorr_coeff_pdf(ρ, N, r)

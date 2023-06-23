@@ -62,9 +62,12 @@ function get_data_correlated_ou2d(batchsize;
 
     # Create train and test datasets
 
-    #@assert pairs_per_τ <= samp_per_τ/2
-    stride = 1#Int(floor(samp_per_τ/pairs_per_τ))
-    #@info stride
+    stride = Int(floor(samp_per_τ/pairs_per_τ))
+    if pairs_per_τ == :all
+        stride = 1
+    end
+
+    @info stride
     nsamp_train = size(rawtrain)[end]
     npairs_train = length(Array(1:stride:(nsamp_train-1)))
     xtrain  = zeros(FT, (resolution, resolution, 2, npairs_train))
