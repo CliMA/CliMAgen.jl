@@ -8,6 +8,9 @@ using Random
 using FFTW
 using DifferentialEquations
 using DelimitedFiles
+using HypergeometricFunctions: _₂F₁ # Gaussian hypergeometric function
+using SpecialFunctions: gamma
+using Interpolations: linear_interpolation, deduplicate_knots!
 """
 
 """
@@ -305,18 +308,47 @@ Lags are reported in units of steps. The autocorrelation is
 computed by taking the mean over the autocorrelation of
 pixels in a single row of the image.
 """
-function autocorrelation(x, ch)
+function autocorr(x, ch)
     nsteps = size(x)[end]
-    N = size(x)[1]
-    row = Int(round(N/2))
-    values = zeros(nsteps,N)
-    for i in 1:nsteps
-        values[i,:] .= x[row,: , ch, i]
-    end
     lags = Array(1:1:nsteps-1) # in units of steps
-    ac = StatsBase.autocor(values, lags; demean = true)
-    mean_ac = mean(ac, dims = 2)[:]
-    return mean_ac, lags
+    autocor_wrapper(x) = StatsBase.autocor(x, lags; demean = true)
+
+    ac = mapslices(autocor_wrapper, x[:,:,ch,:], dims = (3))
+    mean_ac = mean(ac, dims = (1,2))[:]
+    std_ac = std(ac, dims = (1,2))[:]
+    return mean_ac, std_ac, lags
+end
+
+function autocorr(x, ch, ix, iy)
+    nsteps = size(x)[end]
+    lags = Array(1:1:nsteps-1) # in units of steps
+    ac = StatsBase.autocor(x[ix, iy, ch, :], lags; demean = true)
+    return ac, lags
+end
+
+function autocorr_coeff_pdf(ρ, N, r)
+    ν = N-1
+    @assert ν > 1
+    Γ_νp1 = gamma(ν + 1)
+    Γ_νphalf = gamma(ν + 1/2)
+    F = _₂F₁(3/2, -1/2, ν + 1/2, (1+r*ρ)/2)
+    F = isnan(F) ? 1 : F
+    return Γ_νp1 / (sqrt(2π) * Γ_νphalf) *(1 - r^2)^((ν-1)/2)*(1-ρ^2)^((ν-2)/2)*(1-r*ρ)^((1-2*ν)/2)* F
+end
+
+function autocorr_inverse_cdf(p, N, r; ρ = -0.99:0.01:0.99)
+    @assert -1 <= r <=1
+    @assert minimum(ρ) >= -1
+    @assert maximum(ρ) <= 1
+    @assert 0 <= p <= 1
+
+    a_pdf = autocorr_coeff_pdf.(ρ, N, r)
+    a_cdf = cumsum(a_pdf).*2 ./ length(ρ)
+    deduplicate_knots!(a_cdf)
+    inverse_cdf = linear_interpolation(a_cdf, ρ)
+    return inverse_cdf(p)
+end
+
 """
     power_spectrum2d(img)
 

@@ -13,7 +13,7 @@ package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
-function run_analysis(params; FT=Float32, logger=nothing)
+function run_analysis(params; FT=Float32)
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
@@ -59,22 +59,14 @@ function run_analysis(params; FT=Float32, logger=nothing)
         rng=Random.GLOBAL_RNG
     )
     # compute max/min using map reduce, then generate a single batch = nsamples
+    # use xtest because it has not been shuffled and the images are in the timeseries order
     xtest = cat([x for x in dl_test]..., dims=4)
-    # To use Images.Gray, we need the input to be between 0 and 1.
-    # Obtain max and min here using the whole data set
-    maxtest = maximum(xtest, dims=(1, 2, 4))
-    mintest = minimum(xtest, dims=(1, 2, 4))
     
     # To compare statistics from samples and testing data,
     # cut testing data to length nsamples.
     nsamples = 100
     xtest = xtest[:, :, :, 1:nsamples]
 
-
-    # Movie to make sure
-    clims= (percentile(xtest[:],0.1), percentile(xtest[:], 99.9))
-    anim = convert_to_animation(xtest, 1, clims)
-    gif(anim, string("anim_test_data.gif"), fps = 10)
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
@@ -90,30 +82,27 @@ function run_analysis(params; FT=Float32, logger=nothing)
         num_steps=nsteps,
     )
     # assert sample channels  = half the total channels?
-    if sampler == "euler"
-        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :] |> device)
-    elseif sampler == "pc"
-        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :] |> device)
-    end
-    samples = cpu(samples)
 
-    # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtest[:,:,1:sample_channels, :], samples, savedir, "spatial_mean_distribution.png", logger=logger)
+    samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :] |> device)
+    samples_self_generating = CliMAgen.Euler_Maruyama_timeseries_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :])
 
-    # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtest[:,:,1:sample_channels, :], samples, savedir, "qq_plot.png", logger=logger)
+    #samples = cpu(samples)
 
-    # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtest[:,:,1:sample_channels, :], samples, savedir, "mean_spectra.png", logger=logger)
+    #clims= (percentile(samples[:],0.1), percentile(samples[:], 99.9))
+    #anim = convert_to_animation(samples, 1, clims)
+    #gif(anim, string("anim_samples.gif"), fps = 10)
 
-    # create plots with nimages images of sampled data and testing data
-    # Rescale now using mintest and maxtest
-    xtest = @. (xtest - mintest) / (maxtest - mintest)
-    samples = @. (samples - mintest) / (maxtest - mintest)
+    dt_save = 1.0
+    ac, ac_σ, lag = autocorrelation(samples, 1)
+    ac_sg, ac_sg_σ, lag = autocorrelation(samples_self_generating, 1)
+    ac_truth, ac_truth_σ, lag = autocorrelation(xtest, 1) # this is a portion of the timeseries if stride = 1
+    Plots.plot(lag*dt_save, ac,  ribbon = ac_σ, label = "Generated", ylabel = "Autocorrelation Coeff", xlabel = "Lag (time)", margin = 10Plots.mm)
+    Plots.plot!(lag*dt_save, ac_sg, ribbon = ac_sg_σ, label = "Generated (Self Generating)")
+    Plots.plot!(lag*dt_save, ac_truth, ribbon = ac_truth_σ, label = "Training")
+    Plots.savefig("autocorr_samples_$nsamples.png")
 
-    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
-    img_plot(xtest[:, :, [1], 1:nimages], savedir, "test_images_ch1.png")
-    loss_plot(savedir, "losses.png"; xlog = false, ylog = true)    
+
+
 end
 
 function main(; experiment_toml="Experiment_all_data.toml")
