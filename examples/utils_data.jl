@@ -61,10 +61,12 @@ function get_data_correlated_ou2d(batchsize;
     rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f, resolution=resolution, Tx=FT)[:]
 
     # Create train and test datasets
-
-    stride = Int(floor(samp_per_τ/pairs_per_τ))
-    if pairs_per_τ == :all
-        stride = 1
+    if typeof(pairs_per_τ) <: Int
+       stride = Int(floor(samp_per_τ/pairs_per_τ))
+    elseif pairs_per_τ == :all
+       stride = 1
+    else
+	@assert("Pairs per tau must be an integer or the symbol :all.")
     end
 
     @info stride

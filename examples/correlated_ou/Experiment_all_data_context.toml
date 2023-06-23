@@ -9,7 +9,7 @@ nogpu             = false
 [data]
 batchsize         = 64
 resolution        = 32
-fraction          = 0.1
+fraction          = 1.0
 npairs_per_tau    = 3
 standard_scaling  = false
 
@@ -39,7 +39,7 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 1
+nepochs           = 100
 freq_chckpt       = 200
 
 [sampling]

@@ -13,7 +13,7 @@ using CliMAgen: train!, load_model_and_optimizer
 
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
-include("analysis.jl") # for analysis
+include("analysis_context.jl") # for analysis
 
 function run_training(params; FT=Float32, logger=nothing)
     # unpack params
