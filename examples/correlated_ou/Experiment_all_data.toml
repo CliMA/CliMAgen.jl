@@ -43,7 +43,7 @@ freq_chckpt       = 200
 
 [sampling]
 nsteps            = 150
-nsamples          = 10
+nsamples          = 100
 nimages           = 10
 sample_channels   = 1
 sampler           = "euler"

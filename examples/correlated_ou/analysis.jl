@@ -13,7 +13,7 @@ package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
-function run_analysis(params; FT=Float32)
+function run_analysis(params; FT=Float32, logger=nothing)
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
@@ -49,7 +49,7 @@ function run_analysis(params; FT=Float32)
     dl, dl_test  = get_data_correlated_ou2d(
         batchsize;
         pairs_per_τ = :all,
-        f = 0.1,
+        f = 0.2,
         resolution=resolution,
         FT=Float32,
         standard_scaling = standard_scaling,
@@ -64,7 +64,6 @@ function run_analysis(params; FT=Float32)
     
     # To compare statistics from samples and testing data,
     # cut testing data to length nsamples.
-    nsamples = 100
     xtest = xtest[:, :, :, 1:nsamples]
 
     # set up model
@@ -84,7 +83,7 @@ function run_analysis(params; FT=Float32)
     # assert sample channels  = half the total channels?
 
     samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :] |> device)
-    samples_self_generating = CliMAgen.Euler_Maruyama_timeseries_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :])
+    #samples_self_generating = CliMAgen.Euler_Maruyama_timeseries_sampler(model, init_x, time_steps, Δt; c = xtest[:,:,sample_channels+1:end, :])
 
     #samples = cpu(samples)
 
@@ -104,8 +103,24 @@ function run_analysis(params; FT=Float32)
     ac_truth_up = autocorr_inverse_cdf.(0.95, npairs, ac_truth)
     #Plots.plot!(lag*dt_save, ac_sg, ribbon = ac_sg_σ, label = "Generated (Self Generating)")
     Plots.plot!(lag*dt_save, ac_truth, ribbon = (ac_truth .- ac_truth_l, ac_truth_up .- ac_truth), label = "Training")
-    Plots.savefig("autocorr_samples_$nsamples.png")
+    Plots.savefig(joinpath(savedir, "autocorr_samples_$nsamples.png"))
+# create plot showing distribution of spatial mean of generated and real images
+spatial_mean_plot(xtest[:, :, [1], 1:nsamples], samples, savedir, "spatial_mean_distribution.png", logger=logger)
 
+# create q-q plot for cumulants of pre-specified scalar statistics
+qq_plot(xtest[:, :, [1], 1:nsamples], samples, savedir, "qq_plot.png", logger=logger)
+
+# create plots for comparison of real vs. generated spectra
+spectrum_plot(xtest[:, :, [1], 1:nsamples], samples, savedir, "mean_spectra.png", logger=logger)
+
+# create plots with nimages images of sampled data and testing data
+# Rescale now using mintest and maxtest
+xtest = @. (xtest - mintest) / (maxtest - mintest)
+samples = @. (samples - mintest) / (maxtest - mintest)
+
+img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
+img_plot(xtest[:, :, [1], 1:nimages], savedir, "test_images_ch1.png")
+loss_plot(savedir, "losses.png"; xlog = false, ylog = true)    
 
 
 end
