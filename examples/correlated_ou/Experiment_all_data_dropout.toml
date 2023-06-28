@@ -1,7 +1,7 @@
 [experiment]
 project           = "CliMAgen.jl"
-name              = "correlated_ou2d_all_data"
-savedir           = "output_all_data"
+name              = "correlated_ou2d_all_data_dropout"
+savedir           = "output_all_data_dropout"
 rngseed           = 123
 logging           = true
 nogpu             = false
@@ -17,7 +17,7 @@ standard_scaling  = false
 noised_channels   = 2
 sigma_max         = 80.0
 sigma_min         = 1e-2
-dropout_p         = 0.0
+dropout_p         = 0.5
 mean_bypass       = true
 shift_input       = true
 shift_output      = true
@@ -38,7 +38,7 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 200
+nepochs           = 100
 freq_chckpt       = 200
 
 [sampling]

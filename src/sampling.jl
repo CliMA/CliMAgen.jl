@@ -43,6 +43,39 @@ function Euler_Maruyama_sampler(model::CliMAgen.VarianceExplodingSDE,
     return x
 end
 
+function Euler_Maruyama_timeseries_sampler(model::CliMAgen.VarianceExplodingSDE,
+                                           init_x::A,
+                                           time_steps,
+                                           Δt;
+                                           c::A,
+                                           forward = false
+                                           )::A where {A}
+    x = similar(init_x)
+    nbatch = size(init_x)[end]
+    
+    # Stepping in diffusion time
+    @assert size(c)[end]==1
+    @showprogress "Euler-Maruyama Sampling" for b in 1:nbatch
+        x[:,:,:,[b]] .= init_x[:,:,:,[b]]
+        for time_step in time_steps
+             batch_time_step = [time_step]
+            g = CliMAgen.diffusion(model, batch_time_step)
+            if forward
+                x[:,:,:,[b]] .= x[:,:,:,[b]] .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x[:,:,:,[b]]))
+            else
+                if b == 1
+                    score = CliMAgen.score(model, x[:,:,:,[b]], batch_time_step; c=c)
+                else
+                    score = CliMAgen.score(model, x[:,:,:,[b]], batch_time_step; c=x[:,:,:,[b-1]])
+                end
+                x[:,:,:,[b]] .= x[:,:,:,[b]] .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x[:,:,:,[b]]))
+            end
+        end
+    end
+    return x
+end
+
+
 function Euler_Maruyama_sampler(model::CliMAgen.VarianceExplodingSDE{ConditionalDiffusiveEstimator},
                                 init_x::A,
                                 time_steps,

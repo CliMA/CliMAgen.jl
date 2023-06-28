@@ -125,7 +125,7 @@ loss_plot(savedir, "losses.png"; xlog = false, ylog = true)
 
 end
 
-function main(; experiment_toml="Experiment_all_data.toml")
+function main(; experiment_toml="Experiment_all_data_dropout.toml")
     FT = Float32
 
     # read experiment parameters from file
