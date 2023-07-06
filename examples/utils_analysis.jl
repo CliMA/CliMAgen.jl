@@ -10,6 +10,26 @@ using DifferentialEquations
 using DelimitedFiles
 
 """
+    compute_sigma_max(x)
+
+   Returns σ_max for the dataset `x`, which
+is assumed to be of size nx x ny x nc x n_obs.
+"""
+function compute_sigma_max(x)
+    n_obs = size(x)[end]
+    max_distance = 0
+    for i in 1:n_obs
+        for j in i+1:n_obs
+            distance = sqrt(sum((x[:,:,:,i] .- x[:,:,:,j]).^2))
+            max_distance = max(max_distance, distance)
+        end
+    end
+    return max_distance
+end
+
+
+
+"""
     loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::Bool=true)
 
 Creates and saves a plot of the training and test loss values, for both the spatial
@@ -58,6 +78,34 @@ function loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::B
         @info "Loss CSV file has incorrect number of columns"
     end
 end
+
+
+"""
+    heatmap_grid(samples, ch, savepath, plotname; ncolumns = 10,FT=Float32, logger=nothing)
+
+Creates a grid of images with `ncolumns` using the data `samples`. 
+Saves the resulting plot at joinpath(savepath,plotname).
+
+"""
+function heatmap_grid(samples, ch, savepath, plotname; ncolumns = 5,FT=Float32, logger=nothing)
+    batchsize = size(samples)[end]
+    ncolumns = min(batchsize, ncolumns)
+    # We want either an even number of images per row
+    nrows = div(batchsize, ncolumns)
+    nimages = nrows*ncolumns
+    clims = (minimum(samples), maximum(samples))
+    plts = []
+    for img in 1:nimages
+        push!(plts, Plots.heatmap(samples[:,:,ch,img], aspect_ratio=:equal, clims = clims, border = :box, legend = :none, axis=([], false)))
+    end
+    Plots.plot(plts..., layout = (nrows, ncolumns), size = (ncolumns*200, nrows*200))
+    Plots.savefig(joinpath(savepath, plotname))
+
+    if !(logger isa Nothing)
+        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
+    end
+end
+
 
 
 """
