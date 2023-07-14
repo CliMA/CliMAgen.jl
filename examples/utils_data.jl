@@ -49,7 +49,8 @@ function get_data_correlated_ou2d(batchsize;
                                  read = false,
                                  save = false,
                                  preprocess_params_file,
-                                 rng=Random.GLOBAL_RNG)
+                                 rng=Random.GLOBAL_RNG,
+                                 shuffle = true)
                                  
     @assert xor(read, save)
 
@@ -97,7 +98,9 @@ function get_data_correlated_ou2d(batchsize;
     # apply the same rescaler as on training set
     xtest .= apply_preprocessing(xtest, scaling)
 
-    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    if shuffle
+        xtrain = MLUtils.shuffleobs(rng, xtrain)
+    end
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
