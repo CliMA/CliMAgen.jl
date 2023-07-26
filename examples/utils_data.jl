@@ -1,11 +1,73 @@
 using JLD2
 using FFTW
 using MLDatasets, MLUtils, Images, DataLoaders, Statistics
+using HDF5
 using CliMADatasets
-using CliMAgen: expand_dims
+using CliMAgen: expand_dims, MeanSpatialScaling, StandardScaling, apply_preprocessing
 using Random
+import CliMAgen
 
 
+function get_data_allen_cahn(batchsize;
+                            split = 0.8,
+                            f = 0.34,
+                            FT=Float32,
+                            standard_scaling = false,
+                            read = false,
+                            save = false,
+                            preprocess_params_file,
+                            rng=Random.GLOBAL_RNG)
+        
+    @assert xor(read, save)
+    data_path = joinpath(pkgdir(CliMAgen), "examples/allen_cahn/allen_cahn.hdf5")
+    rawdata = HDF5.read(h5open(data_path, "r"), "data")
+    nobs = size(rawdata)[end]
+    nkeep = Int(round(f*nobs))
+    rawdata = rawdata[:,:,:,1:nkeep]
+    ntrain = Int(round(nkeep*split))
+    xtrain = rawdata[:,:,:,1:ntrain]
+    xtest = rawdata[:,:,:,ntrain+1:end]
+
+    # Scaling
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
 
 """
     get_data_correlated_ou2d(batchsize;
