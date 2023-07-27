@@ -5,6 +5,84 @@ using CliMADatasets
 using CliMAgen: expand_dims
 using Random
 
+
+function get_data_correlated_ou2d_timeseries(batchsize;
+                                    windowsize = 2,
+                                    f = 0.1, # this selects the first f*nobs in the raw data (not a random sample),
+                                    resolution=32,
+                                    FT=Float32,
+                                    standard_scaling = false,
+                                    train = false,
+                                    preprocess_params_file,
+                                    rng=Random.GLOBAL_RNG)     
+
+    rawtrain = CliMADatasets.CorrelatedOU2D(:train; f = f, resolution=resolution, Tx=FT);
+    if train
+        stride = Int(round(rawtrain.metadata["τ"]/ rawtrain.metadata["dt_save"])) # stride = number of elements in autocorrelation time
+        @assert windowsize <= stride
+    else
+        stride = windowsize
+    end
+    rawtrain = rawtrain.features
+    rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f, resolution=resolution, Tx=FT)[:]
+    
+    nobs_train = size(rawtrain)[end]
+    nwindows_train = div(nobs_train,stride)
+    xtrain  = zeros(FT, (resolution, resolution, windowsize, nwindows_train))
+    # if windowsize = 4
+    # channels are order [4, 3, 2, 1]
+    for i in 1:windowsize
+        xtrain[:,:,i,:] .= rawtrain[:,:,(windowsize-i+1):stride:(nwindows_train*windowsize-i+1)]
+    end 
+    
+    nobs_test = size(rawtest)[end]
+    nwindows_test = div(nobs_test,stride)
+    xtest  = zeros(FT, (resolution, resolution, windowsize, nwindows_test))
+    for i in 1:windowsize
+        xtest[:,:,i,:] .= rawtest[:,:,(windowsize-i+1):stride:(nwindows_test*windowsize-i+1)]
+    end 
+
+    if train
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    else
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+    
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+
 """
     get_data_correlated_ou2d(batchsize;
                             pairs_per_τ = 1,
