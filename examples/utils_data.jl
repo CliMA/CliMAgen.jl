@@ -12,7 +12,7 @@ function get_data_correlated_ou2d_timeseries(batchsize;
                                     resolution=32,
                                     FT=Float32,
                                     standard_scaling = false,
-                                    train = false,
+                                    train = true,
                                     preprocess_params_file,
                                     rng=Random.GLOBAL_RNG)     
 
@@ -32,14 +32,14 @@ function get_data_correlated_ou2d_timeseries(batchsize;
     # if windowsize = 4
     # channels are order [4, 3, 2, 1]
     for i in 1:windowsize
-        xtrain[:,:,i,:] .= rawtrain[:,:,(windowsize-i+1):stride:(nwindows_train*windowsize-i+1)]
+        xtrain[:,:,i,:] .= rawtrain[:,:,(windowsize-i+1):stride:((nwindows_train-1)*stride+windowsize-i+1)]
     end 
     
     nobs_test = size(rawtest)[end]
     nwindows_test = div(nobs_test,stride)
     xtest  = zeros(FT, (resolution, resolution, windowsize, nwindows_test))
     for i in 1:windowsize
-        xtest[:,:,i,:] .= rawtest[:,:,(windowsize-i+1):stride:(nwindows_test*windowsize-i+1)]
+        xtest[:,:,i,:] .= rawtest[:,:,(windowsize-i+1):stride:((nwindows_test-1)*stride+windowsize-i+1)]
     end 
 
     if train
