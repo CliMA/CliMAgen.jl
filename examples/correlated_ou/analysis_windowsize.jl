@@ -106,6 +106,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
 =#
 
     # create plot showing distribution of spatial mean of generated and real images
+    k = nsamples
     spatial_mean_plot(xtest[:, :, :, 1:k], samples[:,:,:,1:k], savedir, "spatial_mean_distribution.png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
