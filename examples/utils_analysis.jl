@@ -749,3 +749,23 @@ function make_icr(batch)
     cond = @. batch * (batch > 0) / τ
     return  mean(cond, dims=(1,2))
 end
+
+
+function heatmap_grid(samples, ch, savepath, plotname; ncolumns = 5,FT=Float32, logger=nothing)
+    batchsize = size(samples)[end]
+    ncolumns = min(batchsize, ncolumns)
+    # We want either an even number of images per row
+    nrows = div(batchsize, ncolumns)
+    nimages = nrows*ncolumns
+    clims = (minimum(samples), maximum(samples))
+    plts = []
+    for img in 1:nimages
+        push!(plts, Plots.heatmap(samples[:,:,ch,img], aspect_ratio=:equal, clims = clims, border = :box, legend = :none, axis=([], false)))
+    end
+    Plots.plot(plts..., layout = (nrows, ncolumns), size = (ncolumns*200, nrows*200))
+    Plots.savefig(joinpath(savepath, plotname))
+
+    if !(logger isa Nothing)
+        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
+    end
+end

@@ -50,7 +50,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     dl, dl_test = get_data_correlated_ou2d(
         batchsize;
         pairs_per_τ = :all,
-        f = 0.2,
+        f = 0.1,
         resolution=resolution,
         FT=Float32,
         standard_scaling = standard_scaling,
@@ -61,8 +61,8 @@ function run_analysis(params; FT=Float32, logger=nothing)
     )
 
     test = cat([x for x in dl_test]..., dims=4)
-    xtest = test[:,:,1:noised_channels,:]
-    ctest = test[:,:,(noised_channels+1):(noised_channels+context_channels),:]
+    xtest = test[:,:,1:noised_channels,1:nsamples]
+    ctest = test[:,:,(noised_channels+1):(noised_channels+context_channels),1:nsamples]
 
     # To use Images.Gray, we need the input to be between 0 and 1.
     # Obtain max and min here using the whole data set

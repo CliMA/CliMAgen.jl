@@ -63,7 +63,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     xtest = test[:,:,1:noised_channels,:]
     ctest = test[:,:,(noised_channels+1):(noised_channels+context_channels),:]
 
-    # To use Images.Gray, we need the input to be between 0 and 1.
     # Obtain max and min here using the whole data set
     #maxtest = maximum(xtest, dims=(1, 2, 4))
     #mintest = minimum(xtest, dims=(1, 2, 4))
@@ -83,37 +82,39 @@ function run_analysis(params; FT=Float32, logger=nothing)
         num_steps=nsteps,
     )
     if sampler == "euler"
-        #samples = CliMAgen.Euler_Maruyama_timeseries_sampler(model, init_x, time_steps, Δt; c=ctest[:,:,:,[1]])
-        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctest[:,:,:,1:nsamples])
+        samples = CliMAgen.Euler_Maruyama_timeseries_sampler(model, init_x, time_steps, Δt; c=ctest[:,:,:,[1]])
+        #samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctest[:,:,:,1:nsamples])
     elseif sampler == "pc"
         samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c=ctest[:, :, :, 1:nsamples])
     end
     samples = cpu(samples)
+    gen_timeseries = reshape(samples, (resolution, resolution, 1, nsamples*noised_channels))
+    data_timeseries = reshape(xtest[:,:,:,1:nsamples], (resolution, resolution, 1, nsamples*noised_channels))
+    
+    #k = 100
     #=
-    k = 10
-   
     dt_save = 1.0
-    ac, lag, npairs = autocorr(samples[:,:,:,1:k], 1, 16, 16)
+    ac, lag, npairs = autocorr(gen_timeseries[:,:,:,1:k], 1, 16, 16)
     ac_l = autocorr_inverse_cdf.(0.05, npairs, ac)
     ac_up = autocorr_inverse_cdf.(0.95, npairs, ac)
     Plots.plot(lag*dt_save, ac,  ribbon = (ac .- ac_l, ac_up .- ac), label = "Generated", ylabel = "Autocorrelation Coeff", xlabel = "Lag (time)", margin = 10Plots.mm)
 
-    ac_truth, lag = autocorr(xtest[:,:,:,1:k], 1, 16, 16) # this is a portion of the timeseries if stride = 1
+    ac_truth, lag = autocorr(data_timeseries[:,:,:,1:k], 1, 16, 16) # this is a portion of the timeseries if stride = 1
     ac_truth_l = autocorr_inverse_cdf.(0.05, npairs, ac_truth)
     ac_truth_up = autocorr_inverse_cdf.(0.95, npairs, ac_truth)
     Plots.plot!(lag*dt_save, ac_truth, ribbon = (ac_truth .- ac_truth_l, ac_truth_up .- ac_truth), label = "Training")
-    Plots.savefig(joinpath(savedir,"autocorr_samples_$nsamples.png"))
-=#
+    Plots.savefig(joinpath(savedir,"new_autocorr_samples_$nsamples.png"))
+    =#
 
     # create plot showing distribution of spatial mean of generated and real images
     k = nsamples
-    spatial_mean_plot(xtest[:, :, :, 1:k], samples[:,:,:,1:k], savedir, "spatial_mean_distribution.png", logger=logger)
+    spatial_mean_plot(xtest[:, :, [1], 1:k], samples[:,:,[1],1:k], savedir, "spatial_mean_distribution.png", logger=logger)
 
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtest[:, :, :, 1:k], samples[:,:,:,1:k], savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtest[:, :, [1], 1:k], samples[:,:,[1],1:k], savedir, "qq_plot.png", logger=logger)
 
     # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtest[:, :, :, 1:k], samples[:,:,:,1:k], savedir, "mean_spectra.png", logger=logger)
+    spectrum_plot(xtest[:, :, [1], 1:k], samples[:,:,[1],1:k], savedir, "mean_spectra.png", logger=logger)
 
     # create plots with nimages images of sampled data and testing data
     # Rescale now using mintest and maxtest

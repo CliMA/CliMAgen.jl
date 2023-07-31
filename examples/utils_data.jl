@@ -16,7 +16,7 @@ function get_data_correlated_ou2d_timeseries(batchsize;
                                     preprocess_params_file,
                                     rng=Random.GLOBAL_RNG)     
 
-    rawtrain = CliMADatasets.CorrelatedOU2D(:train; f = f, resolution=resolution, Tx=FT);
+    rawtrain = CliMADatasets.CorrelatedOU2D(:train; f = f, dt_save = 1.0, resolution=resolution, Tx=FT);
     if train
         stride = Int(round(rawtrain.metadata["τ"]/ rawtrain.metadata["dt_save"])) # stride = number of elements in autocorrelation time
         @assert windowsize <= stride
@@ -24,7 +24,7 @@ function get_data_correlated_ou2d_timeseries(batchsize;
         stride = windowsize
     end
     rawtrain = rawtrain.features
-    rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f, resolution=resolution, Tx=FT)[:]
+    rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f, dt_save = 1.0, resolution=resolution, Tx=FT)[:]
     
     nobs_train = size(rawtrain)[end]
     nwindows_train = div(nobs_train,stride)
@@ -133,10 +133,10 @@ function get_data_correlated_ou2d(batchsize;
                                  
     @assert xor(read, save)
 
-    rawtrain = CliMADatasets.CorrelatedOU2D(:train; f = f, resolution=resolution, Tx=FT);
+    rawtrain = CliMADatasets.CorrelatedOU2D(:train; f = f, dt_save = 1.0,resolution=resolution, Tx=FT);
     samp_per_τ = Int(round(rawtrain.metadata["τ"]/ rawtrain.metadata["dt_save"]))
     rawtrain = rawtrain.features
-    rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f, resolution=resolution, Tx=FT)[:]
+    rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f,dt_save = 1.0, resolution=resolution, Tx=FT)[:]
 
     # Create train and test datasets
     if typeof(pairs_per_τ) <: Int
