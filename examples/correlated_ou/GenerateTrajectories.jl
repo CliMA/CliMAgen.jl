@@ -107,7 +107,6 @@ function correlated_noise(N)
             for i2 in 1:N
                 for j2 in 1:N
                     k2 = (j2-1)*N+i2
-                    j2min = min(j2,N-j2)
                     Γ[k1,k2] = 1.0/sqrt(min(abs(i1-i2),N-abs(i1-i2))^2 + min(abs(j1-j2),N-abs(j1-j2))^2+1)
                 end
             end
@@ -135,7 +134,7 @@ function s(x,N,alpha, beta, gamma)
 
     lapx = laplacian_periodic(N,1)
     lap = kron(id, lapx) + kron(lapx, id)
-    return lap*x #1/alpha*(beta*lap* sin.(gamma*alpha*(x.-0.5)) .-(alpha*(x.-0.5)).^3 ) #
+    return 1/alpha*(beta*lap* sin.(gamma*alpha*(x.-0.5)) .-(alpha*(x.-0.5)).^3 )
     
 end
 
