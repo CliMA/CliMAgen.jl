@@ -3,14 +3,23 @@ using FFTW
 using MLDatasets, MLUtils, Images, DataLoaders, Statistics
 using CliMADatasets
 using CliMAgen: expand_dims
+using DataDeps
 using Random
 
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl")) 
 
+# Initial conditions from 10 years evolved 1/12th degree simulation
+path = "https://dl.dropboxusercontent.com/scl/fi/767aqumfb40aumyqh8m54/ocean_surface_data_8.jld2?rlkey=cgdbdrg54o8lpyloibpdkwjy4&dl=0"
+
+dh = DataDep("ocean_data", "1/8th degree resolution surface fields, channels are (1) u, (2) v, (3) w, (5) buoyancy", path)
+DataDeps.register(dh)
+
+datadep"ocean_data"
+
 function load_ocean_data(; irange = 1:526, jrange = 1:1134) 
-    file = "/orcd/nese/raffaele/001/ssilvest/4Darray_Nx_Ny_channel_uvwb_Nt_float32.jld2"
-    return jldopen(file)["data"][irange, jrange, :, :]
+    filepath = datadep"ocean_data/ocean_surface_data_8.jld2"
+    return jldopen(filepath)["data"][irange, jrange, :, :]
 end
 
 function compute_sigma_max(x; )
