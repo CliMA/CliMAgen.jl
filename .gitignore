@@ -18,3 +18,4 @@ examples/uniform/experiments
 *.ico
 *.svg
 *.bson
+*core*
