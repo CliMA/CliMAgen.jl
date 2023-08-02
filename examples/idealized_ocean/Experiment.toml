@@ -7,18 +7,18 @@ logging           = true
 nogpu             = false
 
 [data]
-batchsize         = 128
+batchsize         = 8
 train_fraction    = 0.9
 i_init            = 100
-i_end             = 355
+i_end             = 131
 j_init            = 80
-j_end             = 335
+j_end             = 111
 
 [model]
 noised_channels   = 1
-sigma_max         = 500.0
+sigma_max         = 64.0
 sigma_min         = 1e-2
-dropout_p         = 0.0
+dropout_p         = 0.5
 mean_bypass       = true
 shift_input       = true
 shift_output      = true
@@ -39,7 +39,7 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 10
+nepochs           = 250
 freq_chckpt       = 100
 
 [sampling]
@@ -48,4 +48,4 @@ nsamples          = 100
 nimages           = 10
 sample_channels   = 1
 sampler           = "euler"
-tilesize          = 256
+tilesize          = 32
