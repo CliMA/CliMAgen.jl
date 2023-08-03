@@ -99,52 +99,52 @@ function laplacian_periodic(N,diff_ord; dx=1)
     return DD 
 end
 
-function correlated_noise(N)
-    Γ = reshape(zeros(N^4), (N^2,N^2))
+function corr(N)
+    corr = reshape(zeros(N^4), (N^2,N^2))
     for i1 in 1:N
         for j1 in 1:N
             k1 = (j1-1)*N+i1
             for i2 in 1:N
                 for j2 in 1:N
                     k2 = (j2-1)*N+i2
-                    Γ[k1,k2] = 1.0/sqrt(min(abs(i1-i2),N-abs(i1-i2))^2 + min(abs(j1-j2),N-abs(j1-j2))^2+1)
+                    corr[k1,k2] = 1.0/sqrt(min(abs(i1-i2),N-abs(i1-i2))^2 + min(abs(j1-j2),N-abs(j1-j2))^2+1)
                 end
             end
         end
     end
-    ΓL = LinearAlgebra.cholesky(Γ).L
-    return ΓL
+    return corr
 end
 
 function s(x,N,alpha, beta, gamma)
+    # Some possiblities for the drift term
     id = I + zeros(N, N)
-    DX = 1
-    X = ([-N/2:-1...,1:N/2...].+1/2)*DX
-    U2x = (ones(N)*transpose(X))
-    U2 = kron(id, U2x) + kron(U2x, id)
+    # DX = 1
+    # X = ([-N/2:-1...,1:N/2...].+1/2)*DX
+    # U2x = (ones(N)*transpose(X))
+    # U2 = kron(id, U2x) + kron(U2x, id)
 
-    X4 = 2*(1-alpha).*X + 4*alpha*X.^3
-    U4x = (ones(N)*transpose(X4))
-    U4y = id
-    U4 = kron(id, U4x) + kron(U4y, id) 
-    U = U4
+    # X4 = 2*(1-alpha).*X + 4*alpha*X.^3
+    # U4x = (ones(N)*transpose(X4))
+    # U4y = id
+    # U4 = kron(id, U4x) + kron(U4y, id) 
+    # U = U4
 
-    gradx = gradient_periodic(N,1)
-    grad = kron(id, gradx) + kron(gradx, id)
+    # gradx = gradient_periodic(N,1)
+    # grad = kron(id, gradx) + kron(gradx, id)
 
     lapx = laplacian_periodic(N,1)
     lap = kron(id, lapx) + kron(lapx, id)
-    return 1/alpha*(beta*lap* sin.(gamma*alpha*(x.-0.5)) .-(alpha*(x.-0.5)).^3 )
-    
+    return .+1/alpha*((lap.-beta)* tanh.(gamma*alpha*(x.-0.5)))
 end
 
 function trajectory(X0,N,t,seed,sigma,Dt,alpha,beta,gamma)
     Random.seed!(seed)
     f(x) = s(x,N,alpha,beta,gamma)
     x = Vector{Float64}[]
-    global xOld = X0
-    global xNew = X0
-    ΓL = correlated_noise(N)
+    xOld = X0
+    xNew = X0
+    r = randn(N^2,t)
+    ΓL = LinearAlgebra.cholesky(corr(N)).L
     for i in 1:t
         k1 = f(xOld)
         y = xOld + Dt * k1 * 0.5
@@ -153,9 +153,8 @@ function trajectory(X0,N,t,seed,sigma,Dt,alpha,beta,gamma)
         k3 = f(y)
         y = xOld + Dt * k3
         k4 = f(y)
-        r = randn(N^2)
-        r_corr = copy(r)
-        mul!(r_corr,ΓL,r)
+        r_corr = copy(r[:,i])
+        mul!(r_corr,ΓL,r[:,i])
         xNew += Dt / 6. * (k1 + 2 * k2 + 2 * k3 + k4) + sqrt(Dt) .* (sigma .* r_corr)
         push!(x, xNew)
         xOld = xNew
@@ -176,6 +175,3 @@ function regularization(X)
     return X
 end
 end
-
-
-
