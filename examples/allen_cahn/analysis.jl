@@ -55,13 +55,33 @@ function run_analysis(params; FT=Float32, logger=nothing)
         preprocess_params_file,
         rng=Random.GLOBAL_RNG
     )
-    xtrain = first(dl)
+    #xtrain = first(dl)
 
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model)
     
+    function dyadic!(product, x, s)
+        npixels = prod(size(x)[1:3])
+        nbatch = size(x)[end]
+        s_flat = reshape(s, (npixels, nbatch))
+        x_flat = reshape(x, (npixels, nbatch))
+        for idx in 1:nbatch
+            product .+= x_flat[:,idx] * transpose(s_flat[:,idx])
+        end
+    end
+    # compute expectation of <x s^T>
+    npixels = prod(size(x)[1:3])
+    product = zeros(FT, (npixels, npixels))
+    ndata = 0
+    @showprogress "Loop over batches" for x in dl
+        s = CliMAgen.score(model, x, eps(FT))
+        dyadic!(product, x, s)
+        ndata +=1
+    end
+    Plots.heatmap(product ./ ndata)
+
     # sample from the trained model
     time_steps, Δt, init_x = setup_sampler(
         model,
