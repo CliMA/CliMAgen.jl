@@ -5,7 +5,7 @@ using Random
 using LinearAlgebra
 using ProgressBars
 
-export gradient_periodic, laplacian_periodic, trajectory, regularization, s
+export gradient_periodic, laplacian_periodic, corr, trajectory, regularization, s
 
 function gradient_periodic(N,diff_ord; dx=1)
     M1 = [-1,0,1] ./ (2*dx)
@@ -134,7 +134,8 @@ function s(x,N,alpha, beta, gamma)
 
     lapx = laplacian_periodic(N,1)
     lap = kron(id, lapx) + kron(lapx, id)
-    return .+1/alpha*((lap.-beta)* tanh.(gamma*alpha*(x.-0.5)))
+    return 1/alpha*((lap.-beta)* tanh.(gamma*alpha*(x.-0.5)))
+    #1/alpha*((1-gamma)*(lap.-beta)*(alpha.*(x.-0.5)).-gamma*(alpha.*(x.-0.5)).^3)
 end
 
 function trajectory(X0,N,t,seed,sigma,Dt,alpha,beta,gamma)
