@@ -6,15 +6,15 @@ using Statistics
 using Plots
 using HDF5, Random, ProgressBars
 
-using Main.GenerateTrajectories: trajectory, regularization
+using Main.GenerateTrajectories: corr, trajectory, regularization,s
 
-export response_lin, response_num, response_score
+export response_lin, response_true, response_num, response_score
 
 function response_lin(tau, file_in, file_out; n_dist=5)
     hfile = h5open(file_in) 
     x_2D = read(hfile["timeseries"])
     N = size(x_2D)[1]
-    t = size(x_2D)[4]
+    t = size(x_2D)[3]
     x = reshape(x_2D,(N*N,t))
     close(hfile)
     xt = transpose(x)
@@ -42,6 +42,40 @@ function response_lin(tau, file_in, file_out; n_dist=5)
     close(hfile)
 end
 
+
+function response_true(tau, file_in, file_out,alpha,beta,gamma,sigma; n_dist=5)
+    hfile = h5open(file_in) 
+    x_2D = read(hfile["timeseries"])
+    N = size(x_2D)[1]
+    t = size(x_2D)[3]
+    x = reshape(x_2D,(N*N,t))
+    close(hfile)
+    xt = transpose(x)
+    score_true = zeros(N^2,size(x)[2])
+    inv_corr = inv(corr(N))
+    for i in ProgressBar(1:size(x)[2])
+        score_true[:,i] = (.-s(x[:,i],N,alpha,beta,gamma)*2/sigma^2)' * inv_corr
+    end
+    score_true_t = transpose(score_true)
+    response = zeros(N^2,N^2,tau)
+    for i in ProgressBar(1:tau)
+        response[:,:,i] = cov(xt[i:end,:],score_true_t[1:end-i+1,:])
+    end
+    distances = [0:(n_dist-1)...]
+    response_mean = zeros(length(distances),tau)
+    for d in distances
+        for i in 1:N^2 - distances[d+1]
+            response_mean[d+1,:] .+= response[i,i+distances[d+1],:]
+        end
+        response_mean[d+1,:] ./= (N^2 - distances[d+1])
+    end
+    hfile = h5open(file_out, "w") 
+    hfile["response_true"] = response
+    hfile["response_true_mean"] = response_mean
+    close(hfile)
+end
+
+
 function response_num(file_out,tau,n_ens,eps,alpha,beta,gamma,Dt,sigma,t_therm,N; n_dist=5)
     response_ens = zeros(n_dist,tau,n_ens)
     X0 = zeros(N^2,n_ens)
@@ -68,9 +102,9 @@ end
 function response_score(tau, file_in, file_out; n_dist=5)
     hfile = h5open(file_in) 
     x_2D = read(hfile["timeseries"])
-    sc_2D = read(hfile["score"])
+    sc_2D = read(hfile["scores"])
     N = size(x_2D)[1]
-    t = size(x_2D)[4]
+    t = size(x_2D)[3]
     x = reshape(x_2D,(N*N,t))
     sc = reshape(sc_2D,(N*N,t))
     close(hfile)
