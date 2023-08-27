@@ -1,3 +1,38 @@
+using HDF5
+
+function get_data_correlated_ou2d_2(batchsize;
+    f = 1.0,
+    resolution=8,
+    FT=Float32,
+    standard_scaling = false,
+    read = false,
+    save = false,
+    preprocess_params_file,
+    rng=Random.GLOBAL_RNG,
+    shuffle = true)
+    
+    # @assert xor(read, save)
+
+    # hfile = h5open("/home/sandre/Repositories/CliMAgen.jl/examples/correlated_ou/xdata.hdf5")
+    hfile = h5open("/home/sandre/Repositories/CliMAgen.jl/x13data.hdf5")
+    x = HDF5.read(hfile, "x")
+    x = reshape(x, (8, 8, 1, size(x)[end]))
+    N = size(x)[end]
+    close(hfile)
+
+    xtrain = FT.(x[:,: , :, 1:round(Int, 0.8*N)])
+    xtest = FT.(x[:,: , :, round(Int, 0.8*N)+1:end]) 
+
+    if shuffle
+        xtrain = MLUtils.shuffleobs(rng, xtrain)
+    end
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+
 using CUDA
 using Dates
 using Flux
@@ -17,7 +52,7 @@ package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
 include("analysis.jl") # for analysis
 
-function run_training(params; FT=Floatj, logger=nothing)
+function run_training(params; FT=Float32, logger=nothing)
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
@@ -41,6 +76,7 @@ function run_training(params; FT=Floatj, logger=nothing)
     outer_kernelsize = params.model.outer_kernelsize
     middle_kernelsize = params.model.middle_kernelsize
     inner_kernelsize = params.model.inner_kernelsize
+    dropout_p = params.model.dropout_p
 
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
@@ -66,7 +102,7 @@ function run_training(params; FT=Floatj, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_correlated_ou2d(
+    dataloaders = get_data_correlated_ou2d_2(
         batchsize;
         f = fraction,
         resolution=resolution,
@@ -99,7 +135,8 @@ function run_training(params; FT=Floatj, logger=nothing)
                                            proj_kernelsize = proj_kernelsize,
                                            outer_kernelsize = outer_kernelsize,
                                            middle_kernelsize = middle_kernelsize,
-                                           inner_kernelsize = inner_kernelsize
+                                           inner_kernelsize = inner_kernelsize,
+                                           dropout_p = dropout_p
                                            )
         model = VarianceExplodingSDE(sigma_max, sigma_min, net)
         model = device(model)

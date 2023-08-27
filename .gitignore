@@ -19,3 +19,4 @@ examples/uniform/experiments
 *.svg
 *.bson
 *h5
+*.hdf5
