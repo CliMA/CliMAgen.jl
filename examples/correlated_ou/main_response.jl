@@ -1,7 +1,9 @@
+using Revise
+include("GetData.jl")
 include("GenerateTrajectories.jl")
 include("Responses.jl")
 include("ScoreGenMod.jl")
-
+# true is not the true response
 using Statistics
 using Plots
 using HDF5, Random, ProgressBars
@@ -12,7 +14,7 @@ using Main.ScoreGenMod: generate_score
 
 N = 8
 beta = 0.1
-gamma = 5
+gamma = 10
 sigma_start = 1
 Dt = 0.01
 t_therm = 1000
@@ -36,6 +38,7 @@ close(hfile)
 pl = plot(x[1,1:100:end])
 display(pl)
 
+@info "generating score"
 generate_score(beta,gamma,sigma_start)
 
 tau = 1000
@@ -45,13 +48,17 @@ file_x = "correlated_ou/data/data_$(beta)_$(gamma)_$(sigma_start).hdf5"
 file_sc = "correlated_ou/data/scores_$(beta)_$(gamma)_$(sigma_start).hdf5"
 
 file_response_lin = "correlated_ou/data/response_lin_$(beta)_$(gamma)_$(sigma_start).hdf5"
-#file_response_true = "correlated_ou/data/response_true_$(beta)_$(gamma)_$(sigma_start).hdf5"
+file_response_true = "correlated_ou/data/response_true_$(beta)_$(gamma)_$(sigma_start).hdf5"
 file_response_num = "correlated_ou/data/response_num_$(beta)_$(gamma)_$(sigma_start).hdf5"
 file_response_score = "correlated_ou/data/response_score_$(beta)_$(gamma)_$(sigma_start).hdf5"
 
-#response_lin(tau, file_x, file_response_lin)
-#response_true(tau, file_x, file_response_true,alpha,beta,gamma,sigma)
-#response_num(file_response_num,tau,n_ens,eps,alpha,beta,gamma,Dt,sigma,t_therm,N)
+@info "linear response"
+response_lin(tau, file_x, file_response_lin)
+@info "true response"
+response_true(tau, file_x, file_response_true,alpha,beta,gamma,sigma)
+@info "numerical response"
+response_num(file_response_num,tau,n_ens,eps,alpha,beta,gamma,Dt,sigma,t_therm,N)
+@info "generative model response"
 response_score(tau, file_sc, file_response_score)
 
 ##
@@ -61,7 +68,7 @@ response_score(tau, file_sc, file_response_score)
 # sigma_start = 1
 
 file_response_lin = "correlated_ou/data/response_lin_$(beta)_$(gamma)_$(sigma_start).hdf5"
-#file_response_true = "correlated_ou/data/response_true_$(beta)_$(gamma)_$(sigma_start).hdf5"
+file_response_true = "correlated_ou/data/response_true_$(beta)_$(gamma)_$(sigma_start).hdf5"
 file_response_num = "correlated_ou/data/response_num_$(beta)_$(gamma)_$(sigma_start).hdf5"
 file_response_score = "correlated_ou/data/response_score_$(beta)_$(gamma)_$(sigma_start).hdf5"
 
@@ -70,10 +77,10 @@ res_lin_mean = read(hfile["response_lin_mean"])
 res_lin = read(hfile["response_lin"])
 close(hfile)
 
-# hfile = h5open(file_response_true) 
-# res_true_mean = read(hfile["response_true_mean"])
-# res_true = read(hfile["response_true"])
-# close(hfile)
+hfile = h5open(file_response_true) 
+res_true_mean = read(hfile["response_true_mean"])
+res_true = read(hfile["response_true"])
+close(hfile)
 
 hfile = h5open(file_response_num) 
 res_num = read(hfile["response_num"])

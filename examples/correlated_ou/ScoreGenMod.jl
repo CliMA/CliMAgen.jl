@@ -69,17 +69,21 @@ function generate_score(beta,gamma,sigma)
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
+    @info "The first line"
     # set up device
     if !nogpu && CUDA.has_cuda()
         device = Flux.gpu
+        array_type = CuArray
         @info "Sampling on GPU"
     else
         device = Flux.cpu
+        array_type = Array
         @info "Sampling on CPU"
     end
     f_path = "correlated_ou/data/data_$(beta)_$(gamma)_$(sigma).hdf5"
     f_variable = "timeseries"
     # set up dataset
+    @info "creating data loader"
     dataloaders = get_data(
         f_path, f_variable,batchsize;
         f = fraction,
@@ -87,12 +91,28 @@ function generate_score(beta,gamma,sigma)
         rng=Random.GLOBAL_RNG
     )
 
+    # note we are assuming that we run everything from examples directory
+    savedir = pwd() * "/correlated_ou/output"
     # set up model and optimizers
-    if isfile("output/checkpoint_$(beta)_$(gamma)_$(sigma).bson") rm("output/checkpoint_$(beta)_$(gamma)_$(sigma).bson") end
+    if isfile(savedir * "/checkpoint_$(beta)_$(gamma)_$(sigma).bson")
+        @info "removing checkpoint"
+        rm(savedir * "/checkpoint_$(beta)_$(gamma)_$(sigma).bson") 
+    end
 
-    if isfile("output/losses_$(beta)_$(gamma)_$(sigma).bson") rm("output/losses_$(beta)_$(gamma)_$(sigma).bson") end
+    if isfile(savedir * "/checkpoint.bson")
+        @info "removing checkpoint"
+        rm(savedir * "/checkpoint.bson") 
+    end
 
+    if isfile(savedir * "/losses_$(beta)_$(gamma)_$(sigma).txt") 
+        @info "removing losses"
+        rm(savedir * "/losses_$(beta)_$(gamma)_$(sigma).txt") 
+    end
+
+    @info "creating checkpoint path"
+    println(" at " * savedir)
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
+    @info "creating loss file"
     loss_file = joinpath(savedir, "losses_$(beta)_$(gamma)_$(sigma).txt")
 
     if isfile(checkpoint_path) && isfile(loss_file)
@@ -158,27 +178,50 @@ function generate_score(beta,gamma,sigma)
         freq_chckpt = freq_chckpt,
     )
 
-    mv("output/checkpoint.bson", "output/checkpoint_$(beta)_$(gamma)_$(sigma).bson")
+    @info "moving data"
+    mv(checkpoint_path, savedir * "/checkpoint_$(beta)_$(gamma)_$(sigma).bson")
 
-    savedir = "output"
+    @info "new checkpiont path"
     checkpoint_path = joinpath(savedir, "checkpoint_$(beta)_$(gamma)_$(sigma).bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
+    model = device(model)
 
+    @info "writing data"
     hfile = h5open("correlated_ou/data/data_$(beta)_$(gamma)_$(sigma).hdf5")
     data = read(hfile["timeseries"])
     close(hfile) 
     data = data[:,:,1:end]
     times = [1:size(data)[3]...]  
-    t0 = 0.  
+    t0 = Float32(0.)
     N = size(data)[1]
-    x = reshape(data[:,:,times], (N,N,1,length(times)))
-    @time scores = Array(CliMAgen.score(model, Float32.(x), t0));
-    scores = reshape(scores, (N,N,length(times)))
+    @info "calculating scores"
+    model = device(model)
+    Nt  = length(times)
+    batchsize = params.data.batchsize
+    m = floor(Int, Nt/ batchsize)
+    indexlist = UnitRange{Int64}[]
+    for i in 1:m+1
+        if i == m+1
+            push!(indexlist, (i-1)*batchsize+1:Nt)
+        else
+            push!(indexlist, (i-1)*batchsize+1:i*batchsize)
+        end
+    end
+    scores = zeros(N,N,length(times))
+    for indices in ProgressBar(indexlist)
+        x_A1 = Float32.(array_type(reshape(data[:,:,indices], (N,N,1,length(indices)))))
+        scores1 = CliMAgen.score(model, x_A1, t0)
+        scores1 = Array(scores1);
+        scores[:,:, indices] = scores1[:,:,1,:] 
+    end
+    
 
+    @info "writing data part 2"
     f_path = "correlated_ou/data/scores_$(beta)_$(gamma)_$(sigma).hdf5"
     hfile = h5open(f_path,"w")
     write(hfile,"scores",scores)
     write(hfile,"timeseries",data)
     close(hfile)
+    @info "done!"
 end
 end
