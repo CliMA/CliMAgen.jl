@@ -95,7 +95,7 @@ close(hfile)
 tau = 1000
 res_score2 = zeros(N^2,N^2,tau)
 for i in 1:tau
-    res_score2[:,:,i] = inv(res_score[:,:,1])*res_score[:,:,i]
+    res_score2[:,:,i] = res_score[:,:,i] * inv(res_score[:,:,1])
 end
 
 distances = [0:(5-1)...]
