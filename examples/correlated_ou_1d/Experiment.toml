@@ -41,6 +41,8 @@ nepochs           = 100
 freq_chckpt       = 80
 
 [sampling]
+make_samples      = true
+samples_file      = "samples.hdf5"
 nsteps            = 250
 nsamples          = 100
 nimages           = 25
