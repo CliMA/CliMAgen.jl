@@ -9,6 +9,35 @@ using FFTW
 using DifferentialEquations
 using DelimitedFiles
 
+
+"""
+    autocorrelation_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
+
+Creates and saves a plot of the autocorrelation function for the timeseries passed:
+data, gen, both assumed to be of size nsteps x nbatch. The
+the plot is saved at joinpath(savepath, plotname).
+
+Uncertainties are estimated using the members of the batch, and the 5th and 95th 
+percentiles are plotted along with the mean (across the batch) autocorrelation 
+function.
+"""
+function autocorrelation_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
+    nsteps = size(gen)[1]
+    lags = Array(1:1:nsteps-3)
+    ac = mapslices(x -> StatsBase.autocor(x, lags; demean=true), gen, dims=1)
+    mean_ac = mean(ac, dims=2)[:]
+    upper_ac = mapslices(x -> percentile(x, 95), ac, dims = 2)[:] 
+    lower_ac = mapslices(x -> percentile(x, 5), ac, dims = 2)[:] 
+    Plots.plot(lags, mean_ac,  ribbon = (mean_ac .- lower_ac, upper_ac .- mean_ac), label = "Generated")
+
+    ac = mapslices(x -> StatsBase.autocor(x, lags; demean=true),data, dims=1)
+    mean_ac = mean(ac, dims=2)[:]
+    upper_ac = mapslices(x -> percentile(x, 95), ac, dims = 2)[:] 
+    lower_ac = mapslices(x -> percentile(x, 5), ac, dims = 2)[:]
+    Plots.plot!(lags, mean_ac,  ribbon = (mean_ac .- lower_ac, upper_ac .- mean_ac), label = "Training", ylabel = "Autocorrelation Coeff", xlabel = "Lag (steps)", margin = 10Plots.mm)
+    Plots.savefig(joinpath(savepath, plotname))
+end
+
 """
     compute_sigma_max(x)
 
@@ -724,3 +753,175 @@ function make_icr(batch)
     cond = @. batch * (batch > 0) / τ
     return  mean(cond, dims=(1,2))
 end
+
+
+### Return time computation for rare events
+### Adapted from RareEvents.jl
+"""
+    block_applied_func(x::Vector, func::Function, m::Int)
+
+Evaluates the function `func` over non-overlapping blocks
+of length `m` (in indices) of the vector `x`.
+"""
+function block_applied_func(x::Vector, func::Function, m::Int)
+    blocks = collect(Base.Iterators.partition(x, m))
+    result = map(y-> func(y), blocks)
+    output_length = Int(floor(length(x)/m))
+    return result[1:output_length]
+end
+
+"""
+     event_probability(a_m::Vector{FT},
+                       lr::Vector{FT}
+                       ) where {FT <:AbstractFloat}
+
+Estimates the probability of an event as a function of magnitude,
+including an estimate of the uncertainty of the probability.
+
+The input arguments are: 
+    (1) the `a_m` vector consisting of a scalar metric computed from M 
+        uncorrelated trajectory segments;
+    (2) a vector of likelihood ratios `lr`, equal to the ratio of the 
+        target distribution to the importance distribution. This is used
+        when the a_m are obtained using importance sampling; it is set 
+        to a vector of 1 when using the results obtained from a direct 
+        numerical simulation.
+
+This estimates the probability using what I would predict
+from a Poisson process, P(a) = M/q(a), where 
+q is the observed number of segments with metric value
+exceeding the threshold a. This computes the expected
+number q(a) for an array of `a` values.
+
+Under the original distribution p_0, we would have
+q(a)/M = 1/M * ∑_i=1^M θ(a_i>a). If we sort the metric value
+a_i in descending order, we can obtain a curve by noting that
+q(a_j)/M = 1/M * ∑_i=1^j 1 = rank of a_j/M.
+
+Using importance sampling: supposed we instead of M samples
+from a distribution p_k. Then the expected number of events 
+to exceed the threshold a under the model is given by
+q(a)/M = 1/M * ∑_i=1^M θ(a_i>a) (p_0/p_k)_i, or
+q(a_j)/M = 1/M * ∑_i=1^j (p_0/p_k)_i, if the a_j
+are ranked (with their associated probablity ratios) 
+in descending order.
+"""
+function event_probability(a_m::Vector{FT},
+                           lr::Vector{FT}
+                           ) where {FT<:AbstractFloat}
+    sort_indices = reverse(sortperm(a_m))
+    a_sorted = a_m[sort_indices]
+    lr_sorted = lr[sort_indices] 
+    M = length(a_m)
+    # γa = P(X > a)
+    γ = cumsum(lr_sorted)./M
+
+    # Clip the probability to be <= 1
+    # This situation can arise when using computed likelihood ratios. 
+    ceiling = γ .>=1
+    γ[ceiling] .= 0.9999
+    
+    # Compute uncertainty 
+    γ² = cumsum(lr_sorted.^2.0)./M
+    σ_γ = sqrt.(γ² .-  γ.^2.0)/sqrt(M)
+    return a_sorted, γ, σ_γ
+end
+
+
+"""
+     return_curve(a_m::Vector{FT},
+                  ΔT::FT,
+                  lr::Vector{FT}
+                  ) where {FT <:AbstractFloat}
+
+Estimates the return time of an event as a function of magnitude,
+returning an event magnitude array, a return time array, and
+an estimate of the uncertainty.
+
+The input arguments are: 
+    (1) the `a_m` vector consisting of a scalar metric computed from M 
+        uncorrelated trajectory segments;
+    (2) the timespan ΔT  over which the metric is computed;
+    (3) a vector of likelihood ratios `lr`, equal to the ratio of the 
+        target distribution to the importance distribution. This is used
+        when the a_m are obtained using importance sampling; it is set 
+        to a vector of 1 when using the results obtained from a direct 
+        numerical simulation.
+
+This estimates the return curve using what I would predict
+from a Poisson process, Return Time(a) = ΔT*M/q(a), where 
+q is the observed number of segments with metric value
+exceeding the threshold a. This computes the expected
+number q(a) for an array of `a` values, and hence gets
+an array of return times. This is slightly different from
+what was reported in the Ragone et al. paper; we return both.
+
+Under the original distribution p_0, we would have
+q(a)/M = 1/M * ∑_i=1^M θ(a_i>a). If we sort the metric value
+a_i in descending order, we can obtain a curve by noting that
+q(a_j)/M = 1/M * ∑_i=1^j 1 = rank of a_j/M.
+
+Using importance sampling: supposed we instead of M samples
+from a distribution p_k. Then the expected number of events 
+to exceed the threshold a under the model is given by
+q(a)/M = 1/M * ∑_i=1^M θ(a_i>a) (p_0/p_k)_i, or
+q(a_j)/M = 1/M * ∑_i=1^j (p_0/p_k)_i, if the a_j
+are ranked (with their associated probablity ratios) 
+in descending order.
+"""
+function return_curve(a_m::Vector{FT},
+                      ΔT::FT,
+                      lr::Vector{FT}
+                      ) where {FT<:AbstractFloat}
+    a_sorted, γ, σ_γ = event_probability(a_m, lr)
+    
+    # Compute return times rtn
+    rtn_naive = ΔT ./  γ
+    rtn_paper = -ΔT ./ log.(1.0 .- γ)
+
+    # Compute uncertainty in rtn_naive
+    σ_rtn = rtn_naive .* σ_γ./γ
+    return a_sorted,rtn_naive, rtn_paper, σ_rtn
+end
+
+"""
+    return_curve_plot(data::Vector{FT}, gen::Vector{FT}, ΔT::FT, savepath, plotname; logger=nothing) where {FT}
+
+Creates and saves a plot of the return curve of the samples passed:
+data, gen, both assumed to be of size nsamples. The
+the plot is saved at joinpath(savepath, plotname).
+
+The samples must be independent and associated with a time interval ΔT; this is
+is required to turn the probability of the event into 
+how often the event occurs.
+"""
+function return_curve_plot(data::Vector{FT}, gen::Vector{FT}, ΔT::FT, savepath, plotname; logger=nothing) where {FT}
+    lr = ones(FT, length(gen))
+    em, rtn_n, rtn_p, σ_rtn = return_curve(gen, ΔT, lr)
+    Plots.plot(em, rtn_n,  ribbon = (σ_rtn, σ_rtn), label = "Generated", yaxis = :log10)
+    em, rtn_n, rtn_p, σ_rtn = return_curve(data, ΔT, lr)
+    Plots.plot!(em, rtn_n,  ribbon = (σ_rtn, σ_rtn), label = "Training", ylabel = "Return time", xlabel = "Event magnitude", margin = 10Plots.mm)
+    Plots.savefig(joinpath(savepath, plotname))
+end
+
+
+"""
+    return_curve_plot(data::Vector{FT}, gen::Vector{FT}, ΔT::FT, savepath, plotname; logger=nothing) where {FT}
+
+Creates and saves a plot of the return curve of the samples passed:
+data, gen, both assumed to be of size nsamples. The
+the plot is saved at joinpath(savepath, plotname).
+
+The samples must be independent and associated with a time interval ΔT; this is
+is required to turn the probability of the event into 
+how often the event occurs.
+"""
+function event_probability_plot(data::Vector{FT}, gen::Vector{FT}, savepath, plotname; logger=nothing) where {FT}
+    lr = ones(FT, length(gen))
+    em, γ, σ_γ = event_probability(gen, lr)
+    Plots.plot(em, γ,  ribbon = (σ_γ, σ_γ), label = "Generated", yaxis = :log10, ylim = [1e-3, 1])
+    em, γ, σ_γ = event_probability(data, lr)
+    Plots.plot!(em, γ,  ribbon = (σ_γ, σ_γ), label = "Training", ylabel = "Probability", xlabel = "Event magnitude", margin = 10Plots.mm)
+    Plots.savefig(joinpath(savepath, plotname))
+end
+
