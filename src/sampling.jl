@@ -25,19 +25,87 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
                                 time_steps,
                                 Δt;
                                 c=nothing,
-                                forward = false
+                                forward = false,
+                                rng = MersenneTwister(1234),
                                 )::A where {A}
     x = mean_x = init_x
+    score = similar(x) # Preallocate
+    @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
+        batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
+        g = CliMAgen.diffusion(model, batch_time_step)
+        if forward
+            x = x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
+        else
+        score .= CliMAgen.score(model, x, batch_time_step; c=c)
+        mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
+        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
+        end
+    end
+    return x
+end
+
+"""
+    Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
+                           init_x::A,
+                           time_steps,
+                           Δt;
+                           c=nothing,
+                           forward = false
+                           )::A where {A}
+
+Generate a sample from a diffusion model using the Euler-Maruyama method,
+using the large-deviation drift, 
+with 
+- `model` the diffusion model,
+- `init_x` as the initial condition,
+- `time_steps` the vector of times at which a solution is computed,
+   which should advance in ascending order for the forward SDE
+   and descending order for the reverse SDE,
+- `Δt` the absolute value of the timestep,
+- `c` the contextual fields,
+- `forward` a boolean indicating if the forward or reverse SDE is used.
+# References
+https://arxiv.org/abs/1505.04597
+"""
+function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
+                                init_x::A,
+                                time_steps,
+                                Δt;
+                                bias=nothing,
+                                use_shift=false,
+                                c=nothing,
+                                forward = false,
+                                rng = MersenneTwister(1234)
+                                )::A where {A}
+    x = mean_x = init_x
+    # Preallocate
+    score = similar(x)
+    if ~(bias isa Nothing)
+        bias_drift = similar(x)
+        shift = similar(x)
+    end
+    
 
     @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
         g = CliMAgen.diffusion(model, batch_time_step)
         if forward
-            x = x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
+            x = x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
         else
-        score = CliMAgen.score(model, x, batch_time_step; c=c)
+            if bias isa Nothing
+                score .= CliMAgen.score(model, x, batch_time_step; c=c)
+            else
+                _, σ_t = marginal_prob(model, x, batch_time_step)
+                bias_drift .= bias(x)
+                if use_shift
+                    @. shift = σ_t^2 * bias_drift
+                else
+                    shift .= eltype(x)(0)
+                end
+                score .= CliMAgen.score(model, x .+ shift, batch_time_step; c=c) .+ bias_drift
+            end
         mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
-        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
+        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
         end
     end
     return x
