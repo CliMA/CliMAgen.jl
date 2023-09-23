@@ -47,3 +47,4 @@ nsteps            = 250
 nsamples          = 10
 nimages           = 10
 sampler           = "euler_ld"
+k_bias            = 0.0025
