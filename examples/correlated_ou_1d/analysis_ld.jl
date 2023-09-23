@@ -35,6 +35,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nimages = params.sampling.nimages
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
+    k_bias = params.sampling.k_bias
 
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -75,11 +76,9 @@ function run_analysis(params; FT=Float32, logger=nothing)
         model = device(model)
         
         # set up bias for space-time mean
-        k = 0.0025
-        println("THE k is: $k !")
         bias = zeros(FT, n_pixels, n_time, inchannels)
         bias[div(n_pixels, 4):3*div(n_pixels, 4), div(n_time, 4):3*div(n_time, 4), :] .= 1
-        bias = k * bias
+        bias = FT(k_bias) * bias
         bias = device(bias)
 
         # sample from the trained model
