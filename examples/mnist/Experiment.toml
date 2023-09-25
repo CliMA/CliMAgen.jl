@@ -1,7 +1,7 @@
 [experiment]
 project           = "CliMAgen.jl"
 name              = "mnist"
-savedir           = "/home/bischtob/output/mnist/"
+savedir           = "output"
 rngseed           = 123
 logging           = true
 nogpu             = false
@@ -29,12 +29,12 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 240
-freq_chckpt       = 80
+nepochs           = 40
+freq_chckpt       = 40
 
 [sampling]
-nsteps            = 1000
-nsamples          = 100
+nsteps            = 250
+nsamples          = 25
 nimages           = 25
 sampler           = "euler"
 tilesize          = 32
