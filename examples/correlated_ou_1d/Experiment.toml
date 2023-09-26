@@ -1,4 +1,4 @@
-[experiment]
+˘[experiment]
 project           = "CliMAgen.jl"
 name              = "1dcorrelated_ou"
 savedir           = "output"
@@ -44,7 +44,7 @@ freq_chckpt       = 80
 make_samples      = true
 samples_file      = "samples.hdf5"
 nsteps            = 250
-nsamples          = 100
+nsamples          = 250
 nimages           = 10
 sampler           = "euler_ld"
 k_bias            = 1.25

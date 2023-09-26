@@ -101,21 +101,12 @@ function run_analysis(params; FT=Float32, logger=nothing)
     else
         samples = read_from_hdf5(params, filename=samples_file)
     end
-
-    # To compare statistics from samples and training data,
-    # cut training data to length nsamples.
-    xtrain = cpu(xtrain[:, :, :, 1:nsamples])
-
-    # # Autocorrelation code 
-    # # Expects a timeseries of of a scalar: of size nsteps x nbatch
-    # autocorrelation_plot(xtrain[32,:,1,:], samples[32,:,1,:], savedir, "autocorr_ld.png";logger=logger)
-
     # # Return curve for the following metric: the mean of the middle pixel,
     # # taken over a block of time length 8
     m = 8
     observable(x) = mean(x[32,32-div(m,2):32+div(m,2)-1,1,:], dims = 1)[:]
     likelihood_ratio(x; k = k_bias) = Z.*exp.(-k .*A(x; indicator = cpu(indicator)))
-    event_probability_plot(observable(xtrain), observable(samples), likelihood_ratio(samples)[:], samples_savedir, "event_probability_$(m)_ld.png"; logger=logger)
+    event_probability_plot(observable(cpu(xtrain)), observable(samples), likelihood_ratio(samples)[:], samples_savedir, "event_probability_$(m)_ld.png"; logger=logger)
 
     # # Im not sure about the following: 
     # # To compute the return time, we need more care. We need a time interval associated with this event in 
@@ -136,13 +127,10 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # return_curve_plot(metric_return_time(xtrain), metric_return_time(samples), FT(n_time), savedir, "return_curve_$(m)_ld.png"; logger=logger)
 
     # # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, samples_savedir, "spatial_mean_distribution_ld.png", logger=logger)
-    
-    # # create q-q plot for cumulants of pre-specified scalar statistics
-   # qq_plot(xtrain, samples, samples_savedir, "qq_plot_ld.png", logger=logger)
+    spatial_mean_plot(cpu(xtrain), samples, samples_savedir, "spatial_mean_distribution_ld.png", logger=logger)
 
     heatmap_grid(samples[:, :, [1], 1:nimages], 1, samples_savedir, "$(sampler)_images_ld.png")
-    heatmap_grid(xtrain[:, :, [1], 1:nimages], 1, samples_savedir, "train_images_ld.png")
+    heatmap_grid(cpu(xtrain)[:, :, [1], 1:nimages], 1, samples_savedir, "train_images_ld.png")
 end
 
 function main(; experiment_toml="Experiment.toml")
