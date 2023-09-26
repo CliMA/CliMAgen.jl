@@ -17,6 +17,9 @@ include(joinpath(package_dir,"examples/correlated_ou_1d/store_load_samples.jl"))
 function run_analysis(params; FT=Float32, logger=nothing)
     # unpack params
     savedir = params.experiment.savedir
+    samples_savedir = joinpath(savedir, "biased")
+    !ispath(samples_savedir) && mkpath(samples_savedir)
+
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
 
@@ -35,7 +38,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nimages = params.sampling.nimages
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
-    k_bias = params.sampling.k_bias
+    k_bias::FT = params.sampling.k_bias
 
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -60,14 +63,19 @@ function run_analysis(params; FT=Float32, logger=nothing)
                                     FT=FT
                                     )
     xtrain = cat([x for x in dl]..., dims=4)
-    # To use Images.Gray, we need the input to be between 0 and 1.
-    # Obtain max and min here using the whole data set
-    maxtrain = maximum(xtrain, dims=(1, 2, 4))
-    mintrain = minimum(xtrain, dims=(1, 2, 4))
+    xtrain = device(xtrain)
     
-    # To compare statistics from samples and training data,
-    # cut training data to length nsamples.
-    xtrain = xtrain[:, :, :, 1:nsamples]
+    # set up bias for space-time mean
+    indicator = zeros(FT, n_pixels, n_time, inchannels)
+    indicator[div(n_pixels, 4):3*div(n_pixels, 4), div(n_time, 4):3*div(n_time, 4), :] .= 1
+    indicator = device(indicator)
+
+    A(x; indicator = indicator) = sum(indicator .* x, dims=(1, 2, 3)) ./ sum(indicator, dims=(1, 2, 3))
+    ∂A∂x(x; indicator = indicator) = indicator ./ sum(indicator, dims=(1, 2, 3))
+    bias(x, k = k_bias) = k*∂A∂x(x)
+
+    # Compute normalization using all of the data
+    Z = mean(exp.(k_bias .* A(xtrain)))
 
     if make_samples
         # set up model
@@ -75,12 +83,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
         BSON.@load checkpoint_path model model_smooth opt opt_smooth
         model = device(model)
         
-        # set up bias for space-time mean
-        bias = zeros(FT, n_pixels, n_time, inchannels)
-        bias[div(n_pixels, 4):3*div(n_pixels, 4), div(n_time, 4):3*div(n_time, 4), :] .= 1
-        bias = FT(k_bias) * bias
-        bias = device(bias)
-
         # sample from the trained model
         time_steps, Δt, init_x = setup_sampler(
             model,
@@ -100,15 +102,20 @@ function run_analysis(params; FT=Float32, logger=nothing)
         samples = read_from_hdf5(params, filename=samples_file)
     end
 
+    # To compare statistics from samples and training data,
+    # cut training data to length nsamples.
+    xtrain = cpu(xtrain[:, :, :, 1:nsamples])
+
     # # Autocorrelation code 
     # # Expects a timeseries of of a scalar: of size nsteps x nbatch
     # autocorrelation_plot(xtrain[32,:,1,:], samples[32,:,1,:], savedir, "autocorr_ld.png";logger=logger)
 
     # # Return curve for the following metric: the mean of the middle pixel,
     # # taken over a block of time length 8
-    # m = 8
-    # metric(x) = mean(x[32,32-div(m,2):32+div(m,2)-1,1,:], dims = 1)[:]
-    # event_probability_plot(metric(xtrain), metric(samples), savedir, "event_probability_$(m)_ld.png"; logger=logger)
+    m = 8
+    observable(x) = mean(x[32,32-div(m,2):32+div(m,2)-1,1,:], dims = 1)[:]
+    likelihood_ratio(x; k = k_bias) = Z.*exp.(-k .*A(x; indicator = cpu(indicator)))
+    event_probability_plot(observable(xtrain), observable(samples), likelihood_ratio(samples)[:], samples_savedir, "event_probability_$(m)_ld.png"; logger=logger)
 
     # # Im not sure about the following: 
     # # To compute the return time, we need more care. We need a time interval associated with this event in 
@@ -129,19 +136,13 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # return_curve_plot(metric_return_time(xtrain), metric_return_time(samples), FT(n_time), savedir, "return_curve_$(m)_ld.png"; logger=logger)
 
     # # create plot showing distribution of spatial mean of generated and real images
-    # spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution_ld.png", logger=logger)
+    spatial_mean_plot(xtrain, samples, samples_savedir, "spatial_mean_distribution_ld.png", logger=logger)
     
     # # create q-q plot for cumulants of pre-specified scalar statistics
-    # qq_plot(xtrain, samples, savedir, "qq_plot_ld.png", logger=logger)
+   # qq_plot(xtrain, samples, samples_savedir, "qq_plot_ld.png", logger=logger)
 
-    # create plots with nimages images of sampled data and training data
-    # Rescale now using mintrain and maxtrain
-    xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
-    samples = @. (samples - mintrain) / (maxtrain - mintrain)
-
-    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1_ld.png")
-    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1_ld.png")
-    loss_plot(savedir, "losses_ld.png"; xlog = false, ylog = true)    
+    heatmap_grid(samples[:, :, [1], 1:nimages], 1, samples_savedir, "$(sampler)_images_ld.png")
+    heatmap_grid(xtrain[:, :, [1], 1:nimages], 1, samples_savedir, "train_images_ld.png")
 end
 
 function main(; experiment_toml="Experiment.toml")

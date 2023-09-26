@@ -916,11 +916,11 @@ The samples must be independent and associated with a time interval ΔT; this is
 is required to turn the probability of the event into 
 how often the event occurs.
 """
-function event_probability_plot(data::Vector{FT}, gen::Vector{FT}, savepath, plotname; logger=nothing) where {FT}
-    lr = ones(FT, length(gen))
-    em, γ, σ_γ = event_probability(gen, lr)
-    Plots.plot(em, γ,  ribbon = (σ_γ, σ_γ), label = "Generated", yaxis = :log10, ylim = [1e-3, 1])
-    em, γ, σ_γ = event_probability(data, lr)
+function event_probability_plot(data::Vector{FT}, gen::Vector{FT}, lr_gen, savepath, plotname; logger=nothing) where {FT}
+    em, γ, σ_γ = event_probability(gen, lr_gen)
+    Plots.plot(em, γ,  ribbon = (σ_γ, σ_γ), label = "Generated", yaxis = :log10, ylim = [1e-6, 1])
+    lr_train = ones(FT, length(gen))
+    em, γ, σ_γ = event_probability(data, lr_train)
     Plots.plot!(em, γ,  ribbon = (σ_γ, σ_γ), label = "Training", ylabel = "Probability", xlabel = "Event magnitude", margin = 10Plots.mm)
     Plots.savefig(joinpath(savepath, plotname))
 end

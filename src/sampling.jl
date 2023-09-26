@@ -85,7 +85,7 @@ function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
             if bias isa Nothing
                 score = CliMAgen.score(model, x, batch_time_step; c=c)
             else
-                score = CliMAgen.score(model, x, batch_time_step; c=c) .+ bias
+                score = CliMAgen.score(model, x, batch_time_step; c=c) .+ bias(x)
             end
         mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
         x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(similar(x))
