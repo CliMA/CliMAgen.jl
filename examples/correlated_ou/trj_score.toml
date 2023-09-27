@@ -1,0 +1,9 @@
+[param_group]
+alpha = 3.0
+beta = 0.1
+gamma = 20
+sigma = 2
+n_std = 3
+t = 50000000
+res = 1000
+n_ens = 12
