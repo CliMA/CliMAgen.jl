@@ -64,10 +64,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # Obtain max and min here using the whole data set
     maxtrain = maximum(xtrain, dims=(1, 2, 4))
     mintrain = minimum(xtrain, dims=(1, 2, 4))
-    
-    # To compare statistics from samples and training data,
-    # cut training data to length nsamples.
-    xtrain = xtrain[:, :, :, 1:nsamples]
+
 
     if make_samples
         # set up model
@@ -96,13 +93,14 @@ function run_analysis(params; FT=Float32, logger=nothing)
 
     # Autocorrelation code 
     # Expects a timeseries of of a scalar: of size nsteps x nbatch
-    autocorrelation_plot(xtrain[32,:,1,:], samples[32,:,1,:], savedir, "autocorr.png";logger=logger)
+    # Restrict to the first nsamples so that the uncertainties are comparable
+    autocorrelation_plot(xtrain[32,:,1,1:nsamples], samples[32,:,1,:], savedir, "autocorr.png";logger=logger)
 
     # Return curve for the following metric: the mean of the middle pixel,
     # taken over a block of time length 8
     m = 8
     metric(x) = mean(x[32,32-div(m,2):32+div(m,2)-1,1,:], dims = 1)[:]
-    event_probability_plot(metric(xtrain), metric(samples), savedir, "event_probability_$m.png"; logger=logger)
+    event_probability_plot(metric(xtrain), metric(samples), ones(FT, nsamples), savedir, "event_probability_$m.png"; logger=logger)
 
     # Im not sure about the following: 
     # To compute the return time, we need more care. We need a time interval associated with this event in 
@@ -120,7 +118,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # of length m and take the maximum. Then even if they are correlated, we return an independent 
     # sample per n_time.
     metric_return_time(y) = maximum(mapslices(x -> block_applied_func(x, mean, m), y, dims = 1), dims = 1)[:]
-    return_curve_plot(metric_return_time(xtrain), metric_return_time(samples), FT(n_time), savedir, "return_curve_$m.png"; logger=logger)
+    return_curve_plot(metric_return_time(xtrain[:,:,:,1:nsamples]), metric_return_time(samples), FT(n_time), savedir, "return_curve_$m.png"; logger=logger)
 
     # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
