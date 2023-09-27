@@ -39,6 +39,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     k_bias::FT = params.sampling.k_bias
+    shift = params.sampling.shift
 
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -93,7 +94,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
             num_steps=nsteps,
         )
         if sampler == "euler_ld"
-            samples = Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, bias=bias)
+            samples = Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, bias=bias, use_shift = shift)
         elseif sampler == "pc"
             error("invalid sampler $sampler.")
         end
@@ -106,7 +107,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     m = 8
     observable(x) = mean(x[32,32-div(m,2):32+div(m,2)-1,1,:], dims = 1)[:]
     likelihood_ratio(x; k = k_bias) = Z.*exp.(-k .*A(x; indicator = cpu(indicator)))
-    event_probability_plot(observable(cpu(xtrain)), observable(samples), likelihood_ratio(samples)[:], samples_savedir, "event_probability_$(m)_ld.png"; logger=logger)
+    event_probability_plot(observable(cpu(xtrain)), observable(samples), likelihood_ratio(samples)[:], samples_savedir, "event_probability_$(m)_ld_$(k_bias)_shift_$(shift).png"; logger=logger)
 
     # # Im not sure about the following: 
     # # To compute the return time, we need more care. We need a time interval associated with this event in 
