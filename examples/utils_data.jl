@@ -602,6 +602,81 @@ function get_data_context2dturbulence(batchsize;
     return (; loader_train, loader_test)
 end
 
+
+
+"""
+
+"""
+function get_data_extreme2dturbulence(batchsize;
+                                      channels = [1],
+                                      rng=Random.GLOBAL_RNG,
+                                      resolution=64,
+                                      wavenumber=0.0,
+                                      fraction = 1.0,
+                                      standard_scaling = false,
+                                      FT=Float32,
+                                      read = false,
+                                      save = false,
+                                      preprocess_params_file)
+    @assert xor(read, save)
+    @assert resolution ∈ [512, 64]
+    if resolution == 512
+        @assert wavenumber ∈ FT.([0, 1, 2, 4, 8, 16])
+    elseif resolution == 64
+        @assert wavenumber ∈ FT.([0, 1])
+    end
+
+    if wavenumber == FT(0) # Returns all the data, for every wavenumber
+        xtrain = CliMADatasets.Turbulence2DContext(:train; fraction = fraction, resolution=resolution, wavenumber = :all, Tx=FT,)[:]
+        xtest = CliMADatasets.Turbulence2DContext(:test; fraction = fraction, resolution=resolution, wavenumber = :all, Tx=FT,)[:]
+    else # Returns data for a specific wavenumber only
+        xtrain = CliMADatasets.Turbulence2DContext(:train; fraction = fraction, resolution=resolution, wavenumber = wavenumber, Tx=FT,)[:]
+        xtest = CliMADatasets.Turbulence2DContext(:test; fraction = fraction, resolution=resolution, wavenumber = wavenumber, Tx=FT,)[:]
+    end
+
+    xtrain = xtrain[:,:,channels,:]
+    xtest = xtest[:,:,channels,:]
+
+
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
 """
 Helper function that tiles an array in the first two spatial dimensions.
 
