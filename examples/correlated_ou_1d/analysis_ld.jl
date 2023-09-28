@@ -17,9 +17,6 @@ include(joinpath(package_dir,"examples/correlated_ou_1d/store_load_samples.jl"))
 function run_analysis(params; FT=Float32, logger=nothing)
     # unpack params
     savedir = params.experiment.savedir
-    samples_savedir = joinpath(savedir, "biased")
-    !ispath(samples_savedir) && mkpath(samples_savedir)
-
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
 
@@ -33,7 +30,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     inchannels = params.model.inchannels
 
     make_samples = params.sampling.make_samples
-    samples_file = params.sampling.samples_file
     nsamples = params.sampling.nsamples
     nimages = params.sampling.nimages
     nsteps = params.sampling.nsteps
@@ -41,6 +37,10 @@ function run_analysis(params; FT=Float32, logger=nothing)
     k_bias::FT = params.sampling.k_bias
     shift = params.sampling.shift
 
+    # directory for saving biased samples and plots
+    samples_savedir = joinpath(savedir, "biased_$(k_bias)")
+    !ispath(samples_savedir) && mkpath(samples_savedir)
+    samples_file = joinpath(samples_savedir, params.sampling.samples_file)
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
@@ -93,14 +93,15 @@ function run_analysis(params; FT=Float32, logger=nothing)
             num_images=nsamples,
             num_steps=nsteps,
         )
-        if sampler == "euler_ld"
+        if sampler == "euler"
             samples = Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, bias=bias, use_shift = shift)
         elseif sampler == "pc"
             error("invalid sampler $sampler.")
         end
         samples = cpu(samples)
     else
-        samples = read_from_hdf5(params, filename=samples_file)
+        @info samples_file
+        samples = read_from_hdf5(samples_file)
     end
     # # Return curve for the following metric: the mean of the middle pixel,
     # # taken over a block of time length 8

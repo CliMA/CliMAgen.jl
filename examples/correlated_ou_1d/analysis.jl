@@ -88,7 +88,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
         end
         samples = cpu(samples)
     else
-        samples = read_from_hdf5(params, filename=samples_file)
+        samples = read_from_hdf5(samples_file)
     end
 
     # Autocorrelation code 
@@ -124,7 +124,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
     
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtrain[:,:,:, 1:nsamples], samples, savedir, "qq_plot.png", logger=logger)
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
