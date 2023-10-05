@@ -92,7 +92,8 @@ function NoiseConditionalScoreNetwork(; context=false,
                                       proj_kernelsize=3,
                                       outer_kernelsize=3,
                                       middle_kernelsize=3,
-                                      inner_kernelsize=3)
+                                      inner_kernelsize=3,
+                                      periodic=false)
     if scale_mean_bypass & !mean_bypass
         @error("Attempting to scale the mean bypass term without adding in a mean bypass connection.")
     end
@@ -132,47 +133,55 @@ function NoiseConditionalScoreNetwork(; context=false,
     else
         mean_bypass_layers = ()
     end
+    # Lifting/Projection layers depend on periodicity of data
+    if periodic
+        conv1 = CircularConv(3, nspatial, inchannels => channels[1] ; stride=1)
+        tconv1 = CircularConv(proj_kernelsize, nspatial, channels[1] + channels[1] => outchannels; stride=1)
+    else
+        conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad())
+        tconv1=Conv((proj_kernelsize, proj_kernelsize), channels[1] + channels[1] => outchannels, stride=1, pad=SamePad())
+    end
     
     layers = (gaussfourierproj=GaussianFourierProjection(embed_dim, scale),
               linear=Dense(embed_dim, embed_dim, swish),
               
               # Lifting
-              conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad()),
+              conv1=conv1,
               dense1=Dense(embed_dim, channels[1]),
               gnorm1=GroupNorm(channels[1], 4, swish),
               
               # Encoding
-              conv2=Downsampling(channels[1] => channels[2], nspatial, kernel_size=3),
+              conv2=Downsampling(channels[1] => channels[2], nspatial, kernel_size=3, periodic=periodic),
               dense2=Dense(embed_dim, channels[2]),
               gnorm2=GroupNorm(channels[2], 32, swish),
               
-              conv3=Downsampling(channels[2] => channels[3], nspatial, kernel_size=3),
+              conv3=Downsampling(channels[2] => channels[3], nspatial, kernel_size=3, periodic=periodic),
               dense3=Dense(embed_dim, channels[3]),
               gnorm3=GroupNorm(channels[3], 32, swish),
               
-              conv4=Downsampling(channels[3] => channels[4], nspatial, kernel_size=3),
+              conv4=Downsampling(channels[3] => channels[4], nspatial, kernel_size=3, periodic=periodic),
               dense4=Dense(embed_dim, channels[4]),
               
               # Residual Blocks
               resnet_blocks = 
-              [ResnetBlockNCSN(channels[end], nspatial, embed_dim; p = dropout_p) for _ in range(1, length=num_residual)],
+              [ResnetBlockNCSN(channels[end], nspatial, embed_dim; p = dropout_p, periodic=periodic) for _ in range(1, length=num_residual)],
               
               # Decoding
               gnorm4=GroupNorm(channels[4], 32, swish),
-              tconv4=Upsampling(channels[4] => channels[3], nspatial, kernel_size=inner_kernelsize),
+              tconv4=Upsampling(channels[4] => channels[3], nspatial, kernel_size=inner_kernelsize, periodic=periodic),
               denset4=Dense(embed_dim, channels[3]),
               tgnorm4=GroupNorm(channels[3], 32, swish),
               
-              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=middle_kernelsize),
+              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=middle_kernelsize, periodic=periodic),
               denset3=Dense(embed_dim, channels[2]),
               tgnorm3=GroupNorm(channels[2], 32, swish),
               
-              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=outer_kernelsize),
+              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=outer_kernelsize, periodic=periodic),
               denset2=Dense(embed_dim, channels[1]),
               tgnorm2=GroupNorm(channels[1], 32, swish),
               
               # Projection
-              tconv1=Conv((proj_kernelsize, proj_kernelsize), channels[1] + channels[1] => outchannels, stride=1, pad=SamePad()),
+              tconv1=tconv1,
               mean_bypass_layers...
               )
     
@@ -547,18 +556,22 @@ size used in the GaussianFourierProjection,
 `p` is the dropout probability, and `σ` is the nonlinearity used in the group
 norms and the dense layer.
 """
-function ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
+function ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish, periodic=false)
     # channels needs to be larger than 4 for group norms
     @assert channels ÷ 4 > 0
-
-    # Require same input and output spatial size
-    pad = SamePad()
-
+    if periodic
+        conv1 = CircularConv(3, nspatial, channels => channels)
+        conv2 = CircularConv(3, nspatial, channels => channels)
+    else
+        conv_kernel = Tuple(3 for _ in 1:nspatial)
+        conv1 = Conv(conv_kernel, channels => channels, pad = SamePad())
+        conv2 =  Conv(conv_kernel, channels => channels, pad = SamePad())
+    end
     return ResnetBlockNCSN(
         GroupNorm(channels, min(channels ÷ 4, 32), σ),
-        Conv(Tuple(3 for _ in 1:nspatial), channels => channels, pad=pad),
+        conv1,
         GroupNorm(channels, min(channels ÷ 4, 32), σ),
-        Conv(Tuple(3 for _ in 1:nspatial), channels => channels, pad=pad),
+        conv2,
         Dense(nembed => channels, σ),
         Dropout(p),
     )
@@ -669,9 +682,14 @@ Here,
 - `factor` indicates the downsampling factor, and 
 - `kernel_size` is in the kernel size.
 """
-function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
-    conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
-    return Conv(conv_kernel, channels, stride=factor, pad=SamePad())
+function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3, periodic=false)
+    if periodic
+        return CircularConv(kernel_size, nspatial, channels; stride=factor)
+    else
+        conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+        return Conv(conv_kernel, channels; stride=factor, pad = SamePad())
+    end
+    return CircularConv(conv_kernel, channels, stride=factor, periodic=periodic)
 end
 
 """
@@ -689,10 +707,32 @@ Here,
 References:
 https://distill.pub/2016/deconv-checkerboard/
 """
-function Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
-    conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+function Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3, periodic=false)
+    if periodic
+        conv = CircularConv(kernel_size, nspatial, channels)
+    else
+        conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+        conv = Conv(conv_kernel, channels; pad = SamePad())
+    end
     return Chain(
         Flux.Upsample(factor, :nearest),
-        Conv(conv_kernel, channels, pad=SamePad())
+        conv
     )
 end
+
+struct CircularConv{C<:Conv}
+    pad::Tuple
+    conv::C
+    function CircularConv(kernel_size, nspatial, channels;stride=1)
+        conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+        pad = Tuple(div(kernel_size,2) for _ in 1:2*nspatial)
+        conv = Conv(conv_kernel, channels; stride=stride, pad=0)
+        return new{typeof(conv)}(pad, conv)
+    end
+end
+
+@functor CircularConv
+function (layer::CircularConv)(x)
+    layer.conv(NNlib.pad_circular(x, layer.pad))
+end
+

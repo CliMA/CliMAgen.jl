@@ -14,13 +14,12 @@ using ProgressBars
 using Main.GetData: get_data
 
 using CliMAgen
+package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/utils_data.jl"))
+include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
 function generate_score(alpha,beta,gamma,sigma;res=1)
-    package_dir = pkgdir(CliMAgen)
-    include(joinpath(package_dir,"examples/utils_data.jl"))
-    include(joinpath(package_dir,"examples/utils_analysis.jl"))
-
-    experiment_toml = "correlated_ou/Experiment.toml"
+    experiment_toml = "Experiment.toml"
     FT = Float32
     logger=nothing
 
@@ -28,15 +27,13 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
 
-    savedir = "output_$(alpha)_$(beta)_$(gamma)_$(sigma)"
+    savedir = "output_periodic_$(alpha)_$(beta)_$(gamma)_$(sigma)"
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
 
     batchsize = params.data.batchsize
     resolution = params.data.resolution
     fraction = params.data.fraction
-    standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
@@ -50,7 +47,9 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
     outer_kernelsize = params.model.outer_kernelsize
     middle_kernelsize = params.model.middle_kernelsize
     inner_kernelsize = params.model.inner_kernelsize
-
+    dropout_p::FT = params.model.dropout_p
+    periodic = params.model.periodic
+    
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
     learning_rate::FT = params.optimizer.learning_rate
@@ -73,7 +72,7 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
         device = Flux.cpu
         @info "Sampling on CPU"
     end
-    f_path = "correlated_ou/data/data_$(alpha)_$(beta)_$(gamma)_$(sigma).hdf5"
+    f_path = "data/data_$(alpha)_$(beta)_$(gamma)_$(sigma).hdf5"
     f_variable = "timeseries"
     # set up dataset
     dataloaders = get_data(
@@ -102,10 +101,12 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
                                        mean_bypass = mean_bypass,
                                        scale_mean_bypass = scale_mean_bypass,
                                        gnorm = gnorm,
+                                       dropout_p = dropout_p,
                                        proj_kernelsize = proj_kernelsize,
                                        outer_kernelsize = outer_kernelsize,
                                        middle_kernelsize = middle_kernelsize,
-                                       inner_kernelsize = inner_kernelsize
+                                       inner_kernelsize = inner_kernelsize,
+                                       periodic =periodic
                                        )
         model = VarianceExplodingSDE(sigma_max, sigma_min, net)
         model = device(model)
@@ -152,14 +153,14 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
     )
 end
 
-toml_dict = TOML.parsefile("correlated_ou/trj_score.toml")
+toml_dict = TOML.parsefile("trj_score.toml")
 
 alpha = toml_dict["param_group"]["alpha"]
 beta = toml_dict["param_group"]["beta"]
 gamma = toml_dict["param_group"]["gamma"]
 sigma = toml_dict["param_group"]["sigma"]
 
-savedir = "output_$(alpha)_$(beta)_$(gamma)_$(sigma)"
+savedir = "output_periodic_$(alpha)_$(beta)_$(gamma)_$(sigma)"
 run(`mkdir $savedir`)
 
 generate_score(alpha,beta,gamma,sigma;res=1)

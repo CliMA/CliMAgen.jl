@@ -7,16 +7,15 @@ logging           = true
 nogpu             = false
 
 [data]
-batchsize         = 64 #64
+batchsize         = 128
 resolution        = 8
-fraction          = 0.03
-standard_scaling  = false
+fraction          = 0.3
 
 [model]
 noised_channels   = 1
 sigma_max         = 7.0 #62.0
 sigma_min         = 1e-2 #1e-2
-dropout_p         = 0.1
+dropout_p         = 0.0
 mean_bypass       = true
 shift_input       = true
 shift_output      = true
@@ -26,6 +25,7 @@ proj_kernelsize   = 3
 outer_kernelsize  = 3
 middle_kernelsize = 3
 inner_kernelsize  = 3
+periodic          = true
 
 [optimizer]
 learning_rate     = 2e-4
@@ -41,8 +41,8 @@ nepochs           = 100
 freq_chckpt       = 100
 
 [sampling]
-nsteps            = 150
-nsamples          = 5000
+nsteps            = 250
+nsamples          = 1000
 nimages           = 10
 sample_channels   = 1
 sampler           = "euler"
