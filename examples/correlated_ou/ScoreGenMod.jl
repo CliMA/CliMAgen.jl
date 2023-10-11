@@ -18,22 +18,19 @@ package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
-function generate_score(alpha,beta,gamma,sigma;res=1)
-    experiment_toml = "Experiment.toml"
+function generate_score(experiment_toml, alpha,beta,gamma,sigma;res=1)
     FT = Float32
-    logger=nothing
-
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
 
-    savedir = "output_periodic_$(alpha)_$(beta)_$(gamma)_$(sigma)"
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
 
     batchsize = params.data.batchsize
     resolution = params.data.resolution
     fraction = params.data.fraction
+    preprocess = params.data.preprocess
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
@@ -49,7 +46,11 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
     inner_kernelsize = params.model.inner_kernelsize
     dropout_p::FT = params.model.dropout_p
     periodic = params.model.periodic
-    
+    savedir_base = params.experiment.savedir_base
+    savedir = string(savedir_base, "_preprocess_$(preprocess)_periodic_$(periodic)_$(alpha)_$(beta)_$(gamma)_$(sigma)")
+    !ispath(savedir) && mkpath(savedir)
+    preprocess_params_file = joinpath(savedir, "preprocess.jld2")
+
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
     learning_rate::FT = params.optimizer.learning_rate
@@ -80,7 +81,10 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
         f = fraction,
         FT=Float32,
         rng=Random.GLOBAL_RNG,
-        res = res
+        res = res,
+        preprocess = preprocess,
+        preprocess_save = true,
+        preprocess_params_file = preprocess_params_file,
     )
 
     # set up model and optimizers
@@ -148,7 +152,7 @@ function generate_score(alpha,beta,gamma,sigma;res=1)
         device;
         start_epoch = start_epoch,
         savedir = savedir,
-        logger = logger,
+        logger = nothing,
         freq_chckpt = freq_chckpt,
     )
 end
@@ -159,8 +163,5 @@ alpha = toml_dict["param_group"]["alpha"]
 beta = toml_dict["param_group"]["beta"]
 gamma = toml_dict["param_group"]["gamma"]
 sigma = toml_dict["param_group"]["sigma"]
-
-savedir = "output_periodic_$(alpha)_$(beta)_$(gamma)_$(sigma)"
-run(`mkdir $savedir`)
-
-generate_score(alpha,beta,gamma,sigma;res=1)
+experiment_toml = "Experiment_preprocess_periodic.toml"
+generate_score(experiment_toml, alpha,beta,gamma,sigma;res=1)

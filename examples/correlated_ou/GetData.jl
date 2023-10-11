@@ -53,7 +53,10 @@ function get_data(f_path, f_variable, batchsize;
     f = 1.0,
     FT=Float32,
     rng=Random.GLOBAL_RNG,
-    res = 1)
+    res = 1,
+    preprocess = false,
+    preprocess_save = false,
+    preprocess_params_file = "")
 
     rawtrain = Dataset(:train, f_path, f_variable; f = f, Tx=FT,res=res)[:];
     rawtest = Dataset(:test, f_path, f_variable; f = f, Tx=FT,res=res)[:];
@@ -64,6 +67,32 @@ function get_data(f_path, f_variable, batchsize;
     xtrain = reshape(rawtrain, (img_size..., 1, nobs_train))
     nobs_test = size(rawtest)[end]
     xtest = reshape(rawtest, (img_size..., 1, nobs_test))
+
+    if preprocess            
+        if preprocess_save
+        #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+            JLD2.save_object(preprocess_params_file, scaling)
+        else
+            scaling = JLD2.load_object(preprocess_params_file)
+        end
+        xtrain .= apply_preprocessing(xtrain, scaling)
+        # apply the same rescaler as on training set
+        xtest .= apply_preprocessing(xtest, scaling)
+    end
+
     xtrain = MLUtils.shuffleobs(rng, xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)

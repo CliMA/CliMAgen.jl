@@ -723,12 +723,12 @@ end
 struct CircularConv{C<:Conv}
     pad::Tuple
     conv::C
-    function CircularConv(kernel_size, nspatial, channels;stride=1)
-        conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
-        pad = Tuple(div(kernel_size,2) for _ in 1:2*nspatial)
-        conv = Conv(conv_kernel, channels; stride=stride, pad=0)
-        return new{typeof(conv)}(pad, conv)
-    end
+end
+function CircularConv(kernel_size::Int, nspatial::Int, channels::Pair;stride::Int=1)
+    conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+    pad = Tuple(div(kernel_size,2) for _ in 1:2*nspatial)
+    conv = Conv(conv_kernel, channels; stride=stride, pad=0)
+    return CircularConv{typeof(conv)}(pad, conv)
 end
 
 @functor CircularConv

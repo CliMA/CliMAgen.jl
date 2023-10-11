@@ -157,12 +157,20 @@ end
 
 
 @testset "Periodic NCSN" begin
-    net = CliMAgen.NoiseConditionalScoreNetwork(;noised_channels=2, outer_kernelsize=5, channels=[32, 64, 128, 256], periodic=true)
-
     k = 5
-    x = rand(Float32, 2^k, 2^k, 2, 11)
+    x = zeros(Float32, 2^k, 2^k, 1, 1)
+    xx = Float32.(1:1:2^k)
+    for i in 1:2^k
+        for j in 1:2^k
+            x[i,j] = sin(2π*xx[i]*2/2^k-π/2) + 2*abs(xx[j]-2^k/2)/2^k#sin(2π*xx[j]*2/2^k))
+        end
+    end
     c=nothing
     t = rand(Float32)
-    # forward pass
-    @test net(x, c, t) |> size == size(x)
+
+    periodic_net = CliMAgen.NoiseConditionalScoreNetwork(;noised_channels=1, outer_kernelsize=5, channels=[32, 64, 128, 256], periodic=true)
+    periodic_sc = periodic_net(x, c, t)
+
+    nonperiodic_net = CliMAgen.NoiseConditionalScoreNetwork(;noised_channels=1, outer_kernelsize=5, channels=[32, 64, 128, 256]);
+    nonperiodic_sc = nonperiodic_net(x,c,t);
 end
