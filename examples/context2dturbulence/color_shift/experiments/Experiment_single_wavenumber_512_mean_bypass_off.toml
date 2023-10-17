@@ -1,0 +1,50 @@
+[experiment]
+project           = "CliMAgen.jl"
+name              = "context2dturbulence_single_wavenumber_512_mean_bypass_off"
+savedir           = "output/single_wavenumber_512_mean_bypasss_off"
+rngseed           = 123
+logging           = false
+nogpu             = false
+
+[data]
+batchsize         = 4
+resolution        = 512
+wavenumber        = 1
+fraction          = 1.0
+standard_scaling  = false
+
+[model]
+noised_channels   = 2
+context_channels  = 1
+dropout_p         = 0.5
+sigma_max         = 1000.0
+sigma_min         = 1e-2
+mean_bypass       = false
+shift_input       = false
+shift_output      = false
+scale_mean_bypass = false
+gnorm             = false
+proj_kernelsize   = 3
+outer_kernelsize  = 3
+middle_kernelsize = 3
+inner_kernelsize  = 3
+
+[optimizer]
+learning_rate     = 2e-4
+epsilon           = 1e-8
+beta_1            = 0.9
+beta_2            = 0.999
+gradnorm          = 1.0
+ema_rate          = 0.999
+nwarmup           = 5000
+
+[training]
+nepochs           = 200
+freq_chckpt       = 40
+
+[sampling]
+nsteps            = 500
+nsamples          = 10
+nimages           = 10
+sampler           = "euler"
+tilesize          = 512
