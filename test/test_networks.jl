@@ -12,6 +12,32 @@
     @test eltype(resnetblock(x, tembed)) == FT
 end
 
+
+@testset "CircularConv" begin
+    channels = 1 => 1
+    nspatial = 2
+    kernel_size = 5
+    stride = 1
+    conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+    pad = Tuple(div(kernel_size,2) for _ in 1:2*nspatial)
+    conv = Conv(conv_kernel, channels; stride=stride, pad=0)
+    circ_conv = CircularConv(kernel_size, nspatial, channels; stride = stride)
+    @test circ_conv.pad == pad
+    @test typeof(circ_conv.conv) == typeof(conv)
+    circ_conv.conv.weight .= 1.0f0
+    conv.weight .= 1.0f0
+    x = randn(FT, 8, 8, 1, 1)
+    y = circ_conv(x)
+    circ_x = NNlib.pad_circular(x, circ_conv.pad)
+    @test circ_x[3:end-2,3:end-2,:,:] == x
+    @test circ_x[[1, 2], 3:end-2, :, :] == x[[7, 8], :, :, :]
+    @test circ_x[[11, 12], 3:end-2, :, :] == x[[1, 2], :, :, :]
+    @test circ_x[3:end-2,[1,2], :, :] == x[:, [7, 8], :, :]
+    @test circ_x[3:end-2,[11,12], :, :] == x[:, [1, 2], :, :]
+    @test y == conv(circ_x)
+end
+
+
 @testset "AttentionBlock" begin
     # constructor
     channels = 32 => 32
@@ -128,4 +154,23 @@ end
         sum(net2(x, c, t) .^ 2)
     end
     @test loss isa Real
+end
+
+@testset "Periodic NCSN" begin
+    k = 5
+    x = zeros(Float32, 2^k, 2^k, 1, 1)
+    xx = Float32.(1:1:2^k)
+    for i in 1:2^k
+        for j in 1:2^k
+            x[i,j] = sin(2π*xx[i]*2/2^k-π/2) + 2*abs(xx[j]-2^k/2)/2^k
+        end
+    end
+    c=nothing
+    t = rand(Float32)
+
+    periodic_net = CliMAgen.NoiseConditionalScoreNetwork(;noised_channels=1, outer_kernelsize=5, channels=[32, 64, 128, 256], periodic=true)
+    periodic_sc = periodic_net(x, c, t)
+
+    nonperiodic_net = CliMAgen.NoiseConditionalScoreNetwork(;noised_channels=1, outer_kernelsize=5, channels=[32, 64, 128, 256]);
+    nonperiodic_sc = nonperiodic_net(x,c,t);
 end

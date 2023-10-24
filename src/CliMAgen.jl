@@ -11,6 +11,7 @@ using ArgParse
 using BSON
 using CUDA
 using Flux
+using NNlib
 using Functors
 using Logging
 using ProgressMeter
@@ -34,7 +35,7 @@ export struct2dict, dict2nt
 export VarianceExplodingSDE
 export drift, diffusion, marginal_prob, score
 export vanilla_score_matching_loss, score_matching_loss
-export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlockDDN, ResnetBlockNCSN, AttentionBlock
+export NoiseConditionalScoreNetwork, DenoisingDiffusionNetwork, ResnetBlockDDN, ResnetBlockNCSN, AttentionBlock, CircularConv
 export WarmupSchedule, ExponentialMovingAverage
 export train!, load_model_and_optimizer, save_model_and_optimizer
 export setup_sampler, Euler_Maruyama_sampler, predictor_corrector_sampler
