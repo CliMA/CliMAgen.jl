@@ -56,3 +56,12 @@ steps:
       - "julia --color=yes --check-bounds=yes --project test/runtests.jl CUDA"
     agents:
       slurm_gpus: 1
+
+  - label: ":flower_playing_cards: MNIST"
+    key: "gpu_mnist"
+    command:
+      - "julia --project=examples -e 'using CUDA; CUDA.versioninfo()'"
+      - "julia --color=yes --check-bounds=yes --project=examples examples/mnist/training.jl examples/mnist/Experiment.toml CUDA"
+    artifact_paths: "examples/mnist/output/*png"
+    agents:
+      slurm_gpus: 1
