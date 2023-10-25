@@ -28,6 +28,7 @@ proj_kernelsize   = 3
 outer_kernelsize  = 3
 middle_kernelsize = 3
 inner_kernelsize  = 3
+periodic          = false
 
 [optimizer]
 learning_rate     = 2e-4

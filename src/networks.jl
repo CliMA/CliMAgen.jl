@@ -40,6 +40,7 @@ end
                                  channels=[32, 64, 128, 256],
                                  embed_dim=256,
                                  scale=30.0f0,
+                                 periodic=false,
                                  proj_kernelsize=3,
                                  outer_kernelsize=3,
                                  middle_kernelsize=3,
@@ -67,6 +68,7 @@ Returns a NoiseConditionalScoreNetwork, given
             the Unet during downsampling/upsampling
 - embed_dim: integer of the time-embedding dimension
 - scale: float giving the scale of the time-embedding layers
+- periodic: whether or not spatial convolutions should respect periodicity
 - proj_kernelsize: integer giving the kernel size in projection layers
 - outer_kernelsize: integer giving the kernel size in the outermost down/upsample 
                     layers
@@ -89,6 +91,7 @@ function NoiseConditionalScoreNetwork(; context=false,
                                       channels=[32, 64, 128, 256],
                                       embed_dim=256,
                                       scale=30.0f0,
+                                      periodic=false,
                                       proj_kernelsize=3,
                                       outer_kernelsize=3,
                                       middle_kernelsize=3,
@@ -132,47 +135,56 @@ function NoiseConditionalScoreNetwork(; context=false,
     else
         mean_bypass_layers = ()
     end
+
+    # Lifting/Projection layers depend on periodicity of data
+    if periodic
+        conv1 = CircularConv(3, nspatial, inchannels => channels[1] ; stride=1)
+        tconv1 = CircularConv(proj_kernelsize, nspatial, channels[1] + channels[1] => outchannels; stride=1)
+    else
+        conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad())
+        tconv1=Conv((proj_kernelsize, proj_kernelsize), channels[1] + channels[1] => outchannels, stride=1, pad=SamePad())
+    end
     
     layers = (gaussfourierproj=GaussianFourierProjection(embed_dim, scale),
               linear=Dense(embed_dim, embed_dim, swish),
               
               # Lifting
-              conv1=Conv((3, 3), inchannels => channels[1], stride=1, pad=SamePad()),
+              conv1=conv1,
               dense1=Dense(embed_dim, channels[1]),
               gnorm1=GroupNorm(channels[1], 4, swish),
               
               # Encoding
-              conv2=Downsampling(channels[1] => channels[2], nspatial, kernel_size=3),
+              conv2=Downsampling(channels[1] => channels[2], nspatial, kernel_size=3, periodic=periodic),
               dense2=Dense(embed_dim, channels[2]),
               gnorm2=GroupNorm(channels[2], 32, swish),
               
-              conv3=Downsampling(channels[2] => channels[3], nspatial, kernel_size=3),
+              conv3=Downsampling(channels[2] => channels[3], nspatial, kernel_size=3, periodic=periodic),
               dense3=Dense(embed_dim, channels[3]),
               gnorm3=GroupNorm(channels[3], 32, swish),
               
-              conv4=Downsampling(channels[3] => channels[4], nspatial, kernel_size=3),
+              conv4=Downsampling(channels[3] => channels[4], nspatial, kernel_size=3, periodic=periodic),
               dense4=Dense(embed_dim, channels[4]),
               
               # Residual Blocks
               resnet_blocks = 
-              [ResnetBlockNCSN(channels[end], nspatial, embed_dim; p = dropout_p) for _ in range(1, length=num_residual)],
+              [ResnetBlockNCSN(channels[end], nspatial, embed_dim; p = dropout_p, periodic=periodic) for _ in range(1, length=num_residual)],
               
               # Decoding
               gnorm4=GroupNorm(channels[4], 32, swish),
-              tconv4=Upsampling(channels[4] => channels[3], nspatial, kernel_size=inner_kernelsize),
+              tconv4=Upsampling(channels[4] => channels[3], nspatial, kernel_size=inner_kernelsize, periodic=periodic),
               denset4=Dense(embed_dim, channels[3]),
               tgnorm4=GroupNorm(channels[3], 32, swish),
               
-              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=middle_kernelsize),
+              tconv3=Upsampling(channels[3]+channels[3] => channels[2], nspatial, kernel_size=middle_kernelsize, periodic=periodic),
               denset3=Dense(embed_dim, channels[2]),
               tgnorm3=GroupNorm(channels[2], 32, swish),
               
-              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=outer_kernelsize),
+              tconv2=Upsampling(channels[2]+channels[2] => channels[1], nspatial, kernel_size=outer_kernelsize, periodic=periodic),
               denset2=Dense(embed_dim, channels[1]),
               tgnorm2=GroupNorm(channels[1], 32, swish),
               
               # Projection
-              tconv1=Conv((proj_kernelsize, proj_kernelsize), channels[1] + channels[1] => outchannels, stride=1, pad=SamePad()),
+              tconv1=tconv1,
               mean_bypass_layers...
               )
     
@@ -331,6 +343,8 @@ Flux.params(::GaussianFourierProjection) = nothing
 # Notes
 Images stored in (spatial..., channels, batch) order. 
 
+This currently does not support periodic boundary conditions.
+
 # References
 Ho, Jain, Abbeel: Denoising diffusion probabilistic models.
 """
@@ -462,6 +476,8 @@ end
 The ResNet block structure for the Denoising Diffusion 
 Network with GroupNorm and GaussianFourierProjection.
 
+This currently does not support periodic boundary conditions.
+
 References:
 https://arxiv.org/abs/1505.04597
 https://arxiv.org/abs/1712.09763
@@ -537,28 +553,34 @@ struct ResnetBlockNCSN
     dropout
 end
 """
-     ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
+     ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish, periodic=false)
 
 Constructor for the ResnetBlockNCSN, which preserves the `channel` number and image
 size of the input.
 
 Here, `nspatial` is the number of spatial dimensions, `nembed` is the embedding
 size used in the GaussianFourierProjection,
-`p` is the dropout probability, and `σ` is the nonlinearity used in the group
-norms and the dense layer.
+`p` is the dropout probability, `σ` is the nonlinearity used in the group
+norms and the dense layer, and `periodic` is a boolean indicating if spatial
+convolutions respect periodicity at the boundaries.
 """
-function ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish)
+function ResnetBlockNCSN(channels::Int, nspatial::Int, nembed::Int; p=0.1f0, σ=Flux.swish, periodic=false)
     # channels needs to be larger than 4 for group norms
     @assert channels ÷ 4 > 0
-
-    # Require same input and output spatial size
-    pad = SamePad()
+    if periodic
+        conv1 = CircularConv(3, nspatial, channels => channels)
+        conv2 = CircularConv(3, nspatial, channels => channels)
+    else
+        conv_kernel = Tuple(3 for _ in 1:nspatial)
+        conv1 = Conv(conv_kernel, channels => channels, pad = SamePad())
+        conv2 =  Conv(conv_kernel, channels => channels, pad = SamePad())
+    end
 
     return ResnetBlockNCSN(
         GroupNorm(channels, min(channels ÷ 4, 32), σ),
-        Conv(Tuple(3 for _ in 1:nspatial), channels => channels, pad=pad),
+        conv1,
         GroupNorm(channels, min(channels ÷ 4, 32), σ),
-        Conv(Tuple(3 for _ in 1:nspatial), channels => channels, pad=pad),
+        conv2,
         Dense(nembed => channels, σ),
         Dropout(p),
     )
@@ -590,6 +612,7 @@ end
 
 Softmax attention block with group normalization and bypass connection.
 
+This currently does not support periodic boundary conditions.
 References:
 https://arxiv.org/abs/1712.09763
 """
@@ -659,23 +682,33 @@ apply_attention_weights(w, v, ::Val{2}) =
     @tullio v_weighted[h2, w2, c, b] := w[h1, w1, h2, w2, b] * v[h1, w1, c, b]
 
 """
-    CliMAgen.Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
+    CliMAgen.Downsampling(channels::Pair,
+                          nspatial::Int;
+                          factor::Int=2,
+                          kernel_size::Int=3,
+                          periodic=false)
 
 Creates a downsampling layer using convolutional kernels.
 
 Here, 
 - `channels = inchannels => outchannels` is the pair of incoming and outgoing channels,
 - `nspatial` is the number of spatial dimensions of the image,
-- `factor` indicates the downsampling factor, and 
-- `kernel_size` is in the kernel size.
+- `factor` indicates the downsampling factor, 
+- `kernel_size` is in the kernel size, and
+- `periodic` is a boolean indicating if the spatial convolutions should respect periodicity.
 """
-function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
-    conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
-    return Conv(conv_kernel, channels, stride=factor, pad=SamePad())
+function Downsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3, periodic=false)
+    if periodic
+        return CircularConv(kernel_size, nspatial, channels; stride=factor)
+    else
+        conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+        return Conv(conv_kernel, channels; stride=factor, pad = SamePad())
+    end
+    return CircularConv(conv_kernel, channels, stride=factor, periodic=periodic)
 end
 
 """
-    CliMAgen.Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
+    CliMAgen.Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3, periodic=false)
 
 Creates an upsampling layer using nearest-neighbor interpolation and 
 convolutional kernels, so that checkerboard artifacts are avoided.
@@ -683,16 +716,64 @@ convolutional kernels, so that checkerboard artifacts are avoided.
 Here, 
 - `channels = inchannels => outchannels` is the pair of incoming and outgoing channels,
 - `nspatial` is the number of spatial dimensions of the image,
-- `factor` indicates the downsampling factor, and 
-- `kernel_size` is in the kernel size.
+- `factor` indicates the downsampling factor, 
+- `kernel_size` is in the kernel size, and
+- `periodic` is a boolean indicating if the spatial convolutions should respect periodicity.
 
 References:
 https://distill.pub/2016/deconv-checkerboard/
 """
-function Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3)
-    conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+function Upsampling(channels::Pair, nspatial::Int; factor::Int=2, kernel_size::Int=3, periodic=false)
+    if periodic
+        conv = CircularConv(kernel_size, nspatial, channels)
+    else
+        conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+        conv = Conv(conv_kernel, channels; pad = SamePad())
+    end
     return Chain(
         Flux.Upsample(factor, :nearest),
-        Conv(conv_kernel, channels, pad=SamePad())
+        conv
     )
+end
+
+"""
+    CliMAgen.CircularConv
+
+Struct for holding required data for carrying out convolutions
+ respecting periodicity at the boundaries.
+
+- `pad`: a Tuple holding the number of elements to pad with on each of
+the boundaries. 
+- `conv`: the convolutional layer 
+"""
+struct CircularConv{C<:Conv}
+    pad::Tuple
+    conv::C
+end
+
+"""
+    CircularConv(kernel_size::Int, nspatial::Int, channels::Pair;stride::Int=1)
+
+Creates a convolutional layer that respects periodicity at the boundaries, given
+- `kernel_size`: the size of the kernel, in pixels
+- `nspatial`: the number of spatial dimensions,
+- `channels`: a Pair indicating the number of input and output channels
+- `stride`: the stride to use for the convolution.
+"""
+function CircularConv(kernel_size::Int, nspatial::Int, channels::Pair;stride::Int=1)
+    conv_kernel = Tuple(kernel_size for _ in 1:nspatial)
+    pad = Tuple(div(kernel_size,2) for _ in 1:2*nspatial)
+    conv = Conv(conv_kernel, channels; stride=stride, pad=0)
+    return CircularConv{typeof(conv)}(pad, conv)
+end
+
+@functor CircularConv
+
+"""
+    (layer::CircularConv)(x)
+
+Carries on the spatial convolution respecting periodicity at the boundaries.
+"""
+function (layer::CircularConv)(x)
+    layer.conv(NNlib.pad_circular(x, layer.pad))
 end

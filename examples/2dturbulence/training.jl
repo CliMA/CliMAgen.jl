@@ -40,6 +40,7 @@ function run_training(params; FT=Float32, logger=nothing)
     outer_kernelsize = params.model.outer_kernelsize
     middle_kernelsize = params.model.middle_kernelsize
     inner_kernelsize = params.model.inner_kernelsize
+    periodic = params.model.periodic
 
     nwarmup = params.optimizer.nwarmup
     gradnorm::FT = params.optimizer.gradnorm
@@ -97,7 +98,8 @@ function run_training(params; FT=Float32, logger=nothing)
                                            proj_kernelsize = proj_kernelsize,
                                            outer_kernelsize = outer_kernelsize,
                                            middle_kernelsize = middle_kernelsize,
-                                           inner_kernelsize = inner_kernelsize
+                                           inner_kernelsize = inner_kernelsize,
+                                           periodic = periodic,
                                            )
         model = VarianceExplodingSDE(sigma_max, sigma_min, net)
         model = device(model)
