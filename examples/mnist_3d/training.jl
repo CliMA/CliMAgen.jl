@@ -1,7 +1,6 @@
-using Flux
 using CUDA
-using cuDNN
 using Dates
+using Flux
 using Random
 using TOML
 using BSON
@@ -23,11 +22,7 @@ function run_training(params; FT=Float32, logger=nothing)
     nogpu = params.experiment.nogpu
     
     batchsize = params.data.batchsize
-    resolution = params.data.resolution
-    fraction = params.data.fraction
-    standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
-
+    
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
     inchannels = params.model.inchannels
@@ -56,17 +51,9 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_correlated_ou2d_timeseries(
+    dataloaders = get_data_mnist_3d(
         batchsize;
-        f = fraction,
-        resolution=resolution,
-        ntime=16,
-        FT=Float32,
-        standard_scaling = standard_scaling,
-        read = false,
-        save = true,
-        preprocess_params_file,
-        rng=Random.GLOBAL_RNG
+        FT=FT
     )
 
     # set up model and optimizers

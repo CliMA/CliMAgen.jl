@@ -174,3 +174,23 @@ end
     nonperiodic_net = CliMAgen.NoiseConditionalScoreNetwork(;noised_channels=1, outer_kernelsize=5, channels=[32, 64, 128, 256]);
     nonperiodic_sc = nonperiodic_net(x,c,t);
 end
+
+@testset "NCSN3D" begin
+    # test for correct kernel shape
+    net = CliMAgen.NoiseConditionalScoreNetwork3D(;noised_channels=2, outer_kernelsize=5, nspatial=3, channels=[32, 64, 128, 256])
+    @test size(Flux.params(net.layers.tconv2)[1]) == (5, 5, 5, 128, 32)
+
+    # test forward pass
+    k = 4
+    x = rand(Float32, 2^k, 2^k, 16, 2, 11)
+    t = rand(Float32)
+    c=nothing
+    @test net(x, c, t) |> size == size(x)
+
+    # test backward pass
+    ps = Flux.params(net)
+    loss, grad = Flux.withgradient(ps) do
+        sum(net(x, c, t) .^ 2)
+    end
+    @test loss isa Real
+end
