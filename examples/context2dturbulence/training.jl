@@ -31,6 +31,7 @@ function run_training(params; FT=Float32, logger=nothing)
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
+    dropout_p::FT = params.model.dropout_p
     noised_channels = params.model.noised_channels
     context_channels = params.model.context_channels
     shift_input = params.model.shift_input
@@ -91,6 +92,7 @@ function run_training(params; FT=Float32, logger=nothing)
     else
         net = NoiseConditionalScoreNetworkVariant(;
                                                   context = true,
+                                                  dropout_p = dropout_p,
                                                   noised_channels = noised_channels,
                                                   context_channels = context_channels,
                                                   shift_input = shift_input,

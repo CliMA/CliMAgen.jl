@@ -1,4 +1,5 @@
 using JLD2
+using FFTW
 using MLDatasets, MLUtils, Images, DataLoaders, Statistics
 using CliMADatasets
 using CliMAgen: expand_dims
@@ -204,6 +205,26 @@ function get_data_context2dturbulence(batchsize;
         xtest = CliMADatasets.Turbulence2DContext(:test; fraction = fraction, resolution=resolution, wavenumber = wavenumber, Tx=FT,)[:]
     end
 
+    if resolution == 64
+        # Upsampling
+        upsample = Flux.Upsample(8, :nearest)
+        xtrain_upsampled = Complex{FT}.(upsample(xtrain))
+        xtest_upsampled = Complex{FT}.(upsample(xtest));
+        # Upsampling produces artifacts at high frequencies, so now
+        # we filter.
+        fft!(xtrain_upsampled, (1,2));
+        xtrain_upsampled[:,33:479,:,:] .= Complex{FT}(0);
+        xtrain_upsampled[33:479,:,:,:] .= Complex{FT}(0);
+        ifft!(xtrain_upsampled, (1,2))
+        xtrain = real(xtrain_upsampled)
+
+        fft!(xtest_upsampled, (1,2));
+        xtest_upsampled[:,33:479,:,:] .= Complex{FT}(0);
+        xtest_upsampled[33:479,:,:,:] .= Complex{FT}(0);
+        ifft!(xtest_upsampled, (1,2))
+        xtest = real(xtest_upsampled)
+    end
+    
     if save
         if standard_scaling
             maxtrain = maximum(xtrain, dims=(1, 2, 4))

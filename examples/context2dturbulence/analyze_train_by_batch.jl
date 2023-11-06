@@ -40,12 +40,14 @@ function obtain_train_dl(params, wavenumber, FT)
     return dl
 end
 
-function main(wavenumber; experiment_toml="Experiment.toml")
+function main(npixels, wavenumber; experiment_toml="Experiment.toml")
     FT = Float32
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
     resolution = params.data.resolution
+    batchsize = params.data.batchsize
+
     rngseed = params.experiment.rngseed
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -57,6 +59,9 @@ function main(wavenumber; experiment_toml="Experiment.toml")
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
     scaling = JLD2.load_object(preprocess_params_file)
     filenames = [joinpath(savedir, "train_statistics_ch1_$wavenumber.csv"),joinpath(savedir, "train_statistics_ch2_$wavenumber.csv")]
+    pixel_filenames = [joinpath(savedir, "train_pixels_ch1_$wavenumber.csv"),joinpath(savedir, "train_pixels_ch2_$wavenumber.csv")]
+    train_pixels = zeros(FT,(resolution*resolution, noised_channels, batchsize))
+
     for batch in dl
         # revert to real space using the inverse preprocessing step
         batch .= invert_preprocessing(batch, scaling)
@@ -71,7 +76,17 @@ function main(wavenumber; experiment_toml="Experiment.toml")
         # average instant condensation rate
         train_icr = make_icr(batch)
 
+        # samples is 512 x 512 x 3 x 10
+        train_pixels .= reshape(batch[:,:, 1:noised_channels, :], (prod(size(batch)[1:2]), noised_channels, batchsize))
+        pixel_indices = StatsBase.sample(1:1:size(train_pixels)[1], npixels)
+
+
         for ch in 1:noised_channels
+            # write pixel vaues to other file
+            open(pixel_filenames[ch],"a") do io
+                writedlm(io, train_pixels[pixel_indices, ch, :], ',')
+            end
+
             if ch == 1
                 output = hcat(train_means[1,1,ch,:],train_κ2[1,1,ch,:], train_κ3[1,1,ch,:],train_κ4[1,1,ch,:], transpose(train_spectra[:,1,ch,:]), train_icr[1,1,ch,:])
             else
@@ -86,5 +101,5 @@ function main(wavenumber; experiment_toml="Experiment.toml")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(parse(Float32, ARGS[1]); experiment_toml=ARGS[2])
+    main(parse(Int64, ARGS[1]), parse(Float32, ARGS[2]); experiment_toml=ARGS[3])
 end

@@ -3,7 +3,7 @@
     channels = 6 => 12
     nspatial = 2
     nembed = 128
-    resnetblock = ResnetBlock(channels, nspatial, nembed)
+    resnetblock = ResnetBlock(channels, nspatial, nembed; p = 0.1f0)
     @test resnetblock isa ResnetBlock
 
     x = randn(FT, 12, 12, 6, 21)
