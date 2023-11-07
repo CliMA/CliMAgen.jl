@@ -97,28 +97,37 @@ function run_analysis(params; FT=Float32, logger=nothing)
     autocorrelation_plot(xtrain[32,:,1,1:nsamples], samples[32,:,1,:], savedir, "autocorr.png";logger=logger)
 
     # Return curve for the following metric: the mean of the middle pixel,
-    # taken over a block of time length 8
-    m = 8
-    metric(x) = mean(x[32,32-div(m,2):32+div(m,2)-1,1,:], dims = 1)[:]
-    event_probability_plot(metric(xtrain), metric(samples), ones(FT, nsamples), savedir, "event_probability_$m.png"; logger=logger)
+    # taken over a duration time length 8
+    # This may not be using the data fully, since we only extract one "observation" per 
+    # sample. However, we are guaranteed that they are independent. 
+    duration = 8
+    observable(x) = mean(x[32,32-div(duration,2):32+div(duration,2)-1,1,:], dims = 1)[:]
+    lr = ones(FT, nsamples) # no biasing, likelihood ratio is 1.
+    event_probability_plot(metric(xtrain), observable(samples), lr, savedir, "event_probability_$duration.png"; logger=logger)
 
-    # Im not sure about the following: 
     # To compute the return time, we need more care. We need a time interval associated with this event in 
-    # order to turn a probability into a return time. If the block length is longer than the autocorrelation
-    # time, I think we can use the block length directly: within each sample of length n_time > m, we get one
-    # independent sample of length m. If instead we had carried out a direct numerical simulation
-    # and split it into blocks of length m, we would get the same result because the blocks would be independent.
+    # order to turn a probability into a return time. 
+    
+    # It would be wrong to use the length of the timeseries per sample, because our metric only
+    # extracted one event from each sample. The event could happen more than once per sample.
 
-    # The issue arises if the block is shorter than the autocorrelation time. In this case, if we 
-    # had carried out a direct numerical simulation and split it into blocks of length m,
-    # the blocks would no longer be independent. Since these do not agree, I dont think it's the
+    # If the event duration is much longer than the autocorrelation time, I think we could use the event duration
+    # directly: within each sample of length n_time > duration >> autocorrelation time, we could extract one
+    # independent sample of length duration, as we do above.
+    # If instead we had carried out a direct numerical simulation
+    # and split it into blocks of length duration, we would get the same result because the blocks would be ~independent.
+
+    # The issue arises if the event duration is comparable to or shorter than the autocorrelation time. 
+    # In this case, if we 
+    # had carried out a direct numerical simulation and split it into blocks of length duration,
+    # the blocks would no longer be fully independent. Since these do not agree, I dont think it's the
     # right thing to do.
 
-    # We could try: min(autocorrelation time, block length), or split each sample into many blocks
-    # of length m and take the maximum. Then even if they are correlated, we return an independent 
+    # Instead, follow Ragone: split each sample into many blocks
+    # of length duration and take the maximum. Then even if they are correlated, we return an independent 
     # sample per n_time.
-    metric_return_time(y) = maximum(mapslices(x -> block_applied_func(x, mean, m), y, dims = 1), dims = 1)[:]
-    return_curve_plot(metric_return_time(xtrain[:,:,:,1:nsamples]), metric_return_time(samples), FT(n_time), savedir, "return_curve_$m.png"; logger=logger)
+    metric_return_time(y) = maximum(mapslices(x -> block_applied_func(x, mean, duration), y[32, :, 1, :], dims = 1), dims = 1)[:]
+    return_curve_plot(metric_return_time(xtrain), metric_return_time(samples), FT(n_time), savedir, "return_curve_$duration.png"; logger=logger)
 
     # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)

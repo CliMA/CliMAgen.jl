@@ -26,6 +26,20 @@ function generate_samples(params; FT=Float32, bias_sampling = false)
     nsamples = params.sampling.nsamples
     samples_file = params.sampling.samples_file
 
+
+    # set up rng
+    rngseed > 0 && Random.seed!(rngseed)
+
+    # set up device
+    if !nogpu && CUDA.has_cuda()
+        device = Flux.gpu
+        @info "Sampling on GPU"
+    else
+        device = Flux.cpu
+        @info "Sampling on CPU"
+    end
+
+
     # If we are using a biased sampler, set up the bias function
     # and make a new directory to save in
     if bias_sampling
@@ -48,17 +62,6 @@ function generate_samples(params; FT=Float32, bias_sampling = false)
         bias = nothing
         shift = false
     end
-    # set up rng
-    rngseed > 0 && Random.seed!(rngseed)
-
-    # set up device
-    if !nogpu && CUDA.has_cuda()
-        device = Flux.gpu
-        @info "Sampling on GPU"
-    else
-        device = Flux.cpu
-        @info "Sampling on CPU"
-    end
 
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
@@ -80,9 +83,9 @@ function generate_samples(params; FT=Float32, bias_sampling = false)
         )
         if sampler == "euler"
             samples = Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, bias=bias, use_shift = shift)
-        elseif sampler == "pc" & !bias_sampling
+        elseif sampler == "pc" && !bias_sampling
             samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
-        elseif sampler == "pc" & bias_sampling
+        elseif sampler == "pc" && bias_sampling
             @error("Biased sampling with a Predictor-Corrector sampler is not supported.")
         end
         all_samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(samples)
@@ -90,15 +93,15 @@ function generate_samples(params; FT=Float32, bias_sampling = false)
     drop_to_hdf5(all_samples; hdf5_path=samples_file, key = "generated_samples")
 end
 
-function main(; experiment_toml="Experiment.toml", bias = "false")
+function main(; experiment_toml="Experiment.toml", bias_sampling = false)
     FT = Float32
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
-    generate_samples(params; FT=FT, bias = bias)
+    generate_samples(params; FT=FT, bias_sampling = bias)
 
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(;experiment_toml=ARGS[1], bias = ARGS[2])
+    main(;experiment_toml=ARGS[1], bias_sampling = ARGS[2]== "true")
 end

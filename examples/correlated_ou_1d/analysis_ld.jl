@@ -103,30 +103,13 @@ function run_analysis(params; FT=Float32, logger=nothing)
         @info samples_file
         samples = read_from_hdf5(samples_file)
     end
-    # # Return curve for the following metric: the mean of the middle pixel,
-    # # taken over a block of time length 8
-    m = 8
-    observable(x) = mean(x[32,32-div(m,2):32+div(m,2)-1,1,:], dims = 1)[:]
+    # # Probability of event for the following metric: the mean of the middle pixel,
+    # # taken over a time duration length 8
+    # # [recall that the image x is of size (n_spatialn_time_steps)]
+    duration = 8
+    observable(x) = mean(x[32,32-div(duration,2):32+div(duration,2)-1,1,:], dims = 1)[:]
     likelihood_ratio(x; k = k_bias) = Z.*exp.(-k .*A(x; indicator = cpu(indicator)))
-    event_probability_plot(observable(cpu(xtrain)), observable(samples), likelihood_ratio(samples)[:], samples_savedir, "event_probability_$(m)_ld_$(k_bias)_shift_$(shift).png"; logger=logger)
-
-    # # Im not sure about the following: 
-    # # To compute the return time, we need more care. We need a time interval associated with this event in 
-    # # order to turn a probability into a return time. If the block length is longer than the autocorrelation
-    # # time, I think we can use the block length directly: within each sample of length n_time > m, we get one
-    # # independent sample of length m. If instead we had carried out a direct numerical simulation
-    # # and split it into blocks of length m, we would get the same result because the blocks would be independent.
-
-    # # The issue arises if the block is shorter than the autocorrelation time. In this case, if we 
-    # # had carried out a direct numerical simulation and split it into blocks of length m,
-    # # the blocks would no longer be independent. Since these do not agree, I dont think it's the
-    # # right thing to do.
-
-    # # We could try: min(autocorrelation time, block length), or split each sample into many blocks
-    # # of length m and take the maximum. Then even if they are correlated, we return an independent 
-    # # sample per n_time.
-    # metric_return_time(y) = maximum(mapslices(x -> block_applied_func(x, mean, m), y, dims = 1), dims = 1)[:]
-    # return_curve_plot(metric_return_time(xtrain), metric_return_time(samples), FT(n_time), savedir, "return_curve_$(m)_ld.png"; logger=logger)
+    event_probability_plot(observable(cpu(xtrain)), observable(samples), likelihood_ratio(samples)[:], samples_savedir, "event_probability_$(duration)_ld_$(k_bias)_shift_$(shift).png"; logger=logger)
 
     # # create plot showing distribution of spatial mean of generated and real images
     spatial_mean_plot(cpu(xtrain), samples, samples_savedir, "spatial_mean_distribution_ld.png", logger=logger)

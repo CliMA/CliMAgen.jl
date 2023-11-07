@@ -1,20 +1,9 @@
+# This is a script that carries out a sanity check on
+# our event_probability function
+# with Gaussian data.
+
 Using Plots
-
-function event_probability(a_m::Vector{FT},
-    lr::Vector{FT}
-    ) where {FT<:AbstractFloat}
-    sort_indices = reverse(sortperm(a_m))
-    a_sorted = a_m[sort_indices]
-    lr_sorted = lr[sort_indices] 
-    M = length(a_m)
-    # γa = P(X > a)
-    γ = cumsum(lr_sorted)./M
-
-    # Compute uncertainty 
-    γ² = cumsum(lr_sorted.^2.0)./M
-    σ_γ = sqrt.(γ² .-  γ.^2.0)/sqrt(M)
-    return a_sorted, γ, σ_γ
-end
+include("../utils_analysis.jl")# bring in event_probability function
 logscale =true
 N = 10000
 σ = 1
