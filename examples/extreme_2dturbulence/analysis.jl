@@ -12,6 +12,7 @@ using CliMAgen
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
+include(joinpath(package_dir,"examples/utils_etl.jl"))
 
 function run_analysis(params; FT=Float32, logger=nothing)
     # unpack params

@@ -11,16 +11,6 @@ using TOML
 
 using CliMAgen
 
-function read_from_hdf5(hdf5_path="samples.hdf5")
-
-    fid = HDF5.h5open(hdf5_path, "r")
-
-    samples = read(fid["generated_samples"])
-    close(fid)
-
-    return samples
-end
-
 function drop_to_hdf5(params; FT=Float32)
     # unpack params
     savedir = params.experiment.savedir
