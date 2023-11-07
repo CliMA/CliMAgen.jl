@@ -76,7 +76,8 @@ function filter_512_to_64(x)
     return real(y)
 end
 
-function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment_resize_64.toml", target_toml="experiments/Experiment_preprocess_mixed.toml")
+function main(nbatches, npixels, wavenumber; source_toml="experiments/Experiment_resize_64_dropout_preprocess_041023.toml",
+    target_toml="experiments/Experiment_all_data_centered_dropout_05.toml")
     FT = Float32
     device = Flux.gpu
     nsteps = 125
