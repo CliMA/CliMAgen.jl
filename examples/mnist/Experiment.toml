@@ -8,6 +8,7 @@ nogpu             = false
 
 [data]
 batchsize         = 64
+fraction          = 0.1
 
 [model]
 inchannels        = 1
@@ -29,8 +30,8 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 40
-freq_chckpt       = 40
+nepochs           = 15
+freq_chckpt       = 15
 
 [sampling]
 nsteps            = 250
