@@ -73,11 +73,11 @@ function train!(model,
             ) 
         end
 
-        # every so often, we upload a checkpoint to the cloud if applicable
+        # every so often, we save a checkpoint
         if epoch % freq_chckpt == 0
-            if !(logger isa Nothing)
-                log_artifact(logger, savepath; name="checkpoint-$(epoch)", type="BSON-file")
-            end
+            savepath = joinpath(savedir, "checkpoint_$(epoch).bson")
+            CliMAgen.save_model_and_optimizer(Flux.cpu(model), Flux.cpu(model_smooth), opt, opt_smooth, savepath)
+            @info "Checkpoint saved at Epoch $(epoch)."
         end
     end
 end
