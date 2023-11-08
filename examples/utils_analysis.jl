@@ -815,12 +815,6 @@ function event_probability(a_m::Vector{FT},
     M = length(a_m)
     # γa = P(X > a)
     γ = cumsum(lr_sorted)./M
-
-    # Clip the probability to be <= 1
-    # This situation can arise when using computed likelihood ratios. 
-    ceiling = γ .>=1
-    γ[ceiling] .= 0.9999
-    
     # Compute uncertainty 
     γ² = cumsum(lr_sorted.^2.0)./M
     σ_γ = sqrt.(γ² .-  γ.^2.0)/sqrt(M)
@@ -916,12 +910,29 @@ The samples must be independent and associated with a time interval ΔT; this is
 is required to turn the probability of the event into 
 how often the event occurs.
 """
-function event_probability_plot(data::Vector{FT}, gen::Vector{FT}, savepath, plotname; logger=nothing) where {FT}
-    lr = ones(FT, length(gen))
-    em, γ, σ_γ = event_probability(gen, lr)
-    Plots.plot(em, γ,  ribbon = (σ_γ, σ_γ), label = "Generated", yaxis = :log10, ylim = [1e-3, 1])
-    em, γ, σ_γ = event_probability(data, lr)
-    Plots.plot!(em, γ,  ribbon = (σ_γ, σ_γ), label = "Training", ylabel = "Probability", xlabel = "Event magnitude", margin = 10Plots.mm)
-    Plots.savefig(joinpath(savepath, plotname))
+function event_probability_plot(train::Vector{FT}, gen::Vector{FT}, lr_gen, savepath, plotname; logger=nothing) where {FT}
+    plts = []
+    logscales = [true, false]
+    for logscale in logscales
+        em, γ, σ_γ = event_probability(gen, lr_gen)
+        plt1 = Plots.plot()
+        Plots.plot!(plt1, em, γ,  ribbon = (σ_γ, σ_γ), label = "Generated/IS", legend = :bottomleft)
+        if logscale
+         Plots.plot!(plt1, yaxis = :log10, ylim = [1e-6, 1])
+        end
+
+        N_gen = length(gen)
+        lr_train = ones(FT, length(train))
+
+        em, γ, σ_γ = event_probability(train[1:N_gen], lr_train[1:N_gen])
+        Plots.plot!(plt1, em, γ,  ribbon = (σ_γ, σ_γ), label = "DS")
+
+        lr_train = ones(FT, length(train))
+        em, γ, σ_γ = event_probability(train, lr_train)
+        Plots.plot!(plt1, em, γ,  ribbon = (σ_γ, σ_γ), label = "Truth", ylabel = "Probability", xlabel = "Event magnitude", margin = 10Plots.mm)
+        push!(plts, plt1)
+    end
+    plt = Plots.plot(plts..., layout = (1,2))
+    Plots.savefig(plt, joinpath(savepath, plotname))
 end
 

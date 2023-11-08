@@ -6,7 +6,7 @@ using Random
 using Statistics
 
 FT = Float32
-
+include("./test_sampling.jl")
 include("./test_preprocessing.jl")
 include("./tests_models.jl")
 include("./test_networks.jl")
