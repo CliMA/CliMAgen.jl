@@ -1,6 +1,7 @@
+using Flux
 using BSON
 using CUDA
-using Flux
+using cuDNN
 using Images
 using ProgressMeter
 using Plots

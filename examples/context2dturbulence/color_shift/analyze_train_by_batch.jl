@@ -1,8 +1,9 @@
-using BSON
-using CUDA
 ## Script for computing metrics of interest on the training data ##
 
+using BSON
 using Flux
+using CUDA
+using cuDNNN
 using ProgressMeter
 using Plots
 using Random
