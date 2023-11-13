@@ -893,6 +893,7 @@ function return_curve_plot(data::Vector{FT}, gen::Vector{FT}, ΔT::FT, savepath,
     lr = ones(FT, length(gen))
     em, rtn_n, rtn_p, σ_rtn = return_curve(gen, ΔT, lr)
     Plots.plot(em, rtn_n,  ribbon = (σ_rtn, σ_rtn), label = "Generated", yaxis = :log10)
+    lr = ones(FT, length(data))
     em, rtn_n, rtn_p, σ_rtn = return_curve(data, ΔT, lr)
     Plots.plot!(em, rtn_n,  ribbon = (σ_rtn, σ_rtn), label = "Training", ylabel = "Return time", xlabel = "Event magnitude", margin = 10Plots.mm)
     Plots.savefig(joinpath(savepath, plotname))
@@ -927,7 +928,6 @@ function event_probability_plot(train::Vector{FT}, gen::Vector{FT}, lr_gen, save
         em, γ, σ_γ = event_probability(train[1:N_gen], lr_train[1:N_gen])
         Plots.plot!(plt1, em, γ,  ribbon = (σ_γ, σ_γ), label = "DS")
 
-        lr_train = ones(FT, length(train))
         em, γ, σ_γ = event_probability(train, lr_train)
         Plots.plot!(plt1, em, γ,  ribbon = (σ_γ, σ_γ), label = "Truth", ylabel = "Probability", xlabel = "Event magnitude", margin = 10Plots.mm)
         push!(plts, plt1)
