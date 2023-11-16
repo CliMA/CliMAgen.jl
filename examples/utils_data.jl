@@ -5,6 +5,99 @@ using CliMADatasets
 using CliMAgen: expand_dims
 using Random
 
+
+"""
+    get_data_ks(batchsize;
+                f=1.0,
+                n_pixels=128,
+                n_time=128,
+                FT=Float32,
+                standard_scaling = false,
+                read = false,
+                save = false,
+                preprocess_params_file,
+                rng=Random.GLOBAL_RNG)
+
+Obtains the 1D Kuramoto-Sivashinksy dataset, which has already been shaped
+into images of size n_pixels x n_time, 
+ carries out a scaling of the data, and loads the data into train and test
+dataloders, which are returned.
+
+The user can pick:
+- n_pixels:         Spatial size of the data - only 128 is supported 
+                    currently.
+- n_time:           Number of timesteps to include in each image (128 for
+                    square images)
+- fraction:         the amount of the data to use.
+- standard_scaling: boolean indicating if standard minmax scaling is used
+                    or if minmax scaling of the mean and spatial variations
+                    are both implemented.
+- FT:               the float type of the model
+- read:             a boolean indicating if the preprocessing parameters should be read
+- save:             a boolean indicating if the preprocessing parameters should be
+                    computed and read.
+- preprocess_params:filename where preprocessing parameters are stored or read from.
+
+"""
+function get_data_ks(batchsize, preprocess_params_file;
+                     f=1.0,
+                     n_pixels=128,
+                     n_time=64,
+                     FT=Float32,
+                     standard_scaling = false,
+                     read = false,
+                     save = false,
+                     rng=Random.GLOBAL_RNG)
+    
+    @assert xor(read, save)
+    
+    xtrain = CliMADatasets.KuramotoSivashinsky1D(:train; f = f, n_pixels=n_pixels, n_time = n_time, Tx=FT)[:];
+    xtest = CliMADatasets.KuramotoSivashinsky1D(:test; f = f, n_pixels=n_pixels, n_time = n_time, Tx=FT)[:];
+    # Expand dims to a single channel dimension
+    xtrain = reshape(xtrain, size(xtrain)[1], size(xtrain)[2], 1, :)
+    xtest = reshape(xtest, size(xtest)[1], size(xtest)[2], 1, :)
+
+    # Scaling
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+    
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
 """
     get_data_correlated_ou1d(batchsize;
                              f=1.0,

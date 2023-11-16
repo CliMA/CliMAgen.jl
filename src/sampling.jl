@@ -30,15 +30,16 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
                                 )::A where {A}
     x = mean_x = init_x
     score = similar(x) # Preallocate
+    z = similar(x)
     @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
         g = CliMAgen.diffusion(model, batch_time_step)
         if forward
-            x = x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
+            x .= x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
         else
         score .= CliMAgen.score(model, x, batch_time_step; c=c)
-        mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
-        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
+        mean_x .= x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
+        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
         end
     end
     return x
@@ -80,6 +81,7 @@ function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
     x = mean_x = init_x
     # Preallocate
     score = similar(x)
+    z = similar(x)
     if ~(bias isa Nothing)
         bias_drift = similar(x)
         shift = similar(x)
@@ -90,7 +92,7 @@ function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
         g = CliMAgen.diffusion(model, batch_time_step)
         if forward
-            x = x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
+            x .= x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
         else
             if bias isa Nothing
                 score .= CliMAgen.score(model, x, batch_time_step; c=c)
@@ -104,8 +106,8 @@ function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
                 end
                 score .= CliMAgen.score(model, x .+ shift, batch_time_step; c=c) .+ bias_drift
             end
-        mean_x = x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
-        x = mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, similar(x))
+        mean_x .= x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
+        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
         end
     end
     return x
