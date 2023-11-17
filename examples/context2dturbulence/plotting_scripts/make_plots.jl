@@ -16,25 +16,29 @@ data = []
 for type in types
     for ch in channels
         for wn in wavenumbers
-            if wn == 0.0 || type == :train
-                filename = "data/$(type)/$(type)_statistics_ch$(ch)_$(wn).csv"
+            if wn == 0.0 && type == :gen
+                nothing
             else
-                filename = "data/$(type)_downscaling/downscale_$(type)_statistics_ch$(ch)_$(wn).csv"
-                #filename = "data/$(type)/$(type)_statistics_ch$(ch)_$(wn).csv"
+
+                if wn == 0.0 || type == :train
+                    filename = "/groups/esm/kdeck/downscaling/stats/data/$(type)/$(type)_statistics_ch$(ch)_$(wn).csv"
+                else
+                    filename = "/groups/esm/kdeck/downscaling/stats/data/$(type)/downscale_$(type)_statistics_ch$(ch)_$(wn).csv"
+                end
+                df = DataFrame(readdlm(filename, ',', Float32, '\n'), :auto)
+                # no condensation rate for vorticity
+                if ch == 2
+                    df.x261 .= nothing
+                end
+                df.isreal .= type == :gen ? false : true
+                df.channel .= ch
+                df.wavenumber .= wn
+                # adjust number of observations, they are different for the different sets
+                if type == :train
+                    df = df[end-99:end, :]
+                end
+                push!(data, df)
             end
-            df = DataFrame(readdlm(filename, ',', Float32, '\n'), :auto)
-            # no condensation rate for vorticity
-            if ch == 2
-                df.x261 .= nothing
-            end
-            df.isreal .= type == :gen ? false : true
-            df.channel .= ch
-            df.wavenumber .= wn
-            # adjust number of observations, they are different for the different sets
-            if type == :train
-                df = df[end-99:end, :]
-            end
-            push!(data, df)
         end
     end
 end
@@ -58,23 +62,22 @@ pixels = []
 for type in types
     for ch in channels
         for wn in wavenumbers
-            if type == :train
-                filename = "data/$(type)/$(type)_pixels_ch$(ch)_$(wn).csv"
+            if wn == 0.0 && type == :gen
+                nothing
             else
-                if wn == 0.0
-                    filename = "data/$(type)_downscaling/downscale_$(type)_pixels_ch$(ch)_2.0.csv"
-                    #filename = "data/$(type)/$(type)_pixels_ch$(ch)_2.0.csv"
+                if type == :train
+                    filename = "/groups/esm/kdeck/downscaling/stats/data/$(type)/$(type)_pixels_ch$(ch)_$(wn).csv"
                 else
-                    filename = "data/$(type)_downscaling/downscale_$(type)_pixels_ch$(ch)_$(wn).csv"
-                    #filename = "data/$(type)/$(type)_pixels_ch$(ch)_$(wn).csv"
+                    filename = "/groups/esm/kdeck/downscaling/stats/data/$(type)/downscale_$(type)_pixels_ch$(ch)_$(wn).csv"
                 end
+
+                println(filename)
+                df = DataFrame(readdlm(filename, ',', Float32, '\n')[:][1:1600000,:]', :auto)
+                df.isreal .= type == :gen ? false : true
+                df.channel .= ch
+                df.wavenumber .= wn
+                push!(pixels, df)
             end
-            println(filename)
-            df = DataFrame(readdlm(filename, ',', Float32, '\n')[:][1:1600000,:]', :auto)
-            df.isreal .= type == :gen ? false : true
-            df.channel .= ch
-            df.wavenumber .= wn
-            push!(pixels, df)
         end
     end
 end
@@ -120,13 +123,14 @@ function percentile_scale(x, data, lower=1.0, upper=4.0)
 end
 
 ## plotting
-# ch = 1
-# include("plot_mean.jl")
-# include("plot_pdfs.jl")
-# include("plot_spectra.jl")
-# include("plot_cond_rate.jl")
+include("plot_pixelwise_corr.jl")
+ch = 1
+include("plot_mean.jl")
+include("plot_pdfs.jl")
+include("plot_spectra.jl")
+include("plot_cond_rate.jl")
 
-# ch = 2
-# include("plot_mean.jl")
-# include("plot_pdfs.jl")
-# include("plot_spectra.jl")
+ch = 2
+include("plot_mean.jl")
+include("plot_pdfs.jl")
+include("plot_spectra.jl")
