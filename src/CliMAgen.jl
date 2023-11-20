@@ -10,6 +10,7 @@ module CliMAgen
 using ArgParse
 using BSON
 using CUDA
+using cuDNN
 using Flux
 using NNlib
 using Functors
@@ -19,7 +20,6 @@ using Random
 using Statistics
 using Tullio
 using DelimitedFiles
-using CliMAgen
 
 include("utils.jl")
 include("logging.jl")

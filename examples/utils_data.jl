@@ -5,6 +5,98 @@ using CliMADatasets
 using CliMAgen: expand_dims
 using Random
 
+"""
+    get_data_giorgini2d(batchsize, resolution, nonlinearity;
+                       f = 1.0,
+                       time_res = 1,
+                       FT=Float32,
+                       rng=Random.GLOBAL_RNG,
+                       standard_scaling = false,
+                       read = false,
+                       save = false,
+                       preprocess_params_file = "")
+
+Obtains the 2D Giorgini dataset, 
+ carries out a scaling of the data, and loads the data into train and test
+dataloders, which are returned.
+
+The user can pick:
+- batchsize
+- resolution:       8x8, 16x16, or 32x32 is supported (pass 8, 16, 32)
+- nonlinearity      "weak", "medium", or "strong"
+- fraction:         the amount of the data to use.
+- standard_scaling: boolean indicating if standard minmax scaling is used
+                    or if minmax scaling of the mean and spatial variations
+                    are both implemented.
+- FT:               the float type of the model
+- read:             a boolean indicating if the preprocessing parameters should be read
+- save:             a boolean indicating if the preprocessing parameters should be
+                    computed and read.
+- preprocess_params:filename where preprocessing parameters are stored or read from.
+
+"""
+function get_data_giorgini2d(batchsize, resolution, nonlinearity;
+                       f = 1.0,
+                       time_res = 1,
+                       FT=Float32,
+                       rng=Random.GLOBAL_RNG,
+                       standard_scaling = false,
+                       read = false,
+                       save = false,
+                       preprocess_params_file = "")
+    @assert xor(read, save)
+
+    rawtrain = Giorgini2D(:train; f=f, Tx=FT, resolution=resolution, nonlinearity = nonlinearity)[:];
+    rawtest = Giorgini2D(:test; f=f, Tx=FT, resolution=resolution, nonlinearity = nonlinearity)[:];
+
+    # Create train and test datasets
+    nobs_train = size(rawtrain)[end]
+    img_size = size(rawtrain)[1:end-1]
+    xtrain = reshape(rawtrain, (img_size..., 1, nobs_train))
+    nobs_test = size(rawtest)[end]
+    xtest = reshape(rawtest, (img_size..., 1, nobs_test))
+
+   # Scaling
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
 
 """
     get_data_ks(batchsize;

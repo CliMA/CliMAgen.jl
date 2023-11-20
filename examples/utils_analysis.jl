@@ -8,7 +8,7 @@ using Random
 using FFTW
 using DifferentialEquations
 using DelimitedFiles
-
+using Plots
 
 """
     autocorrelation_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
