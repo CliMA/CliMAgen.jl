@@ -33,10 +33,10 @@ function convert_to_symbol(string)
     end
 end
 
-experiment_toml="giorgini2d/Experiment_8_strong.toml"
+experiment_toml="giorgini2d/Experiment_8_medium.toml"
 params = TOML.parsefile(experiment_toml)
 params = CliMAgen.dict2nt(params)
-savedir = "output_8x8_strong"
+savedir = params.experiment.savedir
 resolution = params.data.resolution
 standard_scaling = params.data.standard_scaling
 fraction = params.data.fraction
@@ -47,7 +47,7 @@ pfile = JLD2.load_object(preprocess_params_file)
 N = 8
 α = FT(0.3)
 β = FT(0.5)
-γ = FT(10)
+γ = FT(1)
 σ = FT(2.0)
 T = 500000
 tau = 100
@@ -219,9 +219,8 @@ res = 5
 t = 50000
 t0 = 0.  
 
-pfile = joinpath(savedir, "preprocessing_standard_scaling_false.jld2")
 x = reshape(trj[:,1:res:res*t], (N,N,1,t))
-@time scores = Array(CliMAgen.score(model, Float32.(x), t0));
+@time scores = Array(CliMAgen.score(model, Float32.(x), t0))
 
 x = copy(trj[:,1:res:res*t])
 sc = reshape(scores,(N*N,t))
@@ -251,4 +250,4 @@ pl2 = plot!(1:res:n_tau, responseS_mean[2,1:Int(floor(n_tau/res))],label="score"
 
 pl = plot(pl1,pl2,layout=(1,2),size=(1000,500))
 display(pl)
-savefig(pl, "response_gamma_$γ.png")
+#savefig(pl, "response_gamma_$γ.png")

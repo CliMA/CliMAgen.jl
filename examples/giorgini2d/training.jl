@@ -17,6 +17,8 @@ using CliMAgen: train!, load_model_and_optimizer
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
 include("analysis.jl") # for analysis
+include("GetData.jl") # for data loading
+
 function convert_to_symbol(string)
     if string == "strong"
         return :strong
@@ -29,7 +31,7 @@ function convert_to_symbol(string)
     end
 end
 
-function run_training(params; FT=Float32, logger=nothing)
+function run_training(params, f_path; FT=Float32, logger=nothing)
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
@@ -81,14 +83,17 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders = get_data_giorgini2d(batchsize, resolution, nonlinearity;
-                                      f = fraction,
-                                      FT=FT,
-                                      rng=Random.GLOBAL_RNG,
-                                      standard_scaling = standard_scaling,
-                                      read = false,
-                                      save = true,
-                                      preprocess_params_file = preprocess_params_file)
+    # dataloaders = get_data_giorgini2d(batchsize, resolution, nonlinearity;
+    #                                   f = fraction,
+    #                                   FT=FT,
+    #                                   rng=Random.GLOBAL_RNG,
+    #                                   standard_scaling = standard_scaling,
+    #                                   read = false,
+    #                                   save = true,
+    #                                   preprocess_params_file = preprocess_params_file)
+
+    dataloaders = get_data(
+        f_path, "timeseries",batchsize)
 
     # set up model and optimizers
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
@@ -161,7 +166,7 @@ function run_training(params; FT=Float32, logger=nothing)
     )
 end
 
-function main(; experiment_toml="Experiment.toml")
+function main(f_path; experiment_toml="giorgini2d/Experiment.toml")
     FT = Float32
 
     # read experiment parameters from file
@@ -174,10 +179,10 @@ function main(; experiment_toml="Experiment.toml")
     # start logging if applicable
     logger = nothing
 
-    run_training(params; FT=FT, logger=logger)
+    run_training(params, f_path; FT=FT, logger=logger)
 
     if :sampling in keys(params)
-        run_analysis(params; FT=FT, logger=logger)
+        run_analysis(params, f_path; FT=FT, logger=logger)
     end
 
     # close the logger after the run to avoid hanging logger
@@ -186,6 +191,14 @@ function main(; experiment_toml="Experiment.toml")
     end
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    main(experiment_toml = ARGS[1])
-end
+# if abspath(PROGRAM_FILE) == @__FILE__
+#     main(experiment_toml = ARGS[1])
+# end
+FT = Float32
+toml_dict = TOML.parsefile("giorgini2d/Model.toml")
+α = FT(toml_dict["param_group"]["alpha"])
+β = FT(toml_dict["param_group"]["beta"])
+γ = FT(toml_dict["param_group"]["gamma"])
+σ = FT(toml_dict["param_group"]["sigma"])
+f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
+main(f_path)

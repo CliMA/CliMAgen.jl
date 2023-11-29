@@ -24,7 +24,7 @@ function convert_to_symbol(string)
         @error("Nonlinearity must be weak, medium, or strong.")
     end
 end
-function run_analysis(params; FT=Float32, logger=nothing)
+function run_analysis(params, f_path; FT=Float32, logger=nothing)
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
@@ -54,14 +54,17 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
-    dataloaders,_ = get_data_giorgini2d(batchsize, resolution, nonlinearity;
-                                      f = fraction,
-                                      FT=FT,
-                                      rng=Random.GLOBAL_RNG,
-                                      standard_scaling = standard_scaling,
-                                      read = false,
-                                      save = true,
-                                      preprocess_params_file = preprocess_params_file)
+    # dataloaders,_ = get_data_giorgini2d(batchsize, resolution, nonlinearity;
+    #                                   f = fraction,
+    #                                   FT=FT,
+    #                                   rng=Random.GLOBAL_RNG,
+    #                                   standard_scaling = standard_scaling,
+    #                                   read = false,
+    #                                   save = true,
+    #                                   preprocess_params_file = preprocess_params_file)
+
+    dataloaders = get_data(
+        f_path, "timeseries",batchsize)
 
     xtrain = first(dataloaders)
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
@@ -117,7 +120,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
 
 end
 
-function main(; experiment_toml="Experiment.toml")
+function main(; experiment_toml="giorgini2d/Experiment_8_strong.toml")
     FT = Float32
 
     # read experiment parameters from file
