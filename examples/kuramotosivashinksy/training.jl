@@ -163,7 +163,7 @@ function main(; experiment_toml="Experiment.toml")
     run_training(params; FT=FT, logger=logger)
 
     if :sampling in keys(params)
-        run_analysis(params; FT=FT, logger=logger)
+        run_analysis(params; FT=FT)
     end
 end
 

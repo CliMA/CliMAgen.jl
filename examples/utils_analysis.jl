@@ -6,7 +6,7 @@ using CUDA
 using Images
 using Random
 using FFTW
-using DifferentialEquations
+#using DifferentialEquations
 using DelimitedFiles
 using Plots
 

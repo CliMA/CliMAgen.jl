@@ -15,14 +15,14 @@ include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 include(joinpath(package_dir,"examples/utils_etl.jl"))
 
-function run_analysis(params; FT=Float32, logger=nothing)
+function run_analysis(params; FT=Float32)
 
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
 
-    batchsize = params.sampling.nsamples
+    batchsize = params.data.batchsize
     fraction = params.data.fraction
     standard_scaling = params.data.standard_scaling
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
@@ -32,7 +32,6 @@ function run_analysis(params; FT=Float32, logger=nothing)
     inchannels = params.model.inchannels
 
     make_samples = params.sampling.make_samples
-    samples_file = params.sampling.samples_file
     nsamples = params.sampling.nsamples
     nimages = params.sampling.nimages
     nsteps = params.sampling.nsteps
@@ -60,7 +59,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
                        save=false,
                        FT=FT
                        )
-    xtrain = cat([x for x in dl]..., dims=4)
+    xtrain = cat([x for x in dl]..., dims=4);
     # To use Images.Gray, we need the input to be between 0 and 1.
     # Obtain max and min here using the whole data set
     maxtrain = maximum(xtrain, dims=(1, 2, 4))
@@ -88,56 +87,50 @@ function run_analysis(params; FT=Float32, logger=nothing)
             samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
         end
         samples = cpu(samples)
+        outputdir = savedir
+        lr = ones(FT, nsamples)
     else
-        samples = read_from_hdf5(samples_file)
+        k_bias::FT = params.sampling.k_bias
+        shift = params.sampling.shift
+        samplesdir = joinpath(savedir, "bias_$(k_bias)_shift_$shift")
+        samples_file = params.sampling.samples_file
+        samples = read_from_hdf5(; hdf5_path = joinpath(samplesdir, samples_file))
+        outputdir = samplesdir
+
+
+    
+        # set up bias for space-time mean
+        indicator = zeros(FT, n_pixels, n_time, inchannels)
+        indicator[div(n_pixels, 4):3*div(n_pixels, 4), div(n_time, 4):3*div(n_time, 4), :] .= 1
+        indicator = device(indicator)
+
+        A(x; indicator = indicator) = sum(indicator .* x, dims=(1, 2, 3)) ./ sum(indicator, dims=(1, 2, 3))
+        # Compute normalization using all of the data
+        Z = mean(exp.(k_bias .* A(device(xtrain))))
+        lr = Z.*exp.(-k_bias .*A(samples; indicator = cpu(indicator)))[:]
     end
 
     # Autocorrelation code 
     # Expects a timeseries of of a scalar: of size nsteps x nbatch
     # Restrict to the first nsamples so that the uncertainties are comparable
-    autocorrelation_plot(xtrain[64,:,1,1:nsamples], samples[64,:,1,:], savedir, "autocorr.png";logger=logger)
+    autocorrelation_plot(xtrain[64,:,1,1:nsamples], samples[64,:,1,:], outputdir, "autocorr.png")
     duration = 16 # autocorrelation time is 10
     observable(x) = mean(x[64,64-div(duration,2):64+div(duration,2)-1,1,:], dims = 1)[:]
-    lr = ones(FT, nsamples) # no biasing, likelihood ratio is 1.
-    event_probability_plot(observable(xtrain), observable(samples), lr, savedir, "event_probability_$duration.png"; logger=logger)
-
-    # To compute the return time, we need more care. We need a time interval associated with this event in 
-    # order to turn a probability into a return time. 
-    
-    # It would be wrong to use the length of the timeseries per sample, because our metric only
-    # extracted one event from each sample. The event could happen more than once per sample.
-
-    # If the event duration is much longer than the autocorrelation time, I think we could use the event duration
-    # directly: within each sample of length n_time > duration >> autocorrelation time, we could extract one
-    # independent sample of length duration, as we do above.
-    # If instead we had carried out a direct numerical simulation
-    # and split it into blocks of length duration, we would get the same result because the blocks would be ~independent.
-
-    # The issue arises if the event duration is comparable to or shorter than the autocorrelation time. 
-    # In this case, if we 
-    # had carried out a direct numerical simulation and split it into blocks of length duration,
-    # the blocks would no longer be fully independent. Since these do not agree, I dont think it's the
-    # right thing to do.
-
-    # Instead, follow Ragone: split each sample into many blocks
-    # of length duration and take the maximum. Then even if they are correlated, we return an independent 
-    # sample per n_time.
-    metric_return_time(y) = maximum(mapslices(x -> block_applied_func(x, mean, duration), y[64, :, 1, :], dims = 1), dims = 1)[:]
-    return_curve_plot(metric_return_time(xtrain), metric_return_time(samples), FT(n_time), savedir, "return_curve_$duration.png"; logger=logger)
+    event_probability_plot(observable(xtrain), observable(samples), lr, outputdir, "event_probability_$(duration).png")
 
     # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
+    spatial_mean_plot(xtrain, samples, outputdir, "spatial_mean_distribution.png")
     
     # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain[:,:,:, 1:nsamples], samples, savedir, "qq_plot.png", logger=logger)
+    qq_plot(xtrain[:,:,:, 1:size(samples)[end]], samples, outputdir, "qq_plot.png")
 
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
     xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     samples = @. (samples - mintrain) / (maxtrain - mintrain)
 
-    img_plot(samples[:, :, [1], 1:nimages], savedir, "$(sampler)_images_ch1.png")
-    img_plot(xtrain[:, :, [1], 1:nimages], savedir, "train_images_ch1.png")
+    img_plot(samples[:, :, [1], 1:nimages], outputdir, "$(sampler)_images_ch1.png")
+    img_plot(xtrain[:, :, [1], 1:nimages], outputdir, "train_images_ch1.png")
     loss_plot(savedir, "losses.png"; xlog = false, ylog = true)    
 end
 
