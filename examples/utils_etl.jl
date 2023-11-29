@@ -5,7 +5,7 @@ using CliMAgen
 using CUDA
 using Images
 using Random
-using DifferentialEquations
+
 using DelimitedFiles
 using DataFrames
 using HDF5
@@ -94,7 +94,7 @@ end
 Reads in and allocates memory to hold the data stored in `key`
 in the hdf5 file found at `hdf5_path`.
 """
-function read_from_hdf5(key = "generated_samples", hdf5_path="samples.hdf5")
+function read_from_hdf5(;key = "generated_samples", hdf5_path="samples.hdf5")
 
     fid = HDF5.h5open(hdf5_path, "r")
 
@@ -111,7 +111,6 @@ Saves `samples` to the hdf5 file found at `hdf5_path` under key `key`.
 """
 function drop_to_hdf5(samples; key = "generated_samples", hdf5_path="samples.hdf5")
     # set up HDF5
-    hdf5_path = joinpath(savedir, samples_file)
     fid = HDF5.h5open(hdf5_path, "w")
     fid["generated_samples"] = samples
     close(fid)
