@@ -110,8 +110,7 @@ Saves `samples` to the hdf5 file found at `hdf5_path` under key `key`.
 """
 function drop_to_hdf5(samples; key = "generated_samples", hdf5_path="samples.hdf5")
     # set up HDF5
-    hdf5_path = joinpath(savedir, samples_file)
     fid = HDF5.h5open(hdf5_path, "w")
-    fid["generated_samples"] = samples
+    fid[key] = samples
     close(fid)
 end
