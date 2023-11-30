@@ -15,6 +15,7 @@ using CliMAgen: expand_dims, MeanSpatialScaling, StandardScaling, apply_preproce
 using Distributions
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
+include("GetData.jl")
 
 include("./utils.jl")
 include("./rhs.jl")
@@ -33,7 +34,7 @@ function convert_to_symbol(string)
     end
 end
 
-experiment_toml="giorgini2d/Experiment_8_medium.toml"
+experiment_toml="giorgini2d/Experiment.toml"
 params = TOML.parsefile(experiment_toml)
 params = CliMAgen.dict2nt(params)
 savedir = params.experiment.savedir
@@ -44,15 +45,18 @@ nonlinearity = convert_to_symbol(params.data.nonlinearity)
 preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 pfile = JLD2.load_object(preprocess_params_file)
 
-N = 8
-α = FT(0.3)
-β = FT(0.5)
-γ = FT(1)
-σ = FT(2.0)
-T = 500000
-tau = 100
+FT = Float32
+toml_dict = TOML.parsefile("giorgini2d/Model.toml")
+α = FT(toml_dict["param_group"]["alpha"])
+β = FT(toml_dict["param_group"]["beta"])
+γ = FT(toml_dict["param_group"]["gamma"])
+σ = FT(toml_dict["param_group"]["sigma"])
 dt = FT(0.1)
-dt_save = 10*dt
+dt_save = FT(1.0)
+N = toml_dict["param_group"]["N"]
+f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
+tau = 100
+T = 100000
 n_tau = Int(tau/dt_save)
 n_T = Int(floor(T/dt_save))
 
@@ -134,18 +138,11 @@ u0 = 2*rand(FT, N^2).-1
 trj = trajectory(u0, tspan, dt, dt_save, rand(Int))
 trj = scaling2D(trj)
 
-
-dataloaders,_ = get_data_giorgini2d(4000, resolution, nonlinearity;
-                                      f = fraction,
-                                      FT=FT,
-                                      rng=Random.GLOBAL_RNG,
-                                      standard_scaling = standard_scaling,
-                                      read = false,
-                                      save = true,
-                                      preprocess_params_file = preprocess_params_file)
+dataloaders,_ = get_data(
+        f_path, "timeseries",100)
 
 dataf = first(dataloaders)
-trj2 = reshape(dataf, (N^2,4000))
+trj2 = reshape(dataf, (N^2,size(dataf)[4]))
 
 pl1 = plot(trj[1,1:1:1000],title="time series",xlabel="time",linewidth=3,label="")
 
@@ -216,7 +213,7 @@ checkpoint_path = joinpath(savedir, "checkpoint.bson")
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
 
 res = 5
-t = 50000
+t = 10000
 t0 = 0.  
 
 x = reshape(trj[:,1:res:res*t], (N,N,1,t))

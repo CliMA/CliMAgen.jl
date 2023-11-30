@@ -29,7 +29,7 @@ dt_save = FT(toml_dict["param_group"]["dt_save"])
 N = toml_dict["param_group"]["N"]
 seed = toml_dict["param_group"]["seed"]
 
-pfile = JLD2.load_object("giorgini2d/preprocessing_standard_scaling_false.jld2")
+pfile = JLD2.load_object("output/preprocessing_standard_scaling_false.jld2")
 
 function scaling2D(x; pfile=pfile, FT=Float32)
     return reshape(apply_preprocessing(reshape(x,(N,N,1,size(x)[2])), pfile), (N^2,size(x)[2]))
