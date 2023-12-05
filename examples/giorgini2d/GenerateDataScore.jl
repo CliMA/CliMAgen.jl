@@ -28,8 +28,7 @@ dt = FT(toml_dict["param_group"]["dt"])
 dt_save = FT(toml_dict["param_group"]["dt_save"])
 N = toml_dict["param_group"]["N"]
 seed = toml_dict["param_group"]["seed"]
-
-pfile = JLD2.load_object("output/preprocessing_standard_scaling_false.jld2")
+preprocess_params_file = "output/preprocessing_standard_scaling_false.jld2"
 
 function scaling2D(x; pfile=pfile, FT=Float32)
     return reshape(apply_preprocessing(reshape(x,(N,N,1,size(x)[2])), pfile), (N^2,size(x)[2]))
@@ -71,6 +70,10 @@ for i in 1:nsteps
         solution[:, save_index+1] .= reshape(u, (N^2,))
     end
 end
+
+preprocessing(reshape(solution,(N,N,1,size(solution)[2])), preprocess_params_file)
+
+pfile = JLD2.load_object(preprocess_params_file)
 
 solution = scaling2D(solution)
 
