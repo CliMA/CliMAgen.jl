@@ -1,11 +1,9 @@
 .DS_Store
 
-/Manifest.toml
 
 output/
 examples/2dturbulence/*out
 examples/2dturbulence/experiments
-examples/Manifest.toml
 examples/2dturbulence/*sh
 examples/uniform/*sh
 examples/uniform/experiments

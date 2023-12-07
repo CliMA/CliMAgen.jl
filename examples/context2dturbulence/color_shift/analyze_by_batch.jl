@@ -1,8 +1,9 @@
 ## Script for generating metrics of interest on the generated images ##
 
 using BSON
-using CUDA
 using Flux
+using CUDA
+using cuDNN
 using ProgressMeter
 using Plots
 using Random

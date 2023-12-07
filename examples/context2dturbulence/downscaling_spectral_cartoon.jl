@@ -1,6 +1,7 @@
 using BSON
-using CUDA
 using Flux
+using CUDA
+using cuDNN
 using Images
 using ProgressMeter
 using Random

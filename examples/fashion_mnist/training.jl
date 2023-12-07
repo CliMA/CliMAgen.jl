@@ -1,6 +1,7 @@
-using CUDA
-using Dates
 using Flux
+using CUDA
+using cuDNN
+using Dates
 using Random
 using TOML
 
