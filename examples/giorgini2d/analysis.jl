@@ -10,31 +10,17 @@ using Statistics
 using TOML
 using CliMAgen
 
-package_dir = pkgdir(CliMAgen)
-include(joinpath(package_dir,"examples/utils_data.jl"))
-include(joinpath(package_dir,"examples/utils_analysis.jl"))
-function convert_to_symbol(string)
-    if string == "strong"
-        return :strong
-    elseif string == "medium"
-        return :medium
-    elseif string == "weak"
-        return :weak
-    else
-        @error("Nonlinearity must be weak, medium, or strong.")
-    end
-end
-function run_analysis(params, f_path; FT=Float32, logger=nothing)
-    savedir = params.experiment.savedir
+# run from giorgni2d
+include("../utils_data.jl") # for data loading
+include("../utils_analysis.jl") # for data loading
+include("GetData.jl") # for data loading
+
+function run_analysis(params, f_path, savedir; FT=Float32)
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     
     batchsize = params.data.batchsize
-    resolution = params.data.resolution
     fraction = params.data.fraction
-    nonlinearity = convert_to_symbol(params.data.nonlinearity) 
-    standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
     inchannels = params.model.noised_channels
     nsamples = params.sampling.nsamples
@@ -53,25 +39,16 @@ function run_analysis(params, f_path; FT=Float32, logger=nothing)
         @info "Sampling on CPU"
     end
 
-    # set up dataset
-    # dataloaders,_ = get_data_giorgini2d(batchsize, resolution, nonlinearity;
-    #                                   f = fraction,
-    #                                   FT=FT,
-    #                                   rng=Random.GLOBAL_RNG,
-    #                                   standard_scaling = standard_scaling,
-    #                                   read = false,
-    #                                   save = true,
-    #                                   preprocess_params_file = preprocess_params_file)
+    train_dataloader, test_dataloader = get_data(
+        f_path, "snapshots",batchsize)
 
-    dataloaders = get_data(
-        f_path, "timeseries",batchsize)
-
-    xtrain = first(dataloaders)
+    xtrain = first(train_dataloader)
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model)
     
     # sample from the trained model
+    resolution = size(xtrain)[1]
     time_steps, Δt, init_x = setup_sampler(
         model,
         device,
@@ -86,15 +63,10 @@ function run_analysis(params, f_path; FT=Float32, logger=nothing)
         samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
     end
     samples = cpu(samples) 
-# To convert back to real space
-#    scaling = JLD2.load_object(preprocess_params_file)
-#    samples .= CliMAgen.invert_preprocessing(samples, scaling)
-#    xtrain .= CliMAgen.invert_preprocessing(xtrain, scaling)
 
-
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png", logger=logger)
-    qq_plot(xtrain, samples, savedir, "qq_plot.png", logger=logger)
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png", logger=logger)
+    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
+    qq_plot(xtrain, samples, savedir, "qq_plot.png")
+    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png")
 
     # create plots with nimages images of sampled data and training data
     for ch in 1:inchannels
@@ -120,15 +92,25 @@ function run_analysis(params, f_path; FT=Float32, logger=nothing)
 
 end
 
-function main(; experiment_toml="giorgini2d/Experiment_8_strong.toml")
+function main(;model_toml="Model.toml", experiment_toml="Experiment.toml")
     FT = Float32
+    toml_dict = TOML.parsefile(model_toml)
+    α = FT(toml_dict["param_group"]["alpha"])
+    β = FT(toml_dict["param_group"]["beta"])
+    γ = FT(toml_dict["param_group"]["gamma"])
+    σ = FT(toml_dict["param_group"]["sigma"])
+    f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
 
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
-    run_analysis(params; FT=FT, logger=nothing)
+
+    savedir = "$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
+    # set up directory for saving checkpoints
+    !ispath(savedir) && mkpath(savedir)
+    run_analysis(params, f_path, savedir; FT=FT)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(experiment_toml=ARGS[1])
+    main(; model_toml = ARGS[1], experiment_toml=ARGS[2])
 end

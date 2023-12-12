@@ -14,35 +14,17 @@ using CliMAgen: score_matching_loss
 using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
 
-package_dir = pkgdir(CliMAgen)
-include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
-include("analysis.jl") # for analysis
+# run from giorgni2d
+include("../utils_data.jl") # for data loading
 include("GetData.jl") # for data loading
 
-function convert_to_symbol(string)
-    if string == "strong"
-        return :strong
-    elseif string == "medium"
-        return :medium
-    elseif string == "weak"
-        return :weak
-    else
-        @error("Nonlinearity must be weak, medium, or strong.")
-    end
-end
-
-function run_training(params, f_path; FT=Float32, logger=nothing)
+function run_training(params, f_path, savedir; FT=Float32)
     # unpack params
-    savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
 
     batchsize = params.data.batchsize
-    resolution = params.data.resolution
     fraction = params.data.fraction
-    nonlinearity = convert_to_symbol(params.data.nonlinearity) 
-    standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
@@ -82,18 +64,8 @@ function run_training(params, f_path; FT=Float32, logger=nothing)
         @info "Training on CPU"
     end
 
-    # set up dataset
-    # dataloaders = get_data_giorgini2d(batchsize, resolution, nonlinearity;
-    #                                   f = fraction,
-    #                                   FT=FT,
-    #                                   rng=Random.GLOBAL_RNG,
-    #                                   standard_scaling = standard_scaling,
-    #                                   read = false,
-    #                                   save = true,
-    #                                   preprocess_params_file = preprocess_params_file)
-
     dataloaders = get_data(
-        f_path, "timeseries",batchsize)
+        f_path, "snapshots",batchsize)
 
     # set up model and optimizers
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
@@ -161,44 +133,30 @@ function run_training(params, f_path; FT=Float32, logger=nothing)
         device;
         start_epoch = start_epoch,
         savedir = savedir,
-        logger = logger,
+        logger = nothing,
         freq_chckpt = freq_chckpt,
     )
 end
 
-function main(f_path; experiment_toml="giorgini2d/Experiment.toml")
+function main(; model_toml="Model.toml", experiment_toml="Experiment.toml")
     FT = Float32
+    toml_dict = TOML.parsefile(model_toml)
+    α = FT(toml_dict["param_group"]["alpha"])
+    β = FT(toml_dict["param_group"]["beta"])
+    γ = FT(toml_dict["param_group"]["gamma"])
+    σ = FT(toml_dict["param_group"]["sigma"])
+    f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
 
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
 
+    savedir = "$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
     # set up directory for saving checkpoints
-    !ispath(params.experiment.savedir) && mkpath(params.experiment.savedir)
-
-    # start logging if applicable
-    logger = nothing
-
-    run_training(params, f_path; FT=FT, logger=logger)
-
-    if :sampling in keys(params)
-        run_analysis(params, f_path; FT=FT, logger=logger)
-    end
-
-    # close the logger after the run to avoid hanging logger
-    if ~(logger isa Nothing)
-        close(logger)
-    end
+    !ispath(savedir) && mkpath(savedir)
+    run_training(params, f_path, savedir; FT=FT)
 end
 
-# if abspath(PROGRAM_FILE) == @__FILE__
-#     main(experiment_toml = ARGS[1])
-# end
-FT = Float32
-toml_dict = TOML.parsefile("giorgini2d/Model.toml")
-α = FT(toml_dict["param_group"]["alpha"])
-β = FT(toml_dict["param_group"]["beta"])
-γ = FT(toml_dict["param_group"]["gamma"])
-σ = FT(toml_dict["param_group"]["sigma"])
-f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
-main(f_path)
+if abspath(PROGRAM_FILE) == @__FILE__
+    main(; model_toml = ARGS[1], experiment_toml=ARGS[2])
+end

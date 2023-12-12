@@ -215,8 +215,8 @@ BSON.@load checkpoint_path model model_smooth opt opt_smooth
 res = 5
 t = 10000
 t0 = 0.  
-
-x = reshape(trj[:,1:res:res*t], (N,N,1,t))
+@info "loading score function"
+x = CuArray(reshape(trj[:,1:res:res*t], (N,N,1,t)))
 @time scores = Array(CliMAgen.score(model, Float32.(x), t0))
 
 x = copy(trj[:,1:res:res*t])
