@@ -48,7 +48,6 @@ dt_save = FT(toml_dict["param_group"]["dt_save"]) # timestep between saves
 N = toml_dict["param_group"]["N"] # size of image in one direction
 seed = toml_dict["param_group"]["seed"]
 
-# Create correlation matrix
 Γ = FT.(reshape(zeros(N^4), (N^2,N^2)))
 for i1 in 1:N
     for j1 in 1:N
