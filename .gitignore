@@ -22,3 +22,5 @@ examples/uniform/experiments
 *.out
 *.hdf5 
 *.jld2 
+*.txt
+*.toml
