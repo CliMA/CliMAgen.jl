@@ -51,6 +51,8 @@ for i in 1:N^2
     lines!(lagsL, responseL[i, :], color=(:green, 0.5), strokewidth = 1.5, label = "Linear")
     if i ==1
         axislegend(; position= :rt, labelsize=16)
+    else
+        hidedecorations!(ax)
     end
 end
 display(fig)
