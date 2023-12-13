@@ -46,6 +46,7 @@ model = dev(model)
 t0 = 0.0
 @info "loading score function"
 r_trj = reshape(trj, (M, N, 1, L))
+decorrelation = max(floor(Int, decorrelation/10), 1)
 decorrelated_indices = 1:decorrelation:L
 r_trj_decorrelated = r_trj[:, :, [1], decorrelated_indices]
 L_decorrelated = size(r_trj_decorrelated )[end]
@@ -64,8 +65,9 @@ responseS = zeros(M*N, M*N, length(lag_indices))
 
 for i in ProgressBar(eachindex(lag_indices))
     li = lag_indices[i]
-    xt = transpose(trj[:, li:decorrelation:end][:, 1:nbatches*batchsize])
-    responseS[:, :, i] = -cov(xt, sct)
+    xt = transpose(trj[:, li:decorrelation:end])
+    L = min(nbatches*batchsize, size(xt)[1])
+    responseS[:, :, i] = -cov(xt[1:L, :], sct[1:L, :])
 end
 
 responseS_normalized_left = zeros(N^2, N^2, length(lag_indices))
