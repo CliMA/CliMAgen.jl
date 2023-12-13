@@ -416,7 +416,7 @@ The user can pick:
 
 """
 function get_data_correlated_ou2d_timeseries(batchsize;
-                                 pairs_per_τ = 1,
+                                 ntime = 16,
                                  f = 1.0,
                                  resolution=32,
                                  FT=Float32,
@@ -428,46 +428,48 @@ function get_data_correlated_ou2d_timeseries(batchsize;
                                  
     @assert xor(read, save)
 
+    # TODO: this is an extremly memory inefficient way of creating the dataloaders
     rawtrain = CliMADatasets.CorrelatedOU2D(:train; f = f, resolution=resolution, Tx=FT);
     samp_per_τ = Int(round(rawtrain.metadata["τ"]/ rawtrain.metadata["dt_save"]))
     rawtrain = rawtrain.features
     rawtest = CliMADatasets.CorrelatedOU2D(:test; f = f, resolution=resolution, Tx=FT)[:]
 
     # Create train and test datasets
+    stride = Int(samp_per_τ)
+    @assert stride > ntime
 
-    @assert pairs_per_τ <= samp_per_τ/2
-    stride = Int(floor(samp_per_τ/pairs_per_τ))
-    
     nsamp_train = size(rawtrain)[end]
-    npairs_train = length(Array(1:stride:(nsamp_train-1)))
-    xtrain  = zeros(FT, (resolution, resolution, 2, npairs_train))
-    xtrain[:,:,1,:] .= rawtrain[:,:,1:stride:(nsamp_train-1)]
-    xtrain[:,:,2,:] .= rawtrain[:,:,2:stride:nsamp_train]
+    nseries_train = div(nsamp_train, stride) 
+    xtrain  = zeros(FT, (resolution, resolution, ntime, 1, nseries_train))
+    for i in 1:ntime
+        xtrain[:,:,i,1,:] .= rawtrain[:,:,i:stride:(nsamp_train-rem(nsamp_train, stride))]
+    end
 
     nsamp_test = size(rawtest)[end]
-    npairs_test = length(Array(1:stride:(nsamp_test-1)))
-    xtest  = zeros(FT, (resolution, resolution, 2, npairs_test))
-    xtest[:,:,1,:] .= rawtest[:,:,1:stride:(nsamp_test-1)]
-    xtest[:,:,2,:] .= rawtest[:,:,2:stride:nsamp_test]
+    nseries_test = div(nsamp_test, stride)
+    xtest  = zeros(FT, (resolution, resolution, ntime, 1, nseries_test))
+    for i in 1:ntime
+        xtest[:,:,i,1,:] .= rawtest[:,:,i:stride:(nsamp_test-rem(nsamp_test, stride))]
+    end
 
     # Scaling
     if save
         if standard_scaling
-            maxtrain = maximum(xtrain, dims=(1, 2, 4))
-            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            maxtrain = maximum(xtrain, dims=(1, 2, 3, 5))
+            mintrain = minimum(xtrain, dims=(1, 2, 3, 5))
             Δ = maxtrain .- mintrain
             # To prevent dividing by zero
             Δ[Δ .== 0] .= FT(1)
             scaling = StandardScaling{FT}(mintrain, Δ)
         else
             #scale means and spatial variations separately
-            x̄ = mean(xtrain, dims=(1, 2))
-            maxtrain_mean = maximum(x̄, dims=4)
-            mintrain_mean = minimum(x̄, dims=4)
+            x̄ = mean(xtrain, dims=(1, 2, 3))
+            maxtrain_mean = maximum(x̄, dims=5)
+            mintrain_mean = minimum(x̄, dims=5)
             Δ̄ = maxtrain_mean .- mintrain_mean
             xp = xtrain .- x̄
-            maxtrain_p = maximum(xp, dims=(1, 2, 4))
-            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            maxtrain_p = maximum(xp, dims=(1, 2, 3, 5))
+            mintrain_p = minimum(xp, dims=(1, 2, 3, 5))
             Δp = maxtrain_p .- mintrain_p
 
             # To prevent dividing by zero
@@ -480,9 +482,9 @@ function get_data_correlated_ou2d_timeseries(batchsize;
         scaling = JLD2.load_object(preprocess_params_file)
     end
     
-    xtrain .= apply_preprocessing(xtrain, scaling)
+    xtrain .= apply_preprocessing(xtrain, scaling, nspatial=3)
     # apply the same rescaler as on training set
-    xtest .= apply_preprocessing(xtest, scaling)
+    xtest .= apply_preprocessing(xtest, scaling, nspatial=3)
 
     xtrain = MLUtils.shuffleobs(rng, xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
@@ -526,6 +528,28 @@ function get_data_mnist(batchsize; tilesize=32, FT=Float32)
     xtest = Images.imresize(xtest, (tilesize, tilesize))
     xtest = reshape(xtest, tilesize, tilesize, 1, :)
     xtest = @. 2xtest - 1
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+"""
+Helper function that loads MNIST3D images and returns loaders.
+"""
+function get_data_mnist_3d(batchsize; FT=Float32)
+    xtrain = CliMADatasets.MNIST3D(:train; Tx=FT)[:]
+    xtrain = reshape(xtrain, 64, 64, 20, 1, :)
+    xtrain = xtrain[:,:,1:16,:,:]
+    xtrain_max = 255
+    xtrain = @. (2xtrain - xtrain_max) / xtrain_max
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+
+    xtest = CliMADatasets.MNIST3D(:test; Tx=FT)[:]
+    xtest = reshape(xtest, 64, 64, 20, 1, :)
+    xtest = xtest[:,:,1:16,:,:]
+    xtest_max = 255
+    xtest = @. (2xtest - xtest_max) / xtest_max
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
     return (; loader_train, loader_test)

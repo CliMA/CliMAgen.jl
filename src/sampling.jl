@@ -25,6 +25,7 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
                                 time_steps,
                                 Δt;
                                 c=nothing,
+                                nspatial=2,
                                 forward = false,
                                 rng = MersenneTwister(1234),
                                 )::A where {A}
@@ -35,11 +36,11 @@ function Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
         g = CliMAgen.diffusion(model, batch_time_step)
         if forward
-            x .= x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
+            x .= x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, nspatial+1) .* randn!(rng, z)
         else
         score .= CliMAgen.score(model, x, batch_time_step; c=c)
-        mean_x .= x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
-        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
+        mean_x .= x .+ CliMAgen.expand_dims(g, nspatial+1) .^ 2 .* score .* Δt
+        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, nspatial+1) .* randn!(rng, z)
         end
     end
     return x
@@ -75,10 +76,12 @@ function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
                                 bias=nothing,
                                 use_shift=false,
                                 c=nothing,
+                                nspatial=2,
                                 forward = false,
                                 rng = MersenneTwister(1234)
                                 )::A where {A}
     x = mean_x = init_x
+
     # Preallocate
     score = similar(x)
     z = similar(x)
@@ -87,12 +90,11 @@ function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
         shift = similar(x)
     end
     
-
     @showprogress "Euler-Maruyama Sampling" for time_step in time_steps
         batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
         g = CliMAgen.diffusion(model, batch_time_step)
         if forward
-            x .= x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
+            x .= x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, nspatial+1) .* randn!(rng, z)
         else
             if bias isa Nothing
                 score .= CliMAgen.score(model, x, batch_time_step; c=c)
@@ -106,8 +108,8 @@ function Euler_Maruyama_ld_sampler(model::CliMAgen.AbstractDiffusionModel,
                 end
                 score .= CliMAgen.score(model, x .+ shift, batch_time_step; c=c) .+ bias_drift
             end
-        mean_x .= x .+ CliMAgen.expand_dims(g, 3) .^ 2 .* score .* Δt
-        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, 3) .* randn!(rng, z)
+        mean_x .= x .+ CliMAgen.expand_dims(g, nspatial+1) .^ 2 .* score .* Δt
+        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, nspatial+1) .* randn!(rng, z)
         end
     end
     return x
@@ -183,14 +185,24 @@ function setup_sampler(model::CliMAgen.AbstractDiffusionModel,
                        noised_channels;
                        num_images = 5,
                        num_steps=500,
-                       ϵ=1.0f-3)
+                       ϵ=1.0f-3,
+                       nspatial=2,
+                       ntime=nothing,
+                       FT=Float32,
+                       )
 
-    t = ones(Float32, num_images) |> device
-    init_z = randn(Float32, (tilesize, tilesize, noised_channels, num_images)) |> device
+    t = ones(FT, num_images) |> device
+    if nspatial == 2
+        init_z = randn(FT, (tilesize, tilesize, noised_channels, num_images)) |> device
+        @assert ntime isa Nothing
+    elseif nspatial == 3
+        init_z = randn(FT, (tilesize, tilesize, ntime, noised_channels, num_images)) |> device
+    else
+        error("$nspatial must be 2 or 3.")
+    end
     _, σ_T = CliMAgen.marginal_prob(model, zero(init_z), t)
     init_x = (σ_T .* init_z)
     time_steps = LinRange(1.0f0, ϵ, num_steps)
     Δt = time_steps[1] - time_steps[2]
-    
     return time_steps, Δt, init_x
 end

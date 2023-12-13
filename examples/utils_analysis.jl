@@ -165,14 +165,24 @@ Creates and saves histogram plots of the spatial means of `data` and `gen`;
 the plot is saved at joinpath(savepath, plotname). Both `data` and `gen`
 are assumed to be of size (Nx, Ny, Nchannels, Nbatch).
 """
-function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
+function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2, logger=nothing)
+    @assert nspatial <= 3
     inchannels = size(data)[end-1]
 
-    gen = gen |> Flux.cpu
-    gen_results = mapslices(Statistics.mean, gen, dims=[1, 2])
+    if nspatial == 3
+        sz = size(data)
+        data_rs = reshape(data, (sz[1], sz[2], sz[4], sz[3]*sz[5]))
+        gen_rs = reshape(gen, (sz[1], sz[2], sz[4], sz[3]*sz[5]))
+    else
+        data_rs = data
+        gen_rs = gen 
+    end
+
+    gen_rs = gen_rs |> Flux.cpu
+    gen_results = mapslices(Statistics.mean, gen_rs, dims=[1, 2])
     gen_results = gen_results[1,1,:,:]
 
-    data_results = mapslices(Statistics.mean, data, dims=[1, 2])
+    data_results = mapslices(Statistics.mean, data_rs, dims=[1, 2])
     data_results = data_results[1,1,:,:]
     plot_array = []
     for channel in 1:inchannels
@@ -184,10 +194,6 @@ function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, logger=not
     
     plot(plot_array..., layout=(1, inchannels))
     Plots.savefig(joinpath(savepath, plotname))
-
-    if !(logger isa Nothing)
-        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
-    end
 end
 
 """
@@ -197,19 +203,29 @@ Creates and saves qq plots of the higher order cumulants of `data` and `gen`;
 the plot is saved at joinpath(savepath, plotname). Both `data` and `gen`
 are assumed to be of size (Nx, Ny, Nchannels, Nbatch).
 """
-function qq_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
+function qq_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2, logger=nothing)
+    @assert nspatial <= 3
     statistics = (Statistics.var, x -> StatsBase.cumulant(x[:], 3), x -> StatsBase.cumulant(x[:], 4))
     statistic_names = ["σ²", "κ₃", "κ₄"]
     inchannels = size(data)[end-1]
 
-    gen = gen |> Flux.cpu
-    gen_results = mapslices.(statistics, Ref(gen), dims=[1, 2])
-    gen_results = cat(gen_results..., dims=ndims(gen) - 2)
+    if nspatial == 3
+        sz = size(data)
+        data_rs = reshape(data, (sz[1], sz[2], sz[4], sz[3]*sz[5]))
+        gen_rs = reshape(gen, (sz[1], sz[2], sz[4], sz[3]*sz[5]))
+    else
+        data_rs = data
+        gen_rs = gen 
+    end
+
+    gen_rs = gen_rs |> Flux.cpu
+    gen_results = mapslices.(statistics, Ref(gen_rs), dims=[1, 2])
+    gen_results = cat(gen_results..., dims=ndims(gen_rs) - 2)
     sort!(gen_results, dims=ndims(gen_results)) # CDF of the generated data for each channel and each statistics
 
 
-    data_results = mapslices.(statistics, Ref(data), dims=[1, 2])
-    data_results = cat(data_results..., dims=ndims(data) - 2)
+    data_results = mapslices.(statistics, Ref(data_rs), dims=[1, 2])
+    data_results = cat(data_results..., dims=ndims(data_rs) - 2)
     sort!(data_results, dims=ndims(data_results)) # CDF of the  data for each channel and each statistics
     plot_array = []
     for channel in 1:inchannels
@@ -229,10 +245,6 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing)
 
     plot(plot_array..., layout=(inchannels, length(statistics)), aspect_ratio=:equal)
     Plots.savefig(joinpath(savepath, plotname))
-
-    if !(logger isa Nothing)
-        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
-    end
 end
 
 """
@@ -264,16 +276,26 @@ Both `data` and `gen` are assumed to be of size (Nx, Ny, Nchannels, Nbatch).
 Confidence intervals are computed using the difference batch members as different
 samples.
 """
-function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing) 
-    statistics = x -> hcat(power_spectrum2d(x)...)
+function spectrum_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2, logger=nothing) 
+    @assert nspatial <= 3
     inchannels = size(data)[end-1]
+    statistics = x -> hcat(power_spectrum2d(x)...)
 
-    data_results = mapslices(statistics, data, dims=[1, 2])
+    if nspatial == 3
+        sz = size(data)
+        data_rs = reshape(data, (sz[1], sz[2], sz[4], sz[3]*sz[5]))
+        gen_rs = reshape(gen, (sz[1], sz[2], sz[4], sz[3]*sz[5]))
+    else
+        data_rs = data
+        gen_rs = gen 
+    end    
+
+    data_results = mapslices(statistics, data_rs, dims=[1, 2])
     k = data_results[:, 2, 1, 1]
     data_results = data_results[:, 1, :, :]
 
-    gen = gen |> Flux.cpu
-    gen_results = mapslices(statistics, gen, dims=[1, 2])
+    gen_rs = gen_rs |> Flux.cpu
+    gen_results = mapslices(statistics, gen_rs, dims=[1, 2])
     gen_results = gen_results[:, 1, :, :]
 
     plot_array = []
@@ -298,10 +320,6 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, logger=nothing
 
     plot(plot_array..., layout=(inchannels, 1))
     Plots.savefig(joinpath(savepath, plotname))
-
-    if !(logger isa Nothing)
-        CliMAgen.log_artifact(logger, joinpath(savepath, plotname); name=plotname, type="PNG-file")
-    end
 end
 
 """

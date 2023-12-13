@@ -16,6 +16,5 @@ examples/uniform/experiments
 *.ico
 *.svg
 *.bson
-*.toml
 *.sh
 *.out
