@@ -55,6 +55,7 @@ u = 2*rand(FT, N^2).-1
 u .= atanh(-α/β)/γ
 
 # Run simulation
+@info "running simulation"
 solution = simulate(u, tspan, dt, dt_save, seed; model)
 
 # Compute autocorrelation
@@ -75,7 +76,7 @@ preprocess_params_file = joinpath(data_directory, "preprocess_params.jld2")
 preprocess_data!(solution; preprocess_params_file = preprocess_params_file)
 decorrelated_solution = solution[:, 1:τ:end]
 M = size(decorrelated_solution)[end]
-# σmax = maximum([norm(decorrelated_solution[:, i] - decorrelated_solution[:,j]) for i in rand(1:M, 5000), j in rand(1:M, 5000)])
+σmax = maximum([norm(decorrelated_solution[:, i] - decorrelated_solution[:,j]) for i in rand(1:M, 100), j in rand(1:M, 100)])
 file_path = joinpath(data_directory,"data_$(α)_$(β)_$(γ)_$(σ).hdf5")
 hfile = h5open(file_path, "w") 
 hfile["timeseries"] = reshape(solution,(N,N,size(solution)[2]))
@@ -83,4 +84,5 @@ hfile["snapshots"] = reshape(decorrelated_solution,(N,N,1,size(decorrelated_solu
 hfile["decorrelation"] = τ
 hfile["decorrelation time"] = τ * dt_save
 hfile["dt save"] = dt_save
+hfile["sigma max"] = σmax
 close(hfile)

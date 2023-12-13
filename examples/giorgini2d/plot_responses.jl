@@ -1,6 +1,6 @@
 # This code computes the response functions numerically, using the linear approximation and the score function
 using TOML
-using CairoMakie
+using GLMakie
 using HDF5
 
 # run from giorgini2d
@@ -23,29 +23,35 @@ linear_response_path = joinpath(data_directory, "linear_response_$(α)_$(β)_$(�
 score_response_path = joinpath(savedir, "score_response_$(α)_$(β)_$(γ)_$(σ).hdf5")
 
 fid = h5open(numerical_response_path, "r")
-responseN = read(fid, "response")
+responseN = read(fid, "pixel response")
 lagsN = read(fid, "lag_indices")
 std_err = read(fid, "std_err")
 close(fid)
 
 fid = h5open(linear_response_path, "r")
-responseL = read(fid, "response")
+responseL = read(fid, "pixel response")
 lagsL = read(fid, "lag_indices")
 close(fid)
 
 fid = h5open(score_response_path, "r")
-responseS = read(fid, "response")
+responseS = read(fid, "pixel response")
 lagsS = read(fid, "lag_indices")
 close(fid)
-fig = Figure(resolution=(400, 400), fontsize=24)
-i = 1
-ax = Axis(fig[1,1], xlabel="Lag", ylabel="Response", title="1-$(i)", titlefont = :regular)
-band!(lagsN, responseN[i,:].-std_err[i,:], responseN[i,:].+std_err[i,:], color=(:orange, 0.3), label="Numerical")
-lines!(lagsN, responseN[i,:].-std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
-lines!(lagsN, responseN[i,:].+std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
-lines!(lagsS, responseS[i,:], color=(:purple, 0.5), strokewidth = 1.5, label = "Score Model")
-#check this indexing
-lines!(lagsL, responseL[i,i,:], color=(:green, 0.5), strokewidth = 1.5, label = "Linear")
-axislegend(; position= :lt, labelsize=16)
-
+fig = Figure(resolution=(1600, 1600), fontsize=24)
+N = 5
+for i in 1:N^2
+    ii = floor(Int, (i-1)/N) + 1
+    jj = mod(i-1, N) + 1
+    ax = Axis(fig[ii,jj], xlabel="Lag", ylabel="Response", title="1-$(i)", titlefont = :regular)
+    band!(lagsN, responseN[i,:].-std_err[i,:], responseN[i,:].+std_err[i,:], color=(:orange, 0.3), label="Numerical")
+    lines!(lagsN, responseN[i,:].-std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
+    lines!(lagsN, responseN[i,:].+std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
+    lines!(lagsS, responseS[i,:], color=(:purple, 0.5), strokewidth = 1.5, label = "Score Model")
+    #check this indexing
+    lines!(lagsL, responseL[i, :], color=(:green, 0.5), strokewidth = 1.5, label = "Linear")
+    if i ==1
+        axislegend(; position= :rt, labelsize=16)
+    end
+end
+display(fig)
 save("comparison.png", fig, px_per_unit = 2)

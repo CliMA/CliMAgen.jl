@@ -32,10 +32,13 @@ T = FT(toml_dict["param_group"]["T"])
 # Obtain decorrelation time
 fid = h5open(f_path, "r")
 decorrelation = read(fid, "decorrelation")
+snapshots = read(fid, "snapshots")
 close(fid)
 
+M, N, _, L = size(snapshots)
+
 model = setup_ludo_model(σ, α, β, γ, N; FT = Float32)
-n_ens = 5000*5
+n_ens = 5*5000
 @assert n_ens < size(snapshots)[end]
 ϵ = 0.1
 endT = decorrelation*2
@@ -48,12 +51,12 @@ for i in ProgressBar(1:n_ens)
     R1 = rand(Int)
     u0 = 2*rand(FT, N^2).-1
     u0 .= atanh(-α/β)/γ
-    X0 = simulate(u0, tspan*10, dt, dt_save, R1; model = model)[:,end]
+    X0 = simulate(u0, tspan .* 10, dt, dt_save, R1; model = model, progress = false)[:,end]
     X0eps = copy(X0)
     X0eps[1] += ϵ
     random_seed = rand(Int)
-    t1 = simulate(X0, tspan, dt, dt_save, random_seed;model=model)
-    t2 = simulate(X0eps, tspan, dt, dt_save, random_seed; model = model)
+    t1 = simulate(X0, tspan, dt, dt_save, random_seed;model=model, progress = false)
+    t2 = simulate(X0eps, tspan, dt, dt_save, random_seed; model = model, progress = false)
     responseN_ens[:,:,i] = (t2 .- t1)./ϵ
 end
 # Means over ensemble members
@@ -66,7 +69,7 @@ end
 data_directory = joinpath(package_dir, "data")
 file_path = joinpath(data_directory, "numerical_response_$(α)_$(β)_$(γ)_$(σ).hdf5")
 hfile = h5open(file_path, "w")
-hfile["response"] = responseN
-hfile["lag_indices"] = 1:1:n_things_in_trajectory
-hfile["std_err"] = err./sqrt(n_ens)
+hfile["pixel response"] = responseN
+hfile["lag_indices"] = collect(1:1:n_things_in_trajectory)
+hfile["std_err"] = err ./ sqrt(n_ens)
 close(hfile)

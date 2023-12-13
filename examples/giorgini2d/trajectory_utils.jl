@@ -32,7 +32,7 @@ function preprocessing(xtrain, preprocess_params_file; FT=Float32)
     JLD2.save_object(preprocess_params_file, scaling)
 end
 
-function simulate(u, tspan, dt, dt_save, seed; model)
+function simulate(u, tspan, dt, dt_save, seed; model, progress = true)
     N² = size(u)[1]
     Random.seed!(abs(seed))
     deterministic_tendency! = make_deterministic_tendency(model)
@@ -43,7 +43,12 @@ function simulate(u, tspan, dt, dt_save, seed; model)
     savesteps = 0:n_steps_per_save:nsteps - n_steps_per_save
     solution = zeros(FT, (N², Int(nsteps/n_steps_per_save)))
     solution[:, 1] .= u 
-    for i in 1:nsteps
+    if progress 
+        indices = ProgressBar(1:nsteps)
+    else
+        indices = 1:nsteps
+    end
+    for i in indices
         t = tspan[1]+dt*(i-1)
         Euler_Maruyama_step!(du, u, t, deterministic_tendency!, stochastic_increment!, dt)
         if i ∈ savesteps
