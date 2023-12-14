@@ -38,8 +38,7 @@ close(fid)
 M, N, _, L = size(snapshots)
 
 model = setup_ludo_model(σ, α, β, γ, N; FT = Float32)
-n_ens = 5000
-@assert n_ens < size(snapshots)[end]
+n_ens = 10^5
 ϵ = 0.1
 endT = decorrelation*2
 tspan = FT.((0.0, endT))
