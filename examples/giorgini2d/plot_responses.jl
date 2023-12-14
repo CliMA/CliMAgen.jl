@@ -36,6 +36,7 @@ close(fid)
 
 fid = h5open(score_response_path, "r")
 responseS = read(fid, "pixel response")
+responseS2 = read(fid, "pixel response unnormalized")
 lagsS = read(fid, "lag_indices")
 close(fid)
 fig = Figure(resolution=(1600, 1600), fontsize=24)
@@ -47,8 +48,9 @@ for i in 1:N^2
     band!(lagsN, responseN[i,:].-std_err[i,:], responseN[i,:].+std_err[i,:], color=(:orange, 0.3), label="Numerical")
     lines!(lagsN, responseN[i,:].-std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
     lines!(lagsN, responseN[i,:].+std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
-    lines!(lagsS, responseS[i,:], color=(:purple, 0.5), strokewidth = 1.5, label = "Score Model")
-    GLMakie.ylims!(ax, (-1.0, 1.0))
+    lines!(lagsS, responseS[i,:], color=(:purple, 0.5), strokewidth = 1.5, label = "Score Model (hack)")
+    scatter!(lagsS, responseS2[i,:], color=(:green, 0.1), strokewidth = 1.5, label = "Score Model (no hack)")
+   # GLMakie.ylims!(ax, (-1.0, 1.0))
     #check this indexing
     lines!(lagsL, responseL[i, :], color=(:green, 0.5), strokewidth = 1.5, label = "Linear")
     if i == 64
