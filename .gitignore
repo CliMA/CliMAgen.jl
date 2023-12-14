@@ -24,3 +24,4 @@ examples/uniform/experiments
 *.jld2 
 *.txt
 *.toml
+*.json
