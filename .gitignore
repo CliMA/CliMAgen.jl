@@ -18,3 +18,7 @@ examples/uniform/experiments
 *.bson
 *.sh
 *.out
+*.hdf5
+*.json 
+*.txt
+*.jld2
