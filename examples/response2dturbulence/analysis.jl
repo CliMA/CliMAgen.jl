@@ -97,8 +97,8 @@ function run_analysis(params; FT=Float32)
 
     # create plots with nimages images of sampled data and training data
     for ch in 1:inchannels
-        heatmap_grid(samples[:, :, [ch], 1:nimages], ch, savedir, "$(sampler)_images_$(ch).png")
-        heatmap_grid(xtrain[:, :, [ch], 1:nimages], ch, savedir, "train_images_$(ch).png")
+        heatmap_grid(samples[:, :, :, 1:nimages], ch, savedir, "$(sampler)_images_$(ch).png")
+        heatmap_grid(xtrain[:, :, :, 1:nimages], ch, savedir, "train_images_$(ch).png")
     end
 
     loss_plot(savedir, "losses.png"; xlog = false, ylog = true)

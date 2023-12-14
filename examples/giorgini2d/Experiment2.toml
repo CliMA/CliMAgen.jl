@@ -1,22 +1,18 @@
 [experiment]
 project           = "CliMAgen.jl"
-name              = "response2dturb"
+name              = "ludo"
 rngseed           = 123
-logging           = true
 nogpu             = false
-savedir           = "output_32x32_strong"
+savedir           = "output2"
 
 [data]
 batchsize         = 128
-resolution        = 32
 fraction          = 1.0
-standard_scaling  = false
-nonlinearity      = "strong"
 
 [model]
-noised_channels   = 2
-sigma_max         = 66.0
-sigma_min         = 1e-2
+noised_channels   = 1
+sigma_max         = 11.0
+sigma_min         = 2e-3
 dropout_p         = 0.0
 mean_bypass       = true
 shift_input       = true
@@ -39,12 +35,12 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 200
+nepochs           = 300
 freq_chckpt       = 100
 
 [sampling]
 nsteps            = 250
-nsamples          = 100
+nsamples          = 1000
 nimages           = 10
-sample_channels   = 2
+sample_channels   = 1
 sampler           = "euler"

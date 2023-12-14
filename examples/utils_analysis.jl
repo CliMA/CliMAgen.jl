@@ -122,7 +122,7 @@ function heatmap_grid(samples, ch, savepath, plotname; ncolumns = 5,FT=Float32, 
     # We want either an even number of images per row
     nrows = div(batchsize, ncolumns)
     nimages = nrows*ncolumns
-    clims = (minimum(samples), maximum(samples))
+    clims = (minimum(samples[:,:,ch,:]), maximum(samples[:,:,ch,:i]))
     plts = []
     for img in 1:nimages
         push!(plts, Plots.heatmap(samples[:,:,ch,img], aspect_ratio=:equal, clims = clims, border = :box, legend = :none, axis=([], false)))
