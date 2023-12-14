@@ -16,7 +16,7 @@ using CliMAgen: train!, load_model_and_optimizer
 
 # run from giorgni2d
 include("../utils_data.jl") # for data loading
-include("GetData.jl") # for data loading
+include("dataloader.jl") # for data loading
 
 function run_training(params, f_path, savedir; FT=Float32)
     # unpack params

@@ -2,13 +2,14 @@
 using TOML
 using GLMakie
 using HDF5
+using CliMAgen
 
 # run from giorgini2d
 package_dir = pwd()
 
 experiment_toml="Experiment.toml"
 model_toml = "Model.toml"
-
+FT = Float32
 toml_dict = TOML.parsefile(model_toml)
 params = TOML.parsefile(experiment_toml)
 params = CliMAgen.dict2nt(params)
@@ -38,7 +39,7 @@ responseS = read(fid, "pixel response")
 lagsS = read(fid, "lag_indices")
 close(fid)
 fig = Figure(resolution=(1600, 1600), fontsize=24)
-N = 5
+N = 8
 for i in 1:N^2
     ii = floor(Int, (i-1)/N) + 1
     jj = mod(i-1, N) + 1
@@ -47,9 +48,10 @@ for i in 1:N^2
     lines!(lagsN, responseN[i,:].-std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
     lines!(lagsN, responseN[i,:].+std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
     lines!(lagsS, responseS[i,:], color=(:purple, 0.5), strokewidth = 1.5, label = "Score Model")
+    GLMakie.ylims!(ax, (-1.0, 1.0))
     #check this indexing
     lines!(lagsL, responseL[i, :], color=(:green, 0.5), strokewidth = 1.5, label = "Linear")
-    if i ==1
+    if i == 64
         axislegend(; position= :rt, labelsize=16)
     else
         hidedecorations!(ax)

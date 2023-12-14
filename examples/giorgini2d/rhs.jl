@@ -57,11 +57,14 @@ function make_deterministic_tendency(model::LudoDiffusionSDE{FT, CM, Periodic}) 
                 if j == N
                     v_bc = v[i]
                     du[k] += ((v_bc - v[k])/2 - (v[k] - v[k_jm1]))/2
+                    du[k] += (u[i] - u[k_jm1])/(2 * β * N) # advection
                 elseif j == 1
                     v_bc = v[(N-1)*N+i]
                     du[k] += ((v[k_jp1] - v[k]) - (v[k] - v_bc))/2
+                    du[k] += (u[k_jp1] - u[(N-1)*N+i])/(2 * β * N) # advection
                 else
                     du[k] += ((v[k_jp1] - v[k]) - (v[k] - v[k_jm1]))/2
+                    du[k] += (u[k_jp1] - u[k_jm1])/(2 * β * N) # advection
                 end
             end
         end

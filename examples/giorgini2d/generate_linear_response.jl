@@ -49,6 +49,6 @@ data_directory = joinpath(package_dir, "data")
 file_path = joinpath(data_directory, "linear_response_$(α)_$(β)_$(γ)_$(σ).hdf5")
 hfile = h5open(file_path, "w")
 hfile["response"] = responseL
-hfile["pixel response"] = responseL[1, :, :]
+hfile["pixel response"] = responseL[:, 1, :]
 hfile["lag_indices"] = collect(lag_indices)
 close(hfile)

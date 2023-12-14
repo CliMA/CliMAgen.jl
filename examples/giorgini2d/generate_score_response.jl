@@ -81,7 +81,7 @@ for i in ProgressBar(eachindex(lag_indices))
 end
 
 pixelresponseS_normalized_average = responseS_normalized_average[1, :, :]
-pixelresponseS = responseS[1, :, :]
+pixelresponseS = responseS[:, 1, :]
 
 savedir = "$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
 data_directory = joinpath(package_dir, savedir)

@@ -13,7 +13,7 @@ using CliMAgen
 # run from giorgni2d
 include("../utils_data.jl") # for data loading
 include("../utils_analysis.jl") # for data loading
-include("GetData.jl") # for data loading
+include("dataloader.jl") # for data loading
 
 function run_analysis(params, f_path, savedir; FT=Float32)
     rngseed = params.experiment.rngseed
