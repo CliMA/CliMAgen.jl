@@ -1,4 +1,12 @@
 @testset "Preprocessing" begin
+    @test "Power transform" begin
+        FT = Float32
+        x = randn(FT,(64,64,3,100))
+        λ = CliMAgen.compute_power_transform_param(x)
+        transform = PowerTransform{FT}(λ)
+        @test x ≈ invert_preprocessing(apply_preprocessing(x, transform), transform)
+    end
+
     @testset "Scaling transforms" begin
         FT = Float32
         x = randn(FT,(64,64,3,100))

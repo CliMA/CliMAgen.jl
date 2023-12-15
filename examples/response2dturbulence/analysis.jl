@@ -34,6 +34,7 @@ function run_analysis(params; FT=Float32)
     fraction = params.data.fraction
     nonlinearity = convert_to_symbol(params.data.nonlinearity) 
     standard_scaling = params.data.standard_scaling
+    power_transform = params.data.transform
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
     inchannels = params.model.noised_channels
@@ -61,6 +62,7 @@ function run_analysis(params; FT=Float32)
                                                  FT=FT,
                                                  rng=Random.GLOBAL_RNG,
                                                  standard_scaling = standard_scaling,
+						 power_transform = power_transform,
                                                  read = false,
                                                  save = true,
                                                  preprocess_params_file = preprocess_params_file)

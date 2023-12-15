@@ -18,10 +18,11 @@ struct PowerTransform{FT} <: AbstractPreprocessing{FT}
     λ::Array{FT}
 end
 
-function PowerTransform(x)
+function compute_power_transform_param(x)
     FT = eltype(x)
     datasize = size(x)
     ndims = length(datasize)
+    nspatial = ndims -2
     npixels = prod(datasize[1:nspatial])
     pixeldims = 1:nspatial
     nchannels = datasize[end-1]
@@ -32,8 +33,7 @@ function PowerTransform(x)
     perm = [channeldim, pixeldims..., sampledim]
     y = reshape(permutedims(x, perm), (nchannels, npixels*nsamples))[:,1:nrequired];
     output = mapslices(YeoJohnsonTransform.lambda, y;dims = 2)
-    λ = [o.value for o in output][:]
-    return PowerTransform{FT}(λ)
+    return [o.value for o in output][:]
 end
 
 
@@ -48,7 +48,7 @@ function apply_preprocessing(x, scaling::PowerTransform;FT = Float32)
     ndims = length(datasize)
     channeldim = ndims -1
     x̃ = similar(x)
-    wrapper(x, l) = YeoJohnsonTransform.transform.(x,l)
+    wrapper(x, l) = FT.(YeoJohnsonTransform.transform.(x,l))
     eachslice(x̃, dims = channeldim) .= wrapper.(eachslice(x, dims = channeldim),λ)
     return x̃ 
 end
@@ -65,7 +65,7 @@ function invert_preprocessing(x̃, scaling::PowerTransform;FT = Float32)
     ndims = length(datasize)
     channeldim = ndims -1
     x = similar(x̃)
-    wrapper(x̃, l) = YeoJohnsonTransform.inversetransform.(x̃,l)
+    wrapper(x̃, l) = FT.(YeoJohnsonTransform.inversetransform.(x̃,l))
     eachslice(x, dims = channeldim) .= wrapper.(eachslice(x̃, dims = channeldim),λ)
     return x
 end

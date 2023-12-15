@@ -43,6 +43,7 @@ function get_data_response2dturbulence(batchsize;
     FT=Float32,
     rng=Random.GLOBAL_RNG,
     standard_scaling=false,
+    power_transform=false,
     read=false,
     save=false,
     preprocess_params_file="", 
@@ -54,6 +55,11 @@ function get_data_response2dturbulence(batchsize;
 
     # Scaling
     if save
+        if power_transform
+            λ = CliMAgen.compute_power_transform_param(xtrain)
+            transform = PowerTransform{FT}(λ)
+            xtrain .= apply_preprocessing(xtrain,  transform)
+        end
         if standard_scaling
             maxtrain = maximum(xtrain, dims=(1, 2, 4))
             mintrain = minimum(xtrain, dims=(1, 2, 4))
@@ -76,16 +82,19 @@ function get_data_response2dturbulence(batchsize;
             Δ̄[Δ̄.==0] .= FT(1)
             Δp[Δp.==0] .= FT(1)
             scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+            xtrain .= apply_preprocessing(xtrain, scaling) # transform was already applied prior to determining scaling parameters
         end
+        JLD2.save_object(preprocess_params_file, transform)
         JLD2.save_object(preprocess_params_file, scaling)
     elseif read
         scaling = JLD2.load_object(preprocess_params_file)
+        transform = JLD2.load_object(preprocess_params_file, transform)
+        xtrain .= apply_preprocessing(xtrain, transform)
+        xtrain .= apply_preprocessing(xtrain, scaling)
     end
-
-    xtrain .= apply_preprocessing(xtrain, scaling)
     # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, transform)
     xtest .= apply_preprocessing(xtest, scaling)
-
     xtrain = MLUtils.shuffleobs(rng, xtrain)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)

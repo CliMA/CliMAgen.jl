@@ -4,7 +4,7 @@ name              = "response2dturb"
 rngseed           = 123
 logging           = true
 nogpu             = false
-savedir           = "output_32x32_strong"
+savedir           = "output_32x32_strong_transform"
 
 [data]
 batchsize         = 128
