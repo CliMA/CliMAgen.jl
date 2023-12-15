@@ -11,7 +11,7 @@ batchsize         = 128
 resolution        = 32
 fraction          = 1.0
 standard_scaling  = false
-transform         = true
+transform         = false
 nonlinearity      = "strong"
 
 [model]
