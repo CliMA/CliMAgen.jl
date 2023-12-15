@@ -20,6 +20,7 @@ using Random
 using Statistics
 using Tullio
 using DelimitedFiles
+export PowerTransform
 
 include("utils.jl")
 include("logging.jl")

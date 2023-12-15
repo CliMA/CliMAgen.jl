@@ -1,9 +1,76 @@
+include("YeoJohnsonTransform.jl")
+using .YeoJohnsonTransform
 """
     AbstractPreprocessing{FT<:AbstractFloat}
 
 An abstract type for preprocessing transformations.
 """
 abstract type AbstractPreprocessing{FT<:AbstractFloat} end
+
+
+"""
+    PowerTransform{FT} <: AbstractPreprocessing{FT}
+
+A struct that holds the parameters needed for the 
+Yeo-Johnson power transform.
+"""
+struct PowerTransform{FT} <: AbstractPreprocessing{FT}
+    λ::Array{FT}
+end
+
+function PowerTransform(x)
+    FT = eltype(x)
+    datasize = size(x)
+    ndims = length(datasize)
+    npixels = prod(datasize[1:nspatial])
+    pixeldims = 1:nspatial
+    nchannels = datasize[end-1]
+    channeldim = ndims-1
+    nsamples = datasize[end]
+    sampledim = ndims
+    nrequired = min(nsamples*npixels, 50000)
+    perm = [channeldim, pixeldims..., sampledim]
+    y = reshape(permutedims(x, perm), (nchannels, npixels*nsamples))[:,1:nrequired];
+    output = mapslices(YeoJohnsonTransform.lambda, y;dims = 2)
+    λ = [o.value for o in output][:]
+    return PowerTransform{FT}(λ)
+end
+
+
+"""
+    apply_preprocessing(x, scaling::PowerTransform)
+
+Preprocesses the data x, given a scaling of type `PowerTransform`.
+"""
+function apply_preprocessing(x, scaling::PowerTransform;FT = Float32)
+    λ = scaling.λ
+    datasize = size(x)
+    ndims = length(datasize)
+    channeldim = ndims -1
+    x̃ = similar(x)
+    wrapper(x, l) = YeoJohnsonTransform.transform.(x,l)
+    eachslice(x̃, dims = channeldim) .= wrapper.(eachslice(x, dims = channeldim),λ)
+    return x̃ 
+end
+
+
+"""
+    apply_preprocessing(x, scaling::PowerTransform)
+
+inverts the preprocessing of the data x, given a scaling of type `PowerTransform`.
+"""
+function invert_preprocessing(x̃, scaling::PowerTransform;FT = Float32)
+    λ = scaling.λ
+    datasize = size(x̃)
+    ndims = length(datasize)
+    channeldim = ndims -1
+    x = similar(x̃)
+    wrapper(x̃, l) = YeoJohnsonTransform.inversetransform.(x̃,l)
+    eachslice(x, dims = channeldim) .= wrapper.(eachslice(x̃, dims = channeldim),λ)
+    return x
+end
+
+
 
 """
     StandardScaling{FT} <: AbstractPreprocessing{FT}
