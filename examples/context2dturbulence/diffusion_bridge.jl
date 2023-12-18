@@ -13,7 +13,8 @@ using CliMAgen
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
-
+# Including this file will prompt you to add DiffEq.jl
+include(joinpath(package_dir,"examples/context2dturbulence/diffeqtools.jl")
 function unpack_experiment(experiment_toml, wavenumber; device = Flux.gpu, FT=Float32)
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)

@@ -5,7 +5,6 @@ using CliMAgen
 using CUDA
 using Images
 using Random
-using DifferentialEquations
 using DelimitedFiles
 using DataFrames
 using HDF5
