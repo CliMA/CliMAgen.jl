@@ -1,7 +1,7 @@
 [param_group]
 alpha = 0.3
 beta = 0.5
-gamma = 10
+gamma = 1.0
 sigma = 2
 T = 4000000
 dt = 0.25

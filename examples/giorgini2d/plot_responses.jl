@@ -23,17 +23,20 @@ numerical_response_path = joinpath(data_directory, "numerical_response_$(α)_$(�
 linear_response_path = joinpath(data_directory, "linear_response_$(α)_$(β)_$(γ)_$(σ).hdf5")
 score_response_path = joinpath(savedir, "score_response_$(α)_$(β)_$(γ)_$(σ).hdf5")
 
+@info "loading numerical response"
 fid = h5open(numerical_response_path, "r")
 responseN = read(fid, "pixel response")
 lagsN = read(fid, "lag_indices")
 std_err = read(fid, "std_err")
 close(fid)
 
+@info "loading linear response"
 fid = h5open(linear_response_path, "r")
 responseL = read(fid, "pixel response")
 lagsL = read(fid, "lag_indices")
 close(fid)
 
+@info "loading score response"
 fid = h5open(score_response_path, "r")
 responseS = read(fid, "pixel response")
 responseS2 = read(fid, "pixel response unnormalized")
@@ -49,7 +52,7 @@ for i in 1:N^2
     lines!(lagsN, responseN[i,:].-std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
     lines!(lagsN, responseN[i,:].+std_err[i,:], color=(:orange, 0.5), strokewidth = 1.5)
     lines!(lagsS, responseS[i,:], color=(:purple, 0.5), strokewidth = 1.5, label = "Score Model (hack)")
-    scatter!(lagsS, responseS2[i,:], color=(:green, 0.1), strokewidth = 1.5, label = "Score Model (no hack)")
+    # scatter!(lagsS, responseS2[i,:], color=(:green, 0.1), strokewidth = 1.5, label = "Score Model (no hack)")
    # GLMakie.ylims!(ax, (-1.0, 1.0))
     #check this indexing
     lines!(lagsL, responseL[i, :], color=(:green, 0.5), strokewidth = 1.5, label = "Linear")
