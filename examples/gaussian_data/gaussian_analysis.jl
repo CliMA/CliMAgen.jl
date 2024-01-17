@@ -10,6 +10,7 @@ using DataLoaders
 using Plots
 using ProgressMeter
 using Printf
+using StatsPlots
 using CliMAgen
 using CliMAgen: dict2nt,load_model_and_optimizer
 
@@ -60,7 +61,7 @@ function Euler_Maruyama_ld_sampler_analytic_score(model::CliMAgen.AbstractDiffus
     return x
 end
 
-function generate_samples(params, μ0, σ0; bias = nothing, k_bias = 0f0, analytic=false,FT=Float32)
+function generate_samples(params, μ0, σ0, filename; bias = nothing, k_bias = 0f0, analytic=false,FT=Float32)
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
@@ -111,7 +112,7 @@ function generate_samples(params, μ0, σ0; bias = nothing, k_bias = 0f0, analyt
         end
         all_samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(samples)
     end
-    samplesdir = joinpath(savedir, "bias_$(analytic)_$(FT(k_bias))")
+    samplesdir = joinpath(savedir, filename)
     !ispath(samplesdir) && mkpath(samplesdir)
     drop_to_hdf5(all_samples; hdf5_path=joinpath(samplesdir, samples_file), key = "generated_samples")
 end
@@ -156,25 +157,17 @@ function event_probability_plot(train::Vector{FT}, gen::Vector{FT}, lr_gen, save
 end
 
 
-function compute_statistics(tomlfile, xtrain, A, k_bias; analytic=false,FT = Float32)
-    # read experiment parameters from file
-    params = TOML.parsefile(tomlfile)
-    params = CliMAgen.dict2nt(params)
-
-    # unpack params
-    savedir = params.experiment.savedir
-    samplesdir = joinpath(savedir, "bias_$(analytic)_$(FT(k_bias))")
-    samples_file = params.sampling.samples_file
-    samples = read_from_hdf5(; hdf5_path = joinpath(samplesdir, samples_file))
-    outputdir = samplesdir
-
+function compute_statistics(samples, xtrain, A, k_bias)
     Z = mean(exp.(k_bias .* A(xtrain)))
     lr = Z.*exp.(-k_bias .*A(samples))[:]
-    event_probability_plot(A(xtrain)[:], A(samples)[:], lr, samplesdir, "event_probability.png")
     return mean(lr), mean(A(samples)[:]), std(A(samples)[:])
 end
 
-function run_analysis_with_k(k, xtrain; experiment_toml="Experiment_gaussian.toml")
+
+
+
+
+function main(experiment_toml; analytic=false, sample=true)
     FT = Float32
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
@@ -183,55 +176,10 @@ function run_analysis_with_k(k, xtrain; experiment_toml="Experiment_gaussian.tom
     # set up device
     if !nogpu && CUDA.has_cuda()
         dev = Flux.gpu
-        @info "Sampling on GPU"
     else
         dev = Flux.cpu
-        @info "Sampling on CPU"
     end
-    # set up directory for saving checkpoints
-    savedir = params.experiment.savedir
-    tilesize = size(xtrain)[1]
-    inchannels = 1
-    # set up bias for space-time mean
-    indicator = zeros(FT, tilesize, tilesize, inchannels)
-    indicator[8:8, 8:8, :] .= 1
-    A(x; indicator = indicator) = sum(indicator .* x, dims=(1, 2, 3)) ./ sum(indicator, dims=(1, 2, 3))
-    gpu_indicator = dev(indicator)
-    gpu_∂A∂x(x; indicator = gpu_indicator) = indicator ./ sum(indicator, dims=(1, 2, 3))
-
-    #Used in analytic score. All pixels are drawn from the same distribution
-    #so use a scalar here.
-    σ0 = std(xtrain)
-    μ0 = mean(xtrain)
-    gpu_bias(x, k = k) = k*gpu_∂A∂x(x)
-    generate_samples(params, μ0, σ0; bias =  gpu_bias, k_bias = k, analytic=true,FT=Float32)
-    generate_samples(params, μ0, σ0; bias = gpu_bias, k_bias = k, analytic=false,FT=Float32)
-    samples_file = params.sampling.samples_file
-    analytic_samplesdir = joinpath(savedir, "bias_true_$(FT(k))")
-    samplesdir = joinpath(savedir, "bias_false_$(FT(k))")
-    samples_analytic = read_from_hdf5(; hdf5_path = joinpath(analytic_samplesdir, samples_file));
-    samples = read_from_hdf5(; hdf5_path = joinpath(samplesdir, samples_file));
-
-    Plots.histogram(A(samples_analytic)[:], label = "generated, analytic", title="Event distribution", xlabel = "Pixel value", norm = true)
-    Plots.histogram!(A(samples)[:], label = "generated, score", norm = true)
-    Plots.histogram!(A(xtrain)[:], label = "training", norm = true, margin = 15Plots.mm)
-    Plots.savefig(joinpath(savedir, "event_histogram_$(FT(k)).png"))
-    μA = mean(A(xtrain))
-    σA = std(A(xtrain))
-    expected_mean = μA + σA^2 *k
-    expected_sigma = σA
-    (na,ma,sa) = compute_statistics(experiment_toml, xtrain, A, k; analytic=true,FT = FT)
-    (n,m,s) = compute_statistics(experiment_toml, xtrain, A, k; analytic=false,FT = FT)
-    return (expected = (mean = expected_mean, sigma = expected_sigma), analytic = (norm = na, mean = ma, sigma = sa), score = (norm = n, mean = m, sigma = s))
-end
-
-
-
-function behavior_with_k(experiment_toml="Experiment_gaussian.toml")
-    FT = Float32
-    # read experiment parameters from file
-    params = TOML.parsefile(experiment_toml)
-    params = CliMAgen.dict2nt(params)
+    # obtain training data
     savedir = params.experiment.savedir
     batchsize = params.data.batchsize
     preprocess_params_file = joinpath(savedir, "preprocessing.jld2")
@@ -242,11 +190,50 @@ function behavior_with_k(experiment_toml="Experiment_gaussian.toml")
                                     FT=FT
                                     )
     xtrain = cat([x for x in dataloaders[1]]..., dims=4);
-    results = []
-    for k in [0f0, 0.4f0, 0.8f0, 1.6f0, 3.2f0]
-        stats = run_analysis_with_k(k, xtrain; experiment_toml="Experiment_gaussian.toml")
-        push!(results, stats)
+    σ0 = std(xtrain)
+    μ0 = mean(xtrain)
+    
+    # Set up bias function
+    tilesize = size(xtrain)[1]
+    inchannels = 1
+    indicator = zeros(FT, tilesize, tilesize, inchannels)
+    indicator[8:8, 8:8, :] .= 1
+    A(x; indicator = indicator) = sum(indicator .* x, dims=(1, 2, 3)) ./ sum(indicator, dims=(1, 2, 3))
+    n_pixels = Int(sum(indicator, dims=(1, 2, 3))[1])
+    # generate samples
+    μA = mean(A(xtrain)[:])
+    σA = std(A(xtrain)[:])
+    sigma_values = [0f0, 0.5f0, 1.0f0, 1.5f0]
+    kvalues = sigma_values ./ σA
+    if sample
+        gpu_indicator = dev(indicator)
+        gpu_∂A∂x(x; indicator = gpu_indicator) = indicator ./ sum(indicator, dims=(1, 2, 3))
+        for i in 1:length(kvalues)
+            k = kvalues[i]
+            filename = "bias_$(analytic)_$(sigma_values[i])_$(n_pixels)"
+            gpu_bias(x, k = k) = k*gpu_∂A∂x(x)
+            generate_samples(params, μ0, σ0, filename; bias =  gpu_bias, k_bias = k, analytic=analytic,FT=FT)
+        end
     end
-
-    # do something with the stats - error as a function of k
+    # Now, read in samples and compute A on them
+    expected_mean = @. μA + σA^2 *kvalues
+    expected_sigma = σA
+    nsamples = 1280
+    observables = zeros(nsamples, length(kvalues))
+    for i in 1:length(kvalues)
+        k = kvalues[i]
+        filename = "bias_$(analytic)_$(sigma_values[i])_$(n_pixels)"
+        samples_file = params.sampling.samples_file
+        samplesdir = joinpath(savedir, filename)
+        samples = read_from_hdf5(; hdf5_path = joinpath(samplesdir, samples_file));
+        observables[:, i] .= A(samples)[:]
+    end
+    violin(sigma_values[1] .+ zeros(nsamples), observables[:,1], linewidth=0,side=:right, label="Gen", color = "red")
+    violin!(sigma_values[1] .+ zeros(nsamples), randn(nsamples)*expected_sigma .+ expected_mean[1], linewidth=0,side=:left, label="Expected", color = "blue")
+    for i in 2:length(kvalues)
+        violin!(sigma_values[i].+ zeros(nsamples), observables[:,i], linewidth=0,side=:right, label = "", color = "red")
+        violin!(sigma_values[i] .+ zeros(nsamples), randn(nsamples)*expected_sigma .+ expected_mean[i], linewidth=0,side=:left, label = "", color = "blue")
+    end
+    plot!(xlabel = "Shift [units of σA]", ylabel = "Value of A(x)", margins = 10Plots.mm)
+    savefig(joinpath(savedir, "violin_$(n_pixels).png"))
 end

@@ -54,7 +54,7 @@ function loss_plot(savepath::String, plotname::String; xlog::Bool=false, ylog::B
     end
 end
 
-function quick_analysis_plots(experiment_toml = "Experiment_gaussian.toml")
+function quick_analysis_plots(params; FT = FT)
     # unpack params
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
@@ -122,6 +122,18 @@ function quick_analysis_plots(experiment_toml = "Experiment_gaussian.toml")
     @printf "Variance: Gen %.4f Train %.4f Uncertainty %.4f \n" generated_var train_var standard_error_var
 end
 
-quick_analysis_plots(experiment_toml = "Experiment_gaussian.toml")
+function main(;experiment_toml = "Experiment_gaussian_sigmamax.toml")
+    FT = Float32
+    # read experiment parameters from file
+    params = TOML.parsefile(experiment_toml)
+    params = CliMAgen.dict2nt(params)
+
+    quick_analysis_plots(params; FT = FT)
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main(;experiment_toml = ARGS[1])
+end
+
 
 

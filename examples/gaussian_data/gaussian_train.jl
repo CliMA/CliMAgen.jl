@@ -139,7 +139,7 @@ function run_training(params; FT=Float32)
     )
 end
 
-function main(experiment_toml="Experiment_gaussian.toml")
+function main(;experiment_toml="Experiment_gaussian.toml")
     FT = Float32
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
@@ -148,4 +148,8 @@ function main(experiment_toml="Experiment_gaussian.toml")
     # set up directory for saving checkpoints
     !ispath(params.experiment.savedir) && mkpath(params.experiment.savedir)
     run_training(params; FT = FT)
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main(;experiment_toml = ARGS[1])
 end
