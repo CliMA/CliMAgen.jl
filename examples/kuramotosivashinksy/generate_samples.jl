@@ -95,7 +95,8 @@ function generate_samples(params; FT=Float32, k_bias=0.0f0, n_avg=1)
         hdf5_path=joinpath(outputdir, "samples.hdf5")
         fid = HDF5.h5open(hdf5_path, "w")
         fid["observable"] = observable
-        fid["likelihood_ratio"] = ones(length(observable))
+        fid["samples"] = xtrain[:,:,:,1:size(all_samples)[end]]
+        fid["likelihood_ratio"] = FT.(ones(length(observable)))
         close(fid)
     end
 

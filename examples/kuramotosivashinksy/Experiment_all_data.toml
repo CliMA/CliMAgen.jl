@@ -44,7 +44,7 @@ freq_chckpt       = 175
 [sampling]
 samples_file      = "samples.hdf5"
 nsteps            = 250
-nsamples          = 200
+nsamples          = 640
 nimages           = 10
 sampler           = "euler"
 shift             = true
