@@ -38,8 +38,8 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 150
-freq_chckpt       = 101
+nepochs           = 200
+freq_chckpt       = 175
 
 [sampling]
 samples_file      = "samples.hdf5"

@@ -88,14 +88,26 @@ function generate_samples(params; FT=Float32, k_bias=0.0f0, n_avg=1)
                         FT=FT
                         )
     xtrain = cat([x for x in dl]..., dims=4);
+    if k_bias == 0.0
+        observable = A(xtrain;indicator = cpu(indicator))[:]
+        outputdir = joinpath(savedir, "training_$n_avg")
+        !ispath(outputdir) && mkpath(outputdir)
+        hdf5_path=joinpath(outputdir, "samples.hdf5")
+        fid = HDF5.h5open(hdf5_path, "w")
+        fid["observable"] = observable
+        fid["likelihood_ratio"] = ones(length(observable))
+        close(fid)
+    end
+
     Z = mean(exp.(k_bias .* A(xtrain;indicator = cpu(indicator)))[:])
     # Compute the likelihood ratio of the samples
     lr = Z.*exp.(-k_bias .*A(all_samples; indicator = cpu(indicator)))[:]
-  
+    samples_observable = A(all_samples; indicator = cpu(indicator))[:]
     samplesdir = joinpath(savedir, "bias_$(FT(k_bias))_n_avg_$(n_avg)_shift_$shift")
     !ispath(samplesdir) && mkpath(samplesdir)
     hdf5_path=joinpath(samplesdir, samples_file)
     fid = HDF5.h5open(hdf5_path, "w")
+    fid["observable"] = samples_observable
     fid["generated_samples"] = all_samples
     fid["likelihood_ratio"] = lr
     close(fid)

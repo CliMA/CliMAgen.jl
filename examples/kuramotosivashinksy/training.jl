@@ -4,6 +4,8 @@ using cuDNN
 using Dates
 using Random
 using TOML
+using BSON
+using DelimitedFiles
 
 using CliMAgen
 using CliMAgen: dict2nt
@@ -14,7 +16,6 @@ using CliMAgen: train!, load_model_and_optimizer
 
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
-include("analysis.jl") # for analysis
 
 function run_training(params; FT=Float32, logger=nothing)
     # unpack params
@@ -161,10 +162,6 @@ function main(; experiment_toml="Experiment.toml")
     logger = nothing
 
     run_training(params; FT=FT, logger=logger)
-
-    if :sampling in keys(params)
-        run_analysis(params; FT=FT)
-    end
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
