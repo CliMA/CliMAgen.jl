@@ -47,7 +47,7 @@ function generate_samples(params; FT=Float32, k_bias=0.0f0, n_avg=1)
     indicator = zeros(FT, n_pixels, n_time, inchannels)
     midx = Int(div(n_pixels, 2))
     midy = Int(div(n_time, 2))
-    indicator[midx-n_avg+1:midx, midy-n_avg+1:midy, :] .= 1
+    indicator[midx:midx, midy-div(n_avg,2):midy+div(n_avg,2)-1, :] .= 1
     indicator = device(indicator)
 
     A(x; indicator = indicator) = sum(indicator .* x, dims=(1, 2, 3)) ./ sum(indicator, dims=(1, 2, 3))

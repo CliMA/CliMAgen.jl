@@ -2,15 +2,19 @@ using CairoMakie
 using DataFrames
 using HDF5
 using Statistics
+using StatsBase
+include("bootstrap.jl")
 include("./distribution_plot.jl")
 include("./probability_plot.jl")
 include("./image_plot.jl")
-kvalues = [0,2.0, 4.0]
+kvalues = [0,1.0, 2.0, 3.0]
 n_avg = 16
 nsamples = 640
 FT = Float32
 ndata = 4000
 nimages = 5
+
+
 
 basedir = "../output_all_data_sigma_max"
 trainpath = joinpath(basedir, "training_$n_avg/samples.hdf5")
@@ -35,8 +39,14 @@ end
 train_obs = df[df.train  .== 1.0, "observable"];
 sigmavalues = kvalues .* std(train_obs)
 distribution_plot(df, joinpath(basedir, "distribution_$n_avg.png"), nsamples, kvalues, sigmavalues)
-probability_plot(df, joinpath(basedir, "probability_$n_avg.png"),nsamples, kvalues[1], sigmavalues[1])
+distribution_exceedance_plot(df, joinpath(basedir, "variance_reduction_$(n_avg)_1sigma.png"), nsamples, kvalues, sigmavalues, 1)
+distribution_exceedance_plot(df, joinpath(basedir, "variance_reduction_$(n_avg)_2sigma.png"), nsamples, kvalues, sigmavalues, 2)
+distribution_exceedance_plot(df, joinpath(basedir, "variance_reduction_$(n_avg)_3sigma.png"), nsamples, kvalues, sigmavalues, 3)
 
+
+for k in kvalues
+    probability_plot(df, joinpath(basedir, "probability_$(n_avg)_$k.png"),nsamples, k)
+end
 
 k = kvalues[end]
 unbiased_samplepath =  joinpath(basedir, "bias_$(FT(0))_n_avg_$(n_avg)_shift_true/samples.hdf5")
