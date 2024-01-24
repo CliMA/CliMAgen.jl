@@ -9,6 +9,7 @@ using Plots
 using Random
 using Statistics
 using TOML
+using StatsBase
 
 using CliMAgen
 include("../utils_data.jl")
@@ -60,24 +61,7 @@ function generate_samples(params; FT=Float32, k_bias=0.0f0, n_avg=1)
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model)
 
-    # sample from the trained model
-    samples_per_batch = batchsize
-    nbatch = div(nsamples, samples_per_batch)
-    all_samples = zeros(FT, (n_pixels, n_time, inchannels,nbatch*samples_per_batch))
-    samples = zeros(FT, (n_pixels, n_time, inchannels,samples_per_batch)) |> device
-    for b in 1:nbatch
-        time_steps, Δt, init_x = setup_sampler(
-            model,
-            device,
-            n_pixels,
-            inchannels;
-            num_images=samples_per_batch,
-            num_steps=nsteps,
-        )
-        samples .= Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, rng = MersenneTwister(b), bias=bias, use_shift = shift)
-        all_samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(samples)
-    end
-    # Compute normalization using all of the data
+     # Load training data
      dl,_ = get_data_ks(batchsize,preprocess_params_file;
                         f=fraction,
                         n_pixels=n_pixels,
@@ -88,6 +72,40 @@ function generate_samples(params; FT=Float32, k_bias=0.0f0, n_avg=1)
                         FT=FT
                         )
     xtrain = cat([x for x in dl]..., dims=4);
+    xtrain_indices = 1:1:size(xtrain)[end]
+    
+    plot_tag = "initial_shift_nonzero"
+
+    vector_data = reshape(xtrain, prod(size(xtrain)[1:3]), size(xtrain)[end]);
+    cov_train = cov(vector_data, dims =2)
+    vector_mask = reshape(cpu(indicator), prod(size(xtrain)[1:3])) ./sum(indicator);
+    initial_shift = reshape(k_bias .* (cov_train * vector_mask), size(xtrain)[1:3])
+    initial_shift = device(initial_shift) 
+
+    # sample from the trained model
+    samples_per_batch = batchsize
+    nbatch = div(nsamples, samples_per_batch)
+    all_samples = zeros(FT, (n_pixels, n_time, inchannels,nbatch*samples_per_batch))
+    samples = zeros(FT, (n_pixels, n_time, inchannels,samples_per_batch)) |> device
+    
+    #plot_tag = "initial_shift_zero"
+    #initial_shift =  deepcopy(samples)# should reproduce behavior from before
+    for b in 1:nbatch
+        time_steps, Δt, init_x = setup_sampler(
+            model,
+            device,
+            n_pixels,
+            inchannels;
+            num_images=samples_per_batch,
+            num_steps=nsteps,
+        )
+        init_x .= device(xtrain[:,:,:,StatsBase.sample(xtrain_indices, samples_per_batch)])
+        samples .= Euler_Maruyama_ld_sampler_correct_ic(model, init_x, bias, initial_shift,time_steps, Δt, rng = MersenneTwister(b))
+        #Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, rng = MersenneTwister(b), bias=bias, use_shift = shift)
+        all_samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(samples)
+    end
+   
+    # Save training data in format we want
     if k_bias == 0.0
         observable = A(xtrain;indicator = cpu(indicator))[:]
         outputdir = joinpath(savedir, "training_$n_avg")
@@ -100,13 +118,15 @@ function generate_samples(params; FT=Float32, k_bias=0.0f0, n_avg=1)
         close(fid)
     end
 
+    # Compute normalization using all of the traiing data
     Z = mean(exp.(k_bias .* A(xtrain;indicator = cpu(indicator)))[:])
-    # Compute the likelihood ratio of the samples
+
+    # Compute the likelihood ratio of the samples, save output in similar format.
     lr = Z.*exp.(-k_bias .*A(all_samples; indicator = cpu(indicator)))[:]
     samples_observable = A(all_samples; indicator = cpu(indicator))[:]
     samplesdir = joinpath(savedir, "bias_$(FT(k_bias))_n_avg_$(n_avg)_shift_$shift")
     !ispath(samplesdir) && mkpath(samplesdir)
-    hdf5_path=joinpath(samplesdir, samples_file)
+    hdf5_path=joinpath(samplesdir, "samples_$(plot_tag).hdf5")
     fid = HDF5.h5open(hdf5_path, "w")
     fid["observable"] = samples_observable
     fid["generated_samples"] = all_samples

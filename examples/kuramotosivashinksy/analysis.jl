@@ -48,7 +48,7 @@ function run_analysis(params; FT=Float32, k_bias=0.0f0, n_avg=1)
 
     shift = params.sampling.shift
     samplesdir = joinpath(savedir, "bias_$(FT(k_bias))_n_avg_$(n_avg)_shift_$shift")
-    samples_file = params.sampling.samples_file
+    samples_file = "samples_initial_shift_nonzero.hdf5"#params.sampling.samples_file
     hdf5_path = joinpath(samplesdir, samples_file)
     fid = HDF5.h5open(hdf5_path, "r")
     samples =  read(fid["generated_samples"])

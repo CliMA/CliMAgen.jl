@@ -1,3 +1,46 @@
+function Euler_Maruyama_ld_sampler_correct_ic(model::CliMAgen.AbstractDiffusionModel,
+                                              train_x::A,
+                                              bias,
+                                              initial_shift,
+                                              time_steps,
+                                              Δt;
+                                              c=nothing,
+                                              nspatial=2,
+                                              rng = MersenneTwister(1234))::A where {A}
+    x = train_x
+    # Preallocate
+    score = similar(x)
+    z = similar(x)
+    bias_drift = similar(x)
+    shift = similar(x)
+
+    @showprogress "Euler-Maruyama Forward Sampling" for time_step in reverse(time_steps)
+        batch_time_step = fill!(similar(train_x, size(train_x)[end]), 1) .* time_step
+        g = CliMAgen.diffusion(model, batch_time_step)
+        x .= x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, nspatial+1) .* randn!(rng, z)
+    end
+
+    # set up IC for reverse
+    init_x = x .+ initial_shift
+    x =  mean_x = init_x
+    
+    @showprogress "Euler-Maruyama Reverse Sampling" for time_step in time_steps
+        batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
+        g = CliMAgen.diffusion(model, batch_time_step)
+        if bias isa Nothing
+            score .= CliMAgen.score(model, x, batch_time_step; c=c)
+        else
+            _, σ_t = marginal_prob(model, x, batch_time_step)
+            bias_drift .= bias(x)
+            @. shift = σ_t^2 * bias_drift
+            score .= CliMAgen.score(model, x .+ shift, batch_time_step; c=c) .+ bias_drift
+        end
+        mean_x .= x .+ CliMAgen.expand_dims(g, nspatial+1) .^ 2 .* score .* Δt
+        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, nspatial+1) .* randn!(rng, z)
+    end
+    return x
+end
+
 """
     Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
                            init_x::A,
