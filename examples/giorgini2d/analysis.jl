@@ -40,7 +40,7 @@ function run_analysis(params, f_path, savedir; FT=Float32)
     end
 
     train_dataloader, test_dataloader = get_data(
-        f_path, "snapshots",batchsize)
+        f_path, "snapshots", batchsize)
 
     xtrain = first(train_dataloader)
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
@@ -90,6 +90,11 @@ function run_analysis(params, f_path, savedir; FT=Float32)
 
     loss_plot(savedir, "losses.png"; xlog = false, ylog = true)
 
+    hfile = h5open(f_path[1:end-5] * "_analysis.hdf5", "w")
+    hfile["data cumulants"] = cum_x
+    hfile["generative cumulants"] = cum_samples
+    hfile["samples"] = samples
+    close(hfile)
 end
 
 function main(;model_toml="Model.toml", experiment_toml="Experiment.toml")

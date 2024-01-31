@@ -50,7 +50,7 @@ decorrelation = max(floor(Int, decorrelation/10), 1)
 decorrelated_indices = 1:decorrelation:L
 r_trj_decorrelated = r_trj[:, :, [1], decorrelated_indices]
 L_decorrelated = size(r_trj_decorrelated )[end]
-batchsize = 128 
+batchsize = 32
 nbatches = floor(Int, L_decorrelated / batchsize)
 # t = dev(fill!(similar(x, batchsize), FT(0)))
 # need to apply in batches

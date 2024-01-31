@@ -57,10 +57,12 @@ u .= atanh(-α/β)/γ
 # Run simulation
 @info "running simulation"
 solution = simulate(u, tspan, dt, dt_save, seed; model)
+base_solution = copy(solution)
 
 # Compute autocorrelation
 lags = [0:2000...]
-ac = StatsBase.autocor(solution[1,1:length(lags)*100], lags; demean = true)
+tmp = minimum([length(lags)*100, size(solution)[2]])
+ac = StatsBase.autocor(solution[1,1:tmp], lags; demean = true)
 τ = minimum(lags[ac .< 0.1]) # in units of dt_save
 # Our initial condition should minimize spinup, but to be safe, remove the first 10 autocorrelation times
 solution = solution[:, 10*τ:end]
@@ -71,6 +73,13 @@ if isdir(data_directory) == false
     mkdir(data_directory)
 end
 preprocess_params_file = joinpath(data_directory, "preprocess_params.jld2")
+
+trj = copy(decorrelated_solution)
+Random.seed!(1234)
+list1 = rand(1:size(trj)[2], 1000)
+list2 = rand(1:size(trj)[2], 1000)
+σmax_guestimate= maximum([norm(trj[:, i] - trj[:, j]) for i in list1, j in list2]) 
+println(" σmax_guestimate = $(σmax_guestimate * 1.2)")
 
 # compute preprocessing parameters and preproccess the data
 preprocess_data!(solution; preprocess_params_file = preprocess_params_file)
@@ -84,5 +93,5 @@ hfile["snapshots"] = reshape(decorrelated_solution,(N,N,1,size(decorrelated_solu
 hfile["decorrelation"] = τ
 hfile["decorrelation time"] = τ * dt_save
 hfile["dt save"] = dt_save
-hfile["sigma max"] = σmax
+hfile["sigma max"] = σmax_guestimate
 close(hfile)

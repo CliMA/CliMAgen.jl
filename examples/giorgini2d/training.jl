@@ -64,8 +64,7 @@ function run_training(params, f_path, savedir; FT=Float32)
         @info "Training on CPU"
     end
 
-    dataloaders = get_data(
-        f_path, "snapshots",batchsize)
+    dataloaders = get_data(f_path, "snapshots", batchsize)
 
     # set up model and optimizers
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
