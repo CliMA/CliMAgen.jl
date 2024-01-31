@@ -10,13 +10,14 @@ nogpu             = false
 batchsize         = 8
 train_fraction    = 0.9
 i_init            = 100
-i_end             = 131
-j_init            = 80
-j_end             = 111
+i_end             = 355
+j_init            = 100
+j_end             = 355
 
 [model]
-noised_channels   = 1
-sigma_max         = 64.0
+noised_channels   = 3
+
+sigma_max         = 577.0
 sigma_min         = 1e-2
 dropout_p         = 0.5
 mean_bypass       = true
@@ -39,13 +40,13 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 250
+nepochs           = 500
 freq_chckpt       = 100
 
 [sampling]
 nsteps            = 150
-nsamples          = 100
+nsamples          = 10
 nimages           = 10
-sample_channels   = 1
+sample_channels   = 3
 sampler           = "euler"
-tilesize          = 32
+tilesize          = 256

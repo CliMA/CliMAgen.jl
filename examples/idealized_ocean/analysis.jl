@@ -7,11 +7,26 @@ using Plots
 using Random
 using Statistics
 using TOML
+using CliMAgen
+using CliMAgen: dict2nt
+using CliMAgen: VarianceExplodingSDE, NoiseConditionalScoreNetwork
+using CliMAgen: score_matching_loss
+using CliMAgen: WarmupSchedule, ExponentialMovingAverage
+using CliMAgen: train!, load_model_and_optimizer
 
 using CliMAgen
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
+using CUDA
+using Dates
+using Flux
+using Random
+using TOML
+using BSON
+using DelimitedFiles
+
+include("ocean_data.jl") # for data loading
 
 function run_analysis(params; FT=Float32, logger=nothing)
     # unpack params
@@ -44,11 +59,17 @@ function run_analysis(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
+    if inchannels != 3
+        channels = 1:inchannels
+    else
+        channels = [1, 2, 4]
+    end
     dl = get_data_ocean(batchsize; 
-                        channels = 1:inchannels,
+                        channels = channels,
                         irange, 
                         jrange, 
-                        train_fraction)
+                        train_fraction, 
+                        sigma_max_comp = false)
     xtrain = first(dl)
 
     # set up model
@@ -84,7 +105,7 @@ function run_analysis(params; FT=Float32, logger=nothing)
     # create plots with nimages images of sampled data and training data
     for ch in 1:inchannels
         heatmap_grid(samples[:, :, ch:ch, 1:nimages], 1, savedir, "$(sampler)_images_$(ch).png")
-        # heatmap_grid(xtrain[:, :, ch:ch, 1:nimages], ch, savedir, "train_images_$(ch).png")
+        heatmap_grid(xtrain.data.data[:, :, [ch], 1:nimages], 1, savedir, "train_images_$(ch).png")
     end
     
     loss_plot(savedir, "losses.png"; xlog = false, ylog = true)    

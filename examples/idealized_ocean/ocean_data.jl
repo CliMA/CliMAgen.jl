@@ -39,6 +39,7 @@ function get_data_ocean(batchsize;
                         jrange = 1:1134, 
                         train_fraction = 0.8, 
                         channels = 1:4,
+                        sigma_max_comp = true,
                         FT = Float32)
     
     data = load_ocean_data(; irange, jrange)
@@ -70,9 +71,11 @@ function get_data_ocean(batchsize;
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
-    @info "computing sigma max"
-    σmax = compute_sigma_max(xtrain)
-    println("sigma max is ", σmax)
+    if sigma_max_comp
+        @info "computing sigma max"
+        σmax = compute_sigma_max(xtrain)
+        println("sigma max is ", σmax)
+    end
 
     return (; loader_train, loader_test) 
 end

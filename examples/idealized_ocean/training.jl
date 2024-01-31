@@ -66,10 +66,15 @@ function run_training(params; FT=Float32, logger=nothing)
     end
 
     # set up dataset
+    if inchannels != 3
+        channels = 1:inchannels
+    else
+        channels = [1, 2, 4]
+    end
     dataloaders = get_data_ocean(batchsize; 
                                  irange, 
                                  jrange, 
-                                 channels = 1:inchannels,
+                                 channels = channels,
                                  train_fraction)
 
     # set up model and optimizers
