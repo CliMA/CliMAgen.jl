@@ -11,7 +11,7 @@ fraction          = 1.0
 
 [model]
 noised_channels   = 1
-sigma_max         = 9.0
+sigma_max         = 28.0
 sigma_min         = 1e-2
 dropout_p         = 0.0
 mean_bypass       = true
@@ -35,7 +35,7 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 300
+nepochs           = 500
 freq_chckpt       = 100
 
 [sampling]

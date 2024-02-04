@@ -43,13 +43,13 @@ close(fid)
 checkpoint_path = joinpath(savedir, "checkpoint.bson")
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
 dev = Flux.gpu
-model = dev(model)
+model = dev(model_smooth)
 t0 = 0.0
 
 @info "applying score function"
 batchsize = 32
 nbatches = floor(Int, L / batchsize)
-# need to apply in batches
+# need to apply in batchesc
 scores = zeros(Float32, M, N, 1, L)
 for i in ProgressBar(1:nbatches)
     x = dev(CuArray(trj[:, :, [1], (i-1)*batchsize+1:i*batchsize]))
@@ -133,4 +133,5 @@ end
 
 hfile = h5open(f_path[1:end-5] * "_generative_response.hdf5", "w")
 hfile["generative response"] = generative_response
+hfile["generative response no hack"] = sra
 close(hfile)

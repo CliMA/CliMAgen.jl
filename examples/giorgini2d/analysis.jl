@@ -45,7 +45,7 @@ function run_analysis(params, f_path, savedir; FT=Float32)
     xtrain = first(train_dataloader)
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
-    model = device(model)
+    model = device(model_smooth)
     
     # sample from the trained model
     resolution = size(xtrain)[1]
