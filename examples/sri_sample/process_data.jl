@@ -17,7 +17,7 @@ r_context_snapshots = copy(context_snapshots)
 r_context_snapshots[:, :, 1, :] = (context_snapshots[:, :, 1, :] .- μ) ./ σ
 r_context_snapshots[:, :, 2, :] = (context_snapshots[:, :, 2, :] .- μ_context) ./ std_context
 
-hfile_context = h5open("data/data_0.0_0.0_0.0_0.0_context.hdf5", "w")
+hfile_context = h5open("data/data_1.0_0.0_0.0_0.0_context.hdf5", "w")
 hfile_context["snapshots"] = r_context_snapshots
 hfile_context["mean"] = μ
 hfile_context["standard deviation"] = σ

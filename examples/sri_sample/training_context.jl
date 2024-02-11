@@ -80,6 +80,7 @@ function run_training(params, f_path, savedir; FT=Float32)
     else
         net = NoiseConditionalScoreNetwork(;
                                            noised_channels = inchannels,
+                                           context_channels = context_channels,
                                            shift_input = shift_input,
                                            shift_output = shift_output,
                                            mean_bypass = mean_bypass,
