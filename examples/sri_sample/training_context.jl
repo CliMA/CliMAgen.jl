@@ -79,6 +79,7 @@ function run_training(params, f_path, savedir; FT=Float32)
         start_epoch = loss_data[end,1]+1
     else
         net = NoiseConditionalScoreNetwork(;
+                                           context = true,
                                            noised_channels = inchannels,
                                            context_channels = context_channels,
                                            shift_input = shift_input,
