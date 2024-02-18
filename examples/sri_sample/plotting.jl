@@ -14,6 +14,8 @@ close(hfile_sample)
 snapshots = snapshots * σ .+ μ 
 samples = samples .* σ .+ μ
 
+println(std(samples), " vs ", std(snapshots))
+
 N = 4
 colormap = :thermometer
 qp = 0.95

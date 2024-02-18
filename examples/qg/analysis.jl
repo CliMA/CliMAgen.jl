@@ -19,14 +19,13 @@ function run_analysis(params, f_path, savedir; FT=Float32)
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     
-    nsamples = params.data.batchsize
+    batchsize = params.data.batchsize
     fraction = params.data.fraction
 
     inchannels = params.model.noised_channels
-    noised_channels = inchannels
-    context_channels = params.model.context_channels
     nsamples = params.sampling.nsamples
     nimages = params.sampling.nimages
+    batchsize = nsamples
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
     rngseed > 0 && Random.seed!(rngseed)
@@ -40,19 +39,10 @@ function run_analysis(params, f_path, savedir; FT=Float32)
         @info "Sampling on CPU"
     end
 
-    train_dataloader, test_dataloader = get_data(f_path, "snapshots", nsamples)
-    x_dataloader = test_dataloader
-    train = cat([x for x in x_dataloader]..., dims=4)
-    xtrain = train[:,:,1:noised_channels,:]
-    old_ctrain = train[:,:,(noised_channels+1):(noised_channels+context_channels),:]
-    ctrain = copy(old_ctrain)
-    nsamples = minimum([size(xtrain)[end], nsamples])
-    inds = 2:2
-    if length(inds) == 1
-        ctrain .= ctrain[:,:, :, inds] # draw from context 1:1
-    end
-    println("nsamples is ", nsamples)
-    
+    train_dataloader, test_dataloader = get_data(
+        f_path, "snapshots", batchsize)
+
+    xtrain = first(train_dataloader)
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model_smooth)
@@ -68,20 +58,20 @@ function run_analysis(params, f_path, savedir; FT=Float32)
         num_steps=nsteps,
     )
     if sampler == "euler"
-        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctrain[:,:,:,1:nsamples])
+        samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt)
     elseif sampler == "pc"
-        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c=ctrain[:, :, :, 1:nsamples])
+        samples = predictor_corrector_sampler(model, init_x, time_steps, Δt)
     end
     samples = cpu(samples) 
 
     spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
-    qq_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "qq_plot.png")
-    spectrum_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "mean_spectra.png")
+    qq_plot(xtrain, samples, savedir, "qq_plot.png")
+    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png")
 
     # create plots with nimages images of sampled data and training data
     for ch in 1:inchannels
-        heatmap_grid(samples[:, :, [ch], 1:nimages], ch, savedir, "$(sampler)_images_$(ch).png")
-        heatmap_grid(xtrain[:, :, [ch], 1:nimages], ch, savedir, "train_images_$(ch).png")
+        heatmap_grid(samples[:, :, [ch], 1:nimages], 1, savedir, "$(sampler)_images_$(ch).png")
+        heatmap_grid(xtrain[:, :, [ch], 1:nimages], 1, savedir, "train_images_$(ch).png")
     end
     ncum = 10
     cum_x = zeros(ncum)
@@ -104,9 +94,6 @@ function run_analysis(params, f_path, savedir; FT=Float32)
     hfile["data cumulants"] = cum_x
     hfile["generative cumulants"] = cum_samples
     hfile["samples"] = samples
-    hfile["data"] = xtrain
-    hfile["context"] = ctrain
-    hfile["context indices"] = collect(inds)
     close(hfile)
 end
 
@@ -117,7 +104,7 @@ function main(;model_toml="Model.toml", experiment_toml="Experiment.toml")
     β = FT(toml_dict["param_group"]["beta"])
     γ = FT(toml_dict["param_group"]["gamma"])
     σ = FT(toml_dict["param_group"]["sigma"])
-    f_path = "data/data_$(α)_$(β)_$(γ)_$(σ)_context.hdf5"
+    f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
 
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)

@@ -80,8 +80,8 @@ function run_analysis(params, f_path, savedir; FT=Float32)
 
     # create plots with nimages images of sampled data and training data
     for ch in 1:inchannels
-        heatmap_grid(samples[:, :, [ch], 1:nimages], ch, savedir, "$(sampler)_images_$(ch).png")
-        heatmap_grid(xtrain[:, :, [ch], 1:nimages], ch, savedir, "train_images_$(ch).png")
+        heatmap_grid(samples[:, :, [ch], 1:nimages], 1, savedir, "$(sampler)_images_$(ch).png")
+        heatmap_grid(xtrain[:, :, [ch], 1:nimages], 1, savedir, "train_images_$(ch).png")
     end
     ncum = 10
     cum_x = zeros(ncum)
