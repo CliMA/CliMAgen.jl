@@ -1,5 +1,5 @@
 @info "Running experiments"
-#=
+
 @info "Experiment 1"
 include("training_context.jl")
 main(;model_toml="Model1.toml")
@@ -11,8 +11,8 @@ include("training_context.jl")
 main(;model_toml="Model2.toml")
 include("analysis_context.jl")
 main(;model_toml="Model2.toml")
-=# 
 
+#=
 @info "Experiment 3"
 include("training_context.jl")
 main(;model_toml="Model3.toml")
@@ -30,4 +30,5 @@ include("training_context.jl")
 main(;model_toml="Model5.toml")
 include("analysis_context.jl")
 main(;model_toml="Model5.toml")
+=#
 

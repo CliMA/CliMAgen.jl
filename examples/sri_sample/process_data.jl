@@ -1,4 +1,4 @@
-using HDF5, Statistics
+using HDF5, Statistics, LinearAlgebra
 
 hfile_true = h5open("data/data_0.0_0.0_0.0_0.0.hdf5", "r")
 μ = read(hfile_true["mean"])
@@ -9,6 +9,9 @@ close(hfile_true)
 hfile_context_true = h5open("data/sri_data_context.hdf5", "r")
 context_snapshots = read(hfile_context_true["snapshots"])
 close(hfile_context_true)
+
+μ =  mean(context_snapshots[:, :, 1, :])
+std = std(context_snapshots[:, :, 1, :])
 
 μ_context =  mean(context_snapshots[:, :, 2, :])
 std_context = std(context_snapshots[:, :, 2, :])

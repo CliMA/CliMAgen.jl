@@ -2,8 +2,8 @@ using GLMakie, HDF5, Random, Statistics
 Random.seed!(1234)
 
 
-hfile_sample = h5open("data/data_5.0_0.0_0.0_0.0_context_analysis.hdf5", "r")
-hfile_context = h5open("data/data_5.0_0.0_0.0_0.0_context.hdf5", "r")
+hfile_sample = h5open("data/data_1.0_0.0_0.0_0.0_context_analysis.hdf5", "r")
+hfile_context = h5open("data/data_1.0_0.0_0.0_0.0_context.hdf5", "r")
 
 snapshots = read(hfile_context["snapshots"])
 μ = read(hfile_context["mean"])
