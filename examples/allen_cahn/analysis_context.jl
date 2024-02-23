@@ -117,9 +117,6 @@ function run_analysis(params, f_path, savedir; FT=Float32)
     hfile["contexts"] = old_ctrain
     close(hfile)
 
-
-
-
 end
 
 function main(;model_toml="Model.toml", experiment_toml="Experiment.toml")
