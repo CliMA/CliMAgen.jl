@@ -58,7 +58,7 @@ end
 normalized_snapshots = (snapshots .- μs) ./ σs
 
 hfile3 = h5open("data/data_4.0_0.0_0.0_0.0_context.hdf5", "w")
-hfile3["snapshots"] =  Float32.(normalized_snapshots[:, :, [2, 1], 1:end])
+hfile3["snapshots"] =  Float32.(normalized_snapshots[:, :, :, 1:end])
 hfile3["mean"] = μs
 hfile3["standard deviation"] = σs
 close(hfile3)

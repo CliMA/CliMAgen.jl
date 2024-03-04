@@ -10,7 +10,7 @@ batchsize         = 1
 fraction          = 1.0
 
 [model]
-noised_channels   = 1
+noised_channels   = 6
 context_channels  = 1
 sigma_max         = 14.0
 sigma_min         = 1e-2
