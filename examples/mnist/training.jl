@@ -22,6 +22,7 @@ function run_training(params; FT=Float32, logger=nothing)
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
+    fraction  = params.data.fraction
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
     inchannels = params.model.inchannels
@@ -55,6 +56,7 @@ function run_training(params; FT=Float32, logger=nothing)
     # set up dataset
     dataloaders = get_data_mnist(
         batchsize;
+        fraction=fraction,
         FT=FT
     )
 
