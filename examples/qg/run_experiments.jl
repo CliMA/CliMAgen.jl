@@ -22,12 +22,37 @@ include("training_context.jl")
 main(;model_toml="Model3.toml", experiment_toml="Experiment3.toml")
 include("analysis_context.jl")
 main(;model_toml="Model3.toml", experiment_toml="Experiment3.toml")
-=#
 
 @info "Experiment 4"
 include("training_context.jl")
 main(;model_toml="Model4.toml", experiment_toml="Experiment4.toml")
 include("analysis_context.jl")
 main(;model_toml="Model4.toml", experiment_toml="Experiment4.toml")
+=#
+
+#=
+@info "Experiment 5"
+include("training_context.jl")
+main(;model_toml="Model5.toml", experiment_toml="Experiment5.toml")
+include("analysis_context.jl")
+main(;model_toml="Model5.toml", experiment_toml="Experiment5.toml")
+
+@info "Experiment 6"
+include("training_context.jl")
+main(;model_toml="Model6.toml", experiment_toml="Experiment6.toml")
+include("analysis_context.jl")
+main(;model_toml="Model6.toml", experiment_toml="Experiment6.toml")
+
+@info "Experiment 7"
+include("training_context.jl")
+main(;model_toml="Model7.toml", experiment_toml="Experiment7.toml")
+include("analysis_context.jl")
+main(;model_toml="Model7.toml", experiment_toml="Experiment7.toml")
+=#
 
 
+@info "Experiment 3"
+include("training_context.jl")
+main(;model_toml="Model3.toml", experiment_toml="Experiment3.toml")
+include("analysis_context.jl")
+main(;model_toml="Model3.toml", experiment_toml="Experiment3.toml")

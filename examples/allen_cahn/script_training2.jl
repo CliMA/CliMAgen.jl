@@ -18,8 +18,8 @@ using CliMAgen: train!, load_model_and_optimizer
 include("../utils_data.jl") # for data loading
 include("dataloader.jl") # for data loading
 
-model_toml="Model.toml"
-experiment_toml="Experiment.toml"
+model_toml = "Model2.toml"
+experiment_toml = "Experiment2.toml"
 FT = Float32
 toml_dict = TOML.parsefile(model_toml)
 α = FT(toml_dict["param_group"]["alpha"])
@@ -83,7 +83,14 @@ else
     @info "Training on CPU"
 end
 
-dataloaders = get_data(f_path, "timeseries", batchsize)
+
+fid = h5open(f_path, "r")
+data = read(fid, "timeseries")
+close(fid)
+M = size(data)[end]
+loader_train = DataLoaders.DataLoader(data[:, :, :, 1:M÷2], batchsize)
+loader_test = DataLoaders.DataLoader(data[:, :, :, M÷2+1:end], batchsize)
+dataloaders = (; loader_train, loader_test)
 #=
 for x in dataloaders.loader_train
     println("x: ", size(x))
@@ -98,32 +105,32 @@ if isfile(checkpoint_path) && isfile(loss_file)
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
     model = device(model)
     model_smooth = device(model_smooth)
-    loss_data = DelimitedFiles.readdlm(loss_file, ',', skipstart = 1)
-    start_epoch = loss_data[end,1]+1
+    loss_data = DelimitedFiles.readdlm(loss_file, ',', skipstart=1)
+    start_epoch = loss_data[end, 1] + 1
 else
     net = NoiseConditionalScoreNetwork(;
-                                        context = true,
-                                        noised_channels = inchannels,
-                                        context_channels = context_channels,
-                                        shift_input = shift_input,
-                                        shift_output = shift_output,
-                                        mean_bypass = mean_bypass,
-                                        scale_mean_bypass = scale_mean_bypass,
-                                        gnorm = gnorm,
-                                        dropout_p = dropout_p,
-                                        proj_kernelsize = proj_kernelsize,
-                                        outer_kernelsize = outer_kernelsize,
-                                        middle_kernelsize = middle_kernelsize,
-                                        inner_kernelsize = inner_kernelsize,
-                                        periodic = periodic,
-                                        )
+        context = false,
+        noised_channels=inchannels,
+        context_channels=context_channels,
+        shift_input=shift_input,
+        shift_output=shift_output,
+        mean_bypass=mean_bypass,
+        scale_mean_bypass=scale_mean_bypass,
+        gnorm=gnorm,
+        dropout_p=dropout_p,
+        proj_kernelsize=proj_kernelsize,
+        outer_kernelsize=outer_kernelsize,
+        middle_kernelsize=middle_kernelsize,
+        inner_kernelsize=inner_kernelsize,
+        periodic=periodic,
+    )
     model = VarianceExplodingSDE(sigma_max, sigma_min, net)
     model = device(model)
     model_smooth = deepcopy(model)
 
     opt = Flux.Optimise.Optimiser(
         WarmupSchedule{FT}(
-            nwarmup 
+            nwarmup
         ),
         Flux.Optimise.ClipNorm(gradnorm),
         Flux.Optimise.Adam(
@@ -135,21 +142,16 @@ else
     opt_smooth = ExponentialMovingAverage(ema_rate)
 
     # set up loss file
-    loss_names = reshape(["#Epoch", "Mean Train", "Spatial Train","Mean Test","Spatial Test"], (1,5))
-    open(loss_file,"w") do io
-            DelimitedFiles.writedlm(io, loss_names,',')
+    loss_names = reshape(["#Epoch", "Mean Train", "Spatial Train", "Mean Test", "Spatial Test"], (1, 5))
+    open(loss_file, "w") do io
+        DelimitedFiles.writedlm(io, loss_names, ',')
     end
 
-    start_epoch=1
+    start_epoch = 1
 end
 
 # set up loss function
-function lossfn(y; noised_channels = inchannels, context_channels=context_channels)
-    x = y[:,:,1:noised_channels,:]
-    c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
-    return score_matching_loss(model, x; c = c)
-end
-
+lossfn(y)  = score_matching_loss(model, y)
 
 # train the model
 train!(
@@ -161,8 +163,8 @@ train!(
     opt_smooth,
     nepochs,
     device;
-    start_epoch = start_epoch,
-    savedir = savedir,
-    logger = nothing,
-    freq_chckpt = freq_chckpt,
+    start_epoch=start_epoch,
+    savedir=savedir,
+    logger=nothing,
+    freq_chckpt=freq_chckpt,
 )

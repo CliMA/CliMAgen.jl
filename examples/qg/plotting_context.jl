@@ -3,8 +3,8 @@ using HDF5, Random, Statistics
 Random.seed!(1234)
 
 
-hfile_sample = h5open("data/data_4.0_0.0_0.0_0.0_context_analysis.hdf5", "r")
-hfile_context = h5open("data/data_4.0_0.0_0.0_0.0_context.hdf5", "r")
+hfile_sample = h5open("data/data_3.0_0.0_0.0_0.0_context_analysis.hdf5", "r")
+hfile_context = h5open("data/data_3.0_0.0_0.0_0.0_context.hdf5", "r")
 
 snapshots = read(hfile_context["snapshots"])
 samples = read(hfile_sample["samples"])
@@ -12,8 +12,8 @@ xtrain = read(hfile_sample["data"] )
 ctrain = read(hfile_sample["context"])
 ctrains = read(hfile_sample["contexts"])
 inds = read(hfile_sample["context indices"])
-μs = read(hfile_context["mean"])
-σs = read(hfile_context["standard deviation"])
+# μs = read(hfile_context["mean"])
+# σs = read(hfile_context["standard deviation"])
 samples_c = read(hfile_sample["samples with various conditionals"])
 close(hfile_context)
 close(hfile_sample)
@@ -54,8 +54,10 @@ end
 
 display(fig5)
 
+save("fig1.png", fig5)
+
 ##
-fig4 = Figure() 
+fig4 = Figure(resolution = (1200, 900)) 
 
 ax = GLMakie.Axis(fig4[1, 1]; title = "True Field")
 GLMakie.heatmap!(ax, xtrain[:, :, 1, context_index]', colorrange = cr, colormap = colormap)
@@ -70,8 +72,10 @@ ax = GLMakie.Axis(fig4[1, 4]; title = "Standard Devation")
 GLMakie.heatmap!(ax, std(samples, dims= 4)[:, :, 1, 1]', colorrange = cr, colormap = colormap)
 display(fig4)
 
+save("fig2.png", fig4)
+
 ##
-fig3 = Figure() 
+fig3 = Figure(resolution = (1200, 900)) 
 
 p1x_e = ctrain[:, :, [1], [context_index]] - circshift(ctrain[:, :, [1], [context_index]], (0, 2, 0, 0))
 p2_e = samples[:, :, [1], :]
@@ -110,14 +114,14 @@ errorbars!(ax, heatflux4, lats, heatflux_lower_quantile, heatflux_upper_quantile
 
 ax = GLMakie.Axis(fig3[2, 2]; title = "Heat Flux: Together", options...)
 GLMakie.lines!(ax, heatflux1, lats, color = :blue)
-GLMakie.lines!(ax, heatflux2, lats, color = :red)
+# GLMakie.lines!(ax, heatflux2, lats, color = :red)
 # GLMakie.lines!(ax, heatflux4, lats, color = :orange)
-GLMakie.scatter!(ax, heatflux4, lats, color = :orange)
+GLMakie.lines!(ax, heatflux4, lats, color = :orange)
 errorbars!(ax, heatflux4, lats, heatflux_lower_quantile, heatflux_upper_quantile,  whiskerwidth = 3, direction = :x, color = (:orange, 0.5))
 
 display(fig3)
 
-
+save("fig3.png", fig3)
 ##
 
 p1x_e = ctrains[:, :, [1], :] - circshift(ctrains[:, :, [1], :], (0, 2, 0, 0))
@@ -138,7 +142,7 @@ heatflux_upper_quantile = [quantile(heatflux_prep[i, :], qu) for i in 1:M] - hea
 heatflux_lower_quantile = heatflux4 - [quantile(heatflux_prep[i, :], 1-qu) for i in 1:M]
 =#
 
-fig2 = Figure() 
+fig2 = Figure(resolution = (900, 900)) 
 lats = collect(1:M)
 options = (; xlabel = "Heat Flux", ylabel = "Latitude")
 ax = GLMakie.Axis(fig2[1, 1]; title = "Generated Field: Heat Flux", options...)
@@ -153,9 +157,10 @@ GLMakie.lines!(ax, heatflux1, lats, color = :orange)
 
 display(fig2)
 
+save("fig4.png", fig2)
 ##
 skip = 10
-fig1 = Figure()
+fig1 = Figure(resolution = (1200, 900))
 for i in 1:4
     ax = GLMakie.Axis(fig1[1, i]; title = "Context $i")
     GLMakie.heatmap!(ax, ctrains[:,:, 1, i*skip]', colorrange = cr, colormap = colormap)
@@ -171,3 +176,5 @@ for i in 1:4
 end
 display(fig1)
 
+
+save("fig5.png", fig1)

@@ -38,9 +38,9 @@ function Dataset(split::Symbol, f_path, f_variable; f = 1.0, Tx = Float32)
     
     # splitting
     if split == :train
-        features, _ = MLUtils.splitobs(features, at=0.25) # normally at 0.8
+        features, _ = MLUtils.splitobs(features, at=0.5) # normally at 0.8
     elseif split == :test
-        _, features = MLUtils.splitobs(features, at=0.25) # normally at 0.8
+        _, features = MLUtils.splitobs(features, at=0.5) # normally at 0.8
     end
     return Dataset(split, Tx.(features))
 end
