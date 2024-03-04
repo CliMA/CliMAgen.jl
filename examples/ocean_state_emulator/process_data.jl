@@ -1,12 +1,13 @@
 using JLD2, HDF5
 using Statistics
 using LinearAlgebra
+using ProgressBars
 
 const regex = r"^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$";
 
 training_data_location = "/orcd/nese/raffaele/001/ssilvest/solution_ribased/"
 
-files = readdir("training_data")
+files = readdir(training_data_location)
 
 files = readdir(dir)
 files = filter(x -> length(x) > 20, files)
@@ -37,8 +38,8 @@ level3 = 40
 patches = [101:228, 201:328]
 snapshots = zeros(128, 128, 7, number_of_files)
 
-for (i, iter) in enumerate(iterations)
-    file = jldopen("data/compressed_iteration_$(iter).jld2")
+for (i, iter) in ProgressBar(enumerate(iterations))
+    file = jldopen(training_data_location * "compressed_iteration_$(iter).jld2")
     T = file["T"]
     S = file["S"]
     η = file["η"]
