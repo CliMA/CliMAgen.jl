@@ -11,7 +11,7 @@ using TOML
 
 using CliMAgen
 package_dir = pkgdir(CliMAgen)
-
+include(joinpath(package_dir,"examples/conus404/preprocessing_utils.jl"))
 function generate_samples(params; FT=Float32, real_space = true)
     # unpack params, including preprocessing numbers
     savedir = params.experiment.savedir
@@ -20,7 +20,7 @@ function generate_samples(params; FT=Float32, real_space = true)
     batchsize = params.data.batchsize
     n_pixels = params.data.n_pixels
     standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
     scaling = JLD2.load_object(preprocess_params_file)
     inchannels = params.model.inchannels
     nsamples = params.sampling.nsamples_generate
@@ -57,12 +57,12 @@ function generate_samples(params; FT=Float32, real_space = true)
             device,
             n_pixels,
             inchannels;
-            num_images=nsamples,
+            num_images=samples_per_batch,
             num_steps=nsteps,
         )
         batch .= Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, rng = MersenneTwister(b))
         if real_space
-            samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(invert_preprocessing(batch, scaling))
+            samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= invert_preprocessing(cpu(batch), scaling)
         else
             samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(batch)
         end

@@ -11,6 +11,7 @@ using TOML
 
 using CliMAgen
 package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/conus404/preprocessing_utils.jl"))
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
@@ -21,7 +22,7 @@ function run_analysis(params; FT=Float32)
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
     standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
     inchannels = params.model.inchannels
     nsamples = params.sampling.nsamples_analysis
     nimages = params.sampling.nimages
@@ -43,9 +44,7 @@ function run_analysis(params; FT=Float32)
     # set up dataset
     dl, _ = get_data_conus404(
         batchsize;
-        standard_scaling=standard_scaling,
         FT=FT,
-        read=true,
         preprocess_params_file=preprocess_params_file
     )
     xtrain = cat([x for x in dl]..., dims=4)
