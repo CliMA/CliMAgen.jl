@@ -640,13 +640,6 @@ function get_data_conus404(batchsize;
 
     if save
         if standard_scaling
-            maxtrain = maximum(xtrain, dims=(1, 2, 4))
-            mintrain = minimum(xtrain, dims=(1, 2, 4))
-            Δ = maxtrain .- mintrain
-            # To prevent dividing by zero
-            Δ[Δ .== 0] .= FT(1)
-            scaling = StandardScaling{FT}(mintrain, Δ)
-        else
             #scale means and spatial variations separately
             x̄ = mean(xtrain, dims=(1, 2))
             maxtrain_mean = maximum(x̄, dims=4)
@@ -661,6 +654,8 @@ function get_data_conus404(batchsize;
             Δ̄[Δ̄ .== 0] .= FT(1)
             Δp[Δp .== 0] .= FT(1)
             scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        else
+            scaling = Conus404Preprocessing{FT}(xtrain)
         end
         JLD2.save_object(preprocess_params_file, scaling)
     elseif read

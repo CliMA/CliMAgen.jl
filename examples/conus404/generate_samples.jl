@@ -11,7 +11,7 @@ using TOML
 
 using CliMAgen
 package_dir = pkgdir(CliMAgen)
-
+include(joinpath(package_dir,"examples/conus404/preprocessing.jl"))
 function generate_samples(params; FT=Float32, real_space = true)
     # unpack params, including preprocessing numbers
     savedir = params.experiment.savedir

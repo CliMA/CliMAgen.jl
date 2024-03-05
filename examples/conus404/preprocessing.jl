@@ -1,8 +1,10 @@
+using FFTW
+using Statistics
 using CliMAgen: AbstractPreprocessing
 import CliMAgen: apply_preprocessing, invert_preprocessing
 
 struct Conus404Preprocessing{FT, A} <: AbstractPreprocessing{FT}
-    low_pass::Boolean
+    low_pass::Bool
     low_pass_k::Union{Nothing, Int}
     temperature_mean_map::A
     temperature_std_map::A
@@ -14,7 +16,7 @@ function Conus404Preprocessing{FT}(xtrain; low_pass = false, low_pass_k = nothin
     end
     temporal_mean = mean(xtrain, dims = 4)
     temporal_std = std(xtrain, dims = 4)
-    return Conus404Preprocessing{FT, typeof(map)}(low_pass, low_pass_k, temporal_mean, temporal_std)
+    return Conus404Preprocessing{FT, typeof(temporal_mean)}(low_pass, low_pass_k, temporal_mean, temporal_std)
 end
 
 function apply_preprocessing(x, scaling::Conus404Preprocessing)
@@ -29,7 +31,7 @@ function invert_preprocessing(x̃, scaling::Conus404Preprocessing)
     temperature_channel = 1
     x = similar(x̃)
     x[:,:,temperature_channel,:] .= @. x̃[:,:,temperature_channel,:] * scaling.temperature_std_map  + scaling.temperature_mean_map
-    return x̃
+    return x
 end
 
     

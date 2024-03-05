@@ -13,6 +13,7 @@ using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
 
 package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/conus404/preprocessing.jl"))
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
 include("analysis.jl") # for analysis
 
