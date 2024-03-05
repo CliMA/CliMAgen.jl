@@ -1,4 +1,5 @@
 using JLD2
+using HDF5
 using FFTW
 using MLDatasets, MLUtils, Images, DataLoaders, Statistics
 using CliMADatasets
@@ -613,6 +614,64 @@ function get_data_celeba_hq(batchsize; resolution=32, gender=:male, FT=Float32)
 
     # bring data to [-1, 1] range
     xtrain = @. 2xtrain - 1
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
+"""
+Helper function that loads conus404 images and returns loaders.
+"""
+function get_data_conus404(batchsize;
+                           standard_scaling=true,
+                           FT=Float32,
+                           save=false,
+                           read=false,
+                           preprocess_params_file)
+    @assert xor(read, save)
+    fname_train = "/central/groups/esm/zhaoyi/conus404/wy1980_1989_T2MEAN.hdf5"
+    fid_train = HDF5.h5open(fname_train, "r")
+    data_train = HDF5.read(fid_train["data"])
+    xtrain = FT.(data_train)
+    fname_test = "/central/groups/esm/zhaoyi/conus404/wy2010_2019_T2MEAN.hdf5"
+    fid_test = HDF5.h5open(fname_test, "r")
+    data_test = HDF5.read(fid_test["data"])
+    xtest = FT.(data_test)
+
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+            
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+    elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
     loader_test = DataLoaders.DataLoader(xtest, batchsize)
 
     return (; loader_train, loader_test)
