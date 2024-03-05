@@ -9,6 +9,9 @@ examples/uniform/*sh
 examples/uniform/experiments
 *~
 *.png
+*.nc 
+*.txt
+*.jld2
 *.jpg
 *.jpeg
 *.gif

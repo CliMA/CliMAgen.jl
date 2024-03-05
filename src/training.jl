@@ -96,7 +96,6 @@ function update_step!(ps, ps_smooth, opt, opt_smooth, loader_train, lossfn::Func
         batch = device(batch)
         
         grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
-
         Flux.Optimise.update!(opt, ps, grad)
         Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
 
