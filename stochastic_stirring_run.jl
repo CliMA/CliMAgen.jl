@@ -1,42 +1,3 @@
-using SpeedyWeather
-using StochasticStir
-using GLMakie
-using LinearAlgebra
-using Statistics
-using ProgressBars
-using Flux
-using CliMAgen
-
-# model components
-sims = []
-t_sims = 32
-for in in 1:t_sims
-    spectral_grid = SpectralGrid(trunc=42,nlev=1)   
-    forcing = StochasticStirring(spectral_grid,latitude=45,strength=7e-11)
-    drag = JetDrag(spectral_grid,time_scale=Day(6))
-    initial_conditions = StartFromRest()
-    # construct the model and initialize
-    model = BarotropicModel(;spectral_grid,initial_conditions,forcing,drag)
-    push!(sims,initialize!(model) )
-end
-
-Nx, Ny = size(sims[1].model.output.vor)
-# now run and store output
-batch = zeros(Nx, Ny, 1, t_sims);
-
-spin_up_days = 100
-for (i,simulation) in enumerate(sims)
-    run!(simulation,period=Day(spin_up_days),output=true)
-    batch[:, :, 1, i] .= simulation.model.output.vor
-    rm("run_0001", recursive=true) 
-end
-μ = mean(batch[:,:,1,:])
-σ = std(batch[:,:,1,:])
-sigmax = 220.0 # known apriori
-# sigmax =  maximum([norm(batch[:,:,1,i] - batch[:, :, 1, j]) for i in 1:t_sims, j in 1:t_sims if i != j]) / σ * 1.5
-
-
-##
 FT = Float32
 #Read in from toml
 batchsize = t_sims
@@ -84,20 +45,18 @@ function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn, ps_smooth = p
 end
 ##
 batch = zeros(FT, Ny, Ny, 1, t_sims);
-gradient_steps = 200 * 100
+gradient_steps = 200
 sigmaxs = []
 for j in ProgressBar(1:gradient_steps)
     for (i,simulation) in enumerate(sims)
-        run!(simulation,period=Day(1),output=true);
+        run!(simulation,period=Day(1),output=true)
         tmp = FT.((simulation.model.output.vor .- μ) / σ)
         rtmp = tmp[1:2:end, :] + tmp[2:2:end, :]
         batch[:, :, 1, i] .= rtmp
         rm("run_0001", recursive=true) 
     end
-    if j % 100 == 0
-        sigmax =  maximum([norm(batch[:,:,1,i] - batch[:, :, 1, j]) for i in 1:t_sims, j in 1:t_sims if i != j]) 
-        push!(sigmaxs , sigmax)
-    end
+    sigmax =  maximum([norm(batch[:,:,1,i] - batch[:, :, 1, j]) for i in 1:t_sims, j in 1:t_sims if i != j]) 
+    push!(sigmaxs , sigmax)
     mock_callback(device(batch))
 end
 
