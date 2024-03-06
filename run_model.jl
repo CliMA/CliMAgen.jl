@@ -12,6 +12,7 @@ for j in ProgressBar(1:gradient_steps)
     if j % 100 == 0
         sigmax =  maximum([norm(batch[:,:,1,i] - batch[:, :, 1, j]) for i in 1:t_sims, j in 1:t_sims if i != j]) 
         push!(sigmaxs , sigmax)
+        CliMAgen.save_model_and_optimizer(Flux.cpu(model), Flux.cpu(model_smooth), opt, opt_smooth, "checkpoint_new.bson")
     end
     mock_callback(device(batch))
 end
@@ -49,3 +50,7 @@ for i in 1:nsamples
 end
 display(fig)
 =#
+
+# CliMAgen.save_model_and_optimizer(Flux.cpu(model), Flux.cpu(model_smooth), opt, opt_smooth, "checkpoint.bson")
+
+# BSON.@load checkpoint_path model model_smooth opt opt_smooth
