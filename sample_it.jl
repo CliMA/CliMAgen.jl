@@ -8,6 +8,11 @@ using Flux
 
 device = Flux.gpu
 
+# μ = 2.6706336894504953e-7 
+# σ = 1.6521036461155343e-5
+# to compare to speedy weather outout need to rescale like y = x * σ + μ
+# where x is the sampled image and y is the speedy weather output
+# alternatively can rescale speedy weather like x = (y - μ) / σ
 @info "Loading Model"
 checkpoint_path = "checkpoint.bson"
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
