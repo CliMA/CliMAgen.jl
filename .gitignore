@@ -25,3 +25,4 @@ examples/uniform/experiments
 *.txt
 # *.toml
 *.json
+*.hdf5

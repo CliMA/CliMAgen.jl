@@ -355,7 +355,7 @@ version = "0.10.0"
 
 [[deps.CliMAgen]]
 deps = ["ArgParse", "BSON", "CUDA", "DelimitedFiles", "Flux", "Functors", "Images", "Logging", "NNlib", "ProgressMeter", "Random", "Statistics", "Tullio", "cuDNN"]
-git-tree-sha1 = "397336afc64fb3f94d049df611a2f30946ff6bd1"
+git-tree-sha1 = "1d55ebcce3c930d8c554db2cf1422f2d03db0644"
 repo-rev = "ss-as/ocean-emulator"
 repo-url = ".."
 uuid = "36c19f5a-2420-4be7-ae2a-5a58b2348981"

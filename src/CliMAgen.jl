@@ -10,7 +10,6 @@ module CliMAgen
 using ArgParse
 using BSON
 using CUDA
-using cuDNN
 using Flux
 using NNlib
 using Functors
