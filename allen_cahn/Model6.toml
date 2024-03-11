@@ -1,0 +1,10 @@
+[param_group]
+alpha = 6.0
+beta = 0.0
+gamma = 0.0
+sigma = 0.0
+T = 1000000
+dt = 0.25
+dt_save = 1.0
+N = 1024
+seed = 12345

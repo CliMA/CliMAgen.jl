@@ -6,15 +6,15 @@ nogpu             = false
 savedir           = "output"
 
 [data]
-batchsize         = 8
+batchsize         = 32
 fraction          = 1.0
 
 [model]
 noised_channels   = 1
-context_channels  = 1
-sigma_max         = 300.0
+context_channels  = 2
+sigma_max         = 30.0
 sigma_min         = 1e-2
-dropout_p         = 0.5
+dropout_p         = 0.0
 mean_bypass       = true
 shift_input       = true
 shift_output      = true
@@ -36,12 +36,12 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 200
+nepochs           = 400
 freq_chckpt       = 100
 
 [sampling]
 nsteps            = 250
-nsamples          = 50
+nsamples          = 10
 nimages           = 10
 sample_channels   = 1
 sampler           = "euler"
