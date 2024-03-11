@@ -73,7 +73,7 @@ old_ctrain = train[:, :, (noised_channels+1):(noised_channels+context_channels),
 ctrain = copy(old_ctrain)
 nsamples = minimum([size(xtrain)[end], nsamples])
 # τ0 = # reshape(time_embedding(1.0, size(xtrain)), (size(xtrain)[1], size(xtrain)[2], 1, 1))
-t = 1/1000
+t = 60/1000
 τ0 = reshape(gfp(t), (size(xtrain)[1], size(xtrain)[2], 1, 1))
 ctrain[:, :, 1, :] .= τ0 # draw from context 1:1
 println("nsamples is ", nsamples)

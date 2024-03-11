@@ -2,6 +2,7 @@ using HDF5, DataLoaders, Random
 import DataLoaders.getobs, DataLoaders.nobs
 using CliMAgen
 import CliMAgen: GaussianFourierProjection
+using Distributions
 
 function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) where {FT}
     Random.seed!(1234) # same thing every time
@@ -23,12 +24,20 @@ struct TimeseriesData{S}
     data::S
 end
 
+##
 function DataLoaders.getobs(d::TimeseriesData, i::Int)
     data_size = size(d.data)
     N = length(data_size)
     rdata = reshape(d.data, (32, 32, 128, 2000))
+    #=
     index_lags = [collect(0:30)..., 1000] # collect(0:1000)
     shift = rand(index_lags)
+    =#
+    index_lags = 0:1000
+    ps = @. exp(-index_lags/30)
+    ps = ps / sum(ps)
+    tmp = DiscreteNonParametric(index_lags, ps)
+    shift = rand(tmp)
     ensemble_member = rand(1:128)
     i = rand(1:2000)
     j = ((i + shift) > 2000) ? 2000 : (i + shift)
