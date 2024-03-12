@@ -73,7 +73,7 @@ old_ctrain = train[:, :, (noised_channels+1):(noised_channels+context_channels),
 ctrain = copy(old_ctrain)
 nsamples = minimum([size(xtrain)[end], nsamples])
 # τ0 = # reshape(time_embedding(1.0, size(xtrain)), (size(xtrain)[1], size(xtrain)[2], 1, 1))
-t = 10/1000
+t = 30/1000
 τ0 = reshape(gfp(t), (size(xtrain)[1], size(xtrain)[2], 1, 1))
 ctrain[:, :, 1, :] .= τ0 # draw from context 1:1
 println("nsamples is ", nsamples)
@@ -92,62 +92,39 @@ time_steps, Δt, init_x = setup_sampler(
     num_images=nsamples,
     num_steps=nsteps,
 )
-if sampler == "euler"
-    samples = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctrain[:, :, :, 1:nsamples])
-    samples = cpu(samples)
-    samples2 = Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=old_ctrain[:, :, :, 1:nsamples])
-    samples2 = cpu(samples2)
-elseif sampler == "pc"
-    samples = predictor_corrector_sampler(model, init_x, time_steps, Δt; c=ctrain[:, :, :, 1:nsamples])
-    samples = cpu(samples)
-    samples2 = predictor_corrector_sampler(model, init_x, time_steps, Δt; c=old_ctrain[:, :, :, 1:nsamples])
-    samples2 = cpu(samples2)
+
+
+lags = collect(0:0.25:60)
+ai_autocorrelations = zeros(length(lags));
+rtseries = reshape(tseries, (32, 32, 128, 2000));
+for (j,t) in ProgressBar(enumerate(lags))
+    τ0 = reshape(gfp(t/1000), (size(xtrain)[1], size(xtrain)[2], 1, 1))
+    ctrain[:, :, 1, 1:nsamples] .= τ0 # draw from context 1:1
+    samples = cpu(Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctrain[:, :, :, 1:nsamples]))
+    ai_autocorrelations[j] = mean(samples[:, :, 1, :] .* samples[:, :, 2, :]) - mean(samples[:, :, 1, :]) * mean(samples[:, :, 2, :])
 end
 
 
-spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
-qq_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "qq_plot.png")
-spectrum_plot(xtrain[:, :, :, 1:nsamples], samples, savedir, "mean_spectra.png")
-
-# create plots with nimages images of sampled data and training data
-for ch in 1:inchannels
-    heatmap_grid(samples[:, :, [ch], 1:nimages], 1, savedir, "$(sampler)_images_$(ch).png")
-    heatmap_grid(samples2[:, :, [ch], 1:nimages], 1, savedir, "old_$(sampler)_images_$(ch).png")
-    heatmap_grid(xtrain[:, :, [ch], 1:nimages], 1, savedir, "train_images_$(ch).png")
+data_autocorrelations = zeros(length(0:lags[end]));
+for (j, t) in ProgressBar(enumerate(0:round(Int,lags[end])))
+    data_autocorrelations[j] = mean(rtseries[:, :, 1:nsamples, 1:end-t] .* rtseries[:, :, 1:nsamples, 1+t:end]) - mean(rtseries[:, :, 1:nsamples, 1:end-t]) * mean(rtseries[:, :, 1:nsamples, 1+t:end])
 end
+##
+using CairoMakie
 
-for ch in 1:context_channels
-    heatmap_grid(ctrain[:, :, [ch], 1:nimages], 1, savedir, "context_images_$(ch).png")
-end
+fig = Figure()
+lw = 6
+ax = CairoMakie.Axis(fig[1,1]; xlabel = "Lag", ylabel = "Autocorrelation", title = "raw")
+CairoMakie.scatter!(ax, lags, ai_autocorrelations , color=(:blue, 0.5), label="AI", linewidth = lw)
+CairoMakie.scatter!(ax, 0:lags[end], data_autocorrelations, color=(:red, 0.5), label="Data", linewidth = lw)
+# CairoMakie.ylims!(ax, 0.0, data_autocorrelations[1] * 1.1)
+CairoMakie.axislegend(ax)
+CairoMakie.save(pwd() * "/autocorrelations.png", fig)
 
-for ch in 1:context_channels
-    heatmap_grid(old_ctrain[:, :, [ch], 1:nimages], 1, savedir, "old_context_images_$(ch).png")
-end
-
-ncum = 10
-cum_x = zeros(ncum)
-cum_samples = zeros(ncum)
-for i in 1:ncum
-    cum_x[i] = cumulant(xtrain[:], i)
-    cum_samples[i] = cumulant(samples[:], i)
-end
-scatter(cum_x, label="Data", xlabel="Cumulants")
-scatter!(cum_samples, label="Gen")
-savefig(joinpath(savedir, "cumulants.png"))
-
-stephist(xtrain[:], normalize=:pdf, label="Data")
-stephist!(samples[:], normalize=:pdf, label="Gen")
-savefig(joinpath(savedir, "pdfs.png"))
-
-loss_plot(savedir, "losses.png"; xlog=false, ylog=true)
-
-hfile = h5open(f_path[1:end-5] * "_analysis.hdf5", "w")
-hfile["data cumulants"] = cum_x
-hfile["generative cumulants"] = cum_samples
-hfile["samples"] = samples
-hfile["data"] = xtrain
-hfile["context"] = ctrain
-hfile["context indices"] = t
-hfile["samples with various conditionals"] = samples2
-hfile["contexts"] = old_ctrain
-close(hfile)
+fig = Figure()
+ax = CairoMakie.Axis(fig[1,1]; xlabel = "Lag", ylabel = "Autocorrelation", title = "normalized")
+CairoMakie.scatter!(ax, lags, ai_autocorrelations / ai_autocorrelations[1], color=(:blue, 0.5), label="AI", linewidth = lw)
+CairoMakie.scatter!(ax, 0:lags[end], data_autocorrelations / data_autocorrelations[1], color=(:red, 0.5), label="Data", linewidth = lw)
+# CairoMakie.ylims!(ax, -0.1, 1.1)
+CairoMakie.axislegend(ax)
+CairoMakie.save(pwd() * "/normalized_autocorrelations.png", fig)

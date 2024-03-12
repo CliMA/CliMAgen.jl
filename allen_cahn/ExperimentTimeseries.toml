@@ -15,16 +15,16 @@ context_channels  = 1
 sigma_max         = 60.0
 sigma_min         = 1e-2
 dropout_p         = 0.0
-mean_bypass       = true
-shift_input       = true
-shift_output      = true
-scale_mean_bypass = true
-gnorm             = true
+mean_bypass       = false
+shift_input       = false
+shift_output      = false
+scale_mean_bypass = false
+gnorm             = false
 proj_kernelsize   = 3
 outer_kernelsize  = 3
 middle_kernelsize = 3
 inner_kernelsize  = 3
-periodic          = false
+periodic          = true
 
 [optimizer]
 learning_rate     = 2e-4
