@@ -1,10 +1,14 @@
-using Distributed, LinearAlgebra, Statistics
-if myid() == 1
-    using LinearAlgebra
-    using Statistics
-    using ProgressBars
-    using Flux
-    using CliMAgen
+using LinearAlgebra
+using Statistics
+using ProgressBars
+using Flux
+using CliMAgen
+
+using Distributed
+using LinearAlgebra, Statistics
+
+if nworkers() ≤ 32
+    addprocs(32)
 end
 
 @everywhere using Random
@@ -71,13 +75,14 @@ ema_rate = FT(0.999);
 device = Flux.gpu
 
 # Create network
+quick_arg = false
 net = NoiseConditionalScoreNetwork(;
                                     noised_channels = inchannels,
-                                    shift_input = true,
-                                    shift_output = true,
-                                    mean_bypass = true,
-                                    scale_mean_bypass = true,
-                                    gnorm = true,
+                                    shift_input = quick_arg,
+                                    shift_output = quick_arg,
+                                    mean_bypass = quick_arg,
+                                    scale_mean_bypass = quick_arg,
+                                    gnorm = quick_arg,
                                     )
 score_model = VarianceExplodingSDE(sigma_max, sigma_min, net)
 score_model = device(score_model)
@@ -103,7 +108,7 @@ end # myid() == 1
 ##
 
 # Run Models
-nsteps = 10000
+nsteps = 1000
 const SLEEP_DURATION = 1e-2
 
 @distributed for i in workers()
