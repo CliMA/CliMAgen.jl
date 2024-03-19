@@ -7,7 +7,7 @@ using CliMAgen
 using Distributed
 using LinearAlgebra, Statistics
 
-if nworkers() ≤ 32
+if nworkers() < 32
     addprocs(32)
 end
 
@@ -75,7 +75,7 @@ ema_rate = FT(0.999);
 device = Flux.gpu
 
 # Create network
-quick_arg = false
+quick_arg = true
 net = NoiseConditionalScoreNetwork(;
                                     noised_channels = inchannels,
                                     shift_input = quick_arg,
@@ -108,7 +108,7 @@ end # myid() == 1
 ##
 
 # Run Models
-nsteps = 1000
+nsteps = 10000
 const SLEEP_DURATION = 1e-2
 
 @distributed for i in workers()
