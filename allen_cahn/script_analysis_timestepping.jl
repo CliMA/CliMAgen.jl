@@ -14,8 +14,8 @@ Random.seed!(1234)
 include("utils_analysis.jl") # for data loading
 include("dataloader.jl") # for data loading
 
-model_toml = "ModelTimeseries.toml"
-experiment_toml = "ExperimentTimeseries.toml"
+model_toml = "ModelTimestepping.toml"
+experiment_toml = "ExperimentTimestepping.toml"
 FT = Float32
 toml_dict = TOML.parsefile(model_toml)
 α = FT(toml_dict["param_group"]["alpha"])
@@ -71,11 +71,13 @@ tmp_shuffle = shuffle(1:nsamples)
 xtrain = train[:, :, 1:noised_channels, tmp_shuffle]
 old_ctrain = train[:, :, (noised_channels+1):(noised_channels+context_channels), tmp_shuffle]
 ctrain = copy(old_ctrain)
+#=
 nsamples = minimum([size(xtrain)[end], nsamples])
 # τ0 = # reshape(time_embedding(1.0, size(xtrain)), (size(xtrain)[1], size(xtrain)[2], 1, 1))
 t = 0.0/300# 0/1000
 τ0 = reshape(gfp(t), (size(xtrain)[1], size(xtrain)[2], 1, 1))
 ctrain[:, :, 1, :] .= τ0 # draw from context 1:1
+=#
 println("nsamples is ", nsamples)
 
 checkpoint_path = joinpath(savedir, "checkpoint.bson")
@@ -141,6 +143,7 @@ savefig(joinpath(savedir, "pdfs.png"))
 
 loss_plot(savedir, "losses.png"; xlog=false, ylog=true)
 
+#=
 hfile = h5open(f_path[1:end-5] * "_analysis.hdf5", "w")
 hfile["data cumulants"] = cum_x
 hfile["generative cumulants"] = cum_samples
@@ -151,6 +154,7 @@ hfile["context indices"] = t
 hfile["samples with various conditionals"] = samples2
 hfile["contexts"] = old_ctrain
 close(hfile)
+=#
 ##
 hfile = h5open("data/data_1.0_0.0_0.0_0.0.hdf5", "r")
 tseries = read(hfile, "timeseries");

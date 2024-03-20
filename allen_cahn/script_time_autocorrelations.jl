@@ -73,8 +73,8 @@ old_ctrain = train[:, :, (noised_channels+1):(noised_channels+context_channels),
 ctrain = copy(old_ctrain)
 nsamples = minimum([size(xtrain)[end], nsamples])
 # τ0 = # reshape(time_embedding(1.0, size(xtrain)), (size(xtrain)[1], size(xtrain)[2], 1, 1))
-t = 30/1000
-τ0 = reshape(gfp(t), (size(xtrain)[1], size(xtrain)[2], 1, 1))
+t = 0/350
+τ0 = Float32.(reshape(gfp(t), (size(xtrain)[1], size(xtrain)[2], 1, 1)))
 ctrain[:, :, 1, :] .= τ0 # draw from context 1:1
 println("nsamples is ", nsamples)
 
@@ -94,29 +94,32 @@ time_steps, Δt, init_x = setup_sampler(
 )
 
 
-lags = collect(0:0.25:60)
+lags = collect(0:5:300)
 ai_autocorrelations = zeros(length(lags));
 rtseries = reshape(tseries, (32, 32, 128, 2000));
 for (j,t) in ProgressBar(enumerate(lags))
-    τ0 = reshape(gfp(t/1000), (size(xtrain)[1], size(xtrain)[2], 1, 1))
+    τ0 = Float32.(reshape(gfp(t/lags[end]), (size(xtrain)[1], size(xtrain)[2], 1, 1)))
     ctrain[:, :, 1, 1:nsamples] .= τ0 # draw from context 1:1
     samples = cpu(Euler_Maruyama_sampler(model, init_x, time_steps, Δt; c=ctrain[:, :, :, 1:nsamples]))
     ai_autocorrelations[j] = mean(samples[:, :, 1, :] .* samples[:, :, 2, :]) - mean(samples[:, :, 1, :]) * mean(samples[:, :, 2, :])
 end
 
 
-data_autocorrelations = zeros(length(0:lags[end]));
-for (j, t) in ProgressBar(enumerate(0:round(Int,lags[end])))
+elags = 0:5:lags[end]
+data_autocorrelations = zeros(length(elags));
+for (j, t) in ProgressBar(enumerate(elags))
     data_autocorrelations[j] = mean(rtseries[:, :, 1:nsamples, 1:end-t] .* rtseries[:, :, 1:nsamples, 1+t:end]) - mean(rtseries[:, :, 1:nsamples, 1:end-t]) * mean(rtseries[:, :, 1:nsamples, 1+t:end])
 end
 ##
+@info "Plotting"
 using CairoMakie
 
 fig = Figure()
 lw = 6
 ax = CairoMakie.Axis(fig[1,1]; xlabel = "Lag", ylabel = "Autocorrelation", title = "raw")
 CairoMakie.scatter!(ax, lags, ai_autocorrelations , color=(:blue, 0.5), label="AI", linewidth = lw)
-CairoMakie.scatter!(ax, 0:lags[end], data_autocorrelations, color=(:red, 0.5), label="Data", linewidth = lw)
+CairoMakie.lines!(ax, elags, data_autocorrelations, color=(:red, 0.5), label="Data", linewidth = lw)
+vlines!(ax, [π * 100], color = :black)
 # CairoMakie.ylims!(ax, 0.0, data_autocorrelations[1] * 1.1)
 CairoMakie.axislegend(ax)
 CairoMakie.save(pwd() * "/autocorrelations.png", fig)
@@ -124,7 +127,8 @@ CairoMakie.save(pwd() * "/autocorrelations.png", fig)
 fig = Figure()
 ax = CairoMakie.Axis(fig[1,1]; xlabel = "Lag", ylabel = "Autocorrelation", title = "normalized")
 CairoMakie.scatter!(ax, lags, ai_autocorrelations / ai_autocorrelations[1], color=(:blue, 0.5), label="AI", linewidth = lw)
-CairoMakie.scatter!(ax, 0:lags[end], data_autocorrelations / data_autocorrelations[1], color=(:red, 0.5), label="Data", linewidth = lw)
+CairoMakie.lines!(ax, elags, data_autocorrelations / data_autocorrelations[1], color=(:red, 0.5), label="Data", linewidth = lw)
 # CairoMakie.ylims!(ax, -0.1, 1.1)
+vlines!(ax, [π * 100], color = :black)
 CairoMakie.axislegend(ax)
 CairoMakie.save(pwd() * "/normalized_autocorrelations.png", fig)

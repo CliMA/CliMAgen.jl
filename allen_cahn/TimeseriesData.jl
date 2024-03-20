@@ -40,19 +40,28 @@ function DataLoaders.getobs(d::TimeseriesData, i::Int)
     ps = ps / sum(ps)
     ps =(ps2 + ps)/2
     =#
-    index_lags = 0:1000
+    #=
+    index_lags = 0:350
     ps = @. exp(-index_lags/30)
     ps = ps / sum(ps)
     n = length(index_lags)
     ps2 = @. ps * 0 + 1 /n 
-    ps =(ps2 + ps)/2 # half the time uniform distribution half the time exponential distribution
+    # ps =(ps2 + ps)/2 # half the time uniform distribution half the time exponential distribution
+    ps = (ps2 + ps + reverse(ps)) / 3 # 1/3 of the time uniform, 1/3 weight beginning, 1/3 weight end. Should learn to decorrelate better
     tmp = DiscreteNonParametric(index_lags, ps)
     shift = rand(tmp)
+    =#
+    
+    index_lags = collect(0:10:60)
+    tmp = copy(index_lags)
+    shift = rand(tmp)
+    
     ensemble_member = rand(1:128)
     i = rand(1:2000)
     j = ((i + shift) > 2000) ? 2000 : (i + shift)
-    data1 = rdata[:, :, ensemble_member, i]
-    data2 = rdata[:, :, ensemble_member, j]
+    flip = rand([-1, 1]) # add symmetry
+    data1 = flip * rdata[:, :, ensemble_member, i]
+    data2 = flip * rdata[:, :, ensemble_member, j]
     τ = (j-i) / index_lags[end]
     T = gfp(τ) 
     return cat(data1, data2, T; dims = 3)
