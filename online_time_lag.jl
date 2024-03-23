@@ -3,12 +3,12 @@ using Statistics
 using ProgressBars
 using Flux
 using CliMAgen
-import CliMAgen: GaussianFourierProjecti64
+import CliMAgen: GaussianFourierProjection
 
 using Distributed
 using LinearAlgebra, Statistics
 
-if nworkers() < 32
+if nworkers() < 8
     addprocs(8)
 end
 
@@ -61,14 +61,14 @@ sigmax = norm(atmp1 - atmp2) / σ * 1.2
 function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) where {FT}
     Random.seed!(1234) # same thing every time
     W = randn(FT, embed_dim ÷ 2, embed_dim2) .* scale
-    return GaussianFourierProjection(W)
+    return CliMAgen.GaussianFourierProjection(W)
 end
 
 gfp = GaussianFourierProjection(64, 64, 30.0f0)
 cpu_batch = zeros(Float32, 64, 64, 3, nworkers())
 halfworkers = nworkers() ÷ 2
-cpu_batch[:, :, 3, 1:halfworkers] .= gfp(0.0)
-cpu_batch[:, :, 3, halfworkers+1:end] .= gfp(1.0)
+# cpu_batch[:, :, 3, 1:halfworkers] .= gfp(0.0f0)
+cpu_batch[:, :, 3, :] .= gfp(1.0f0)
 ## Define Score-Based Diffusion Model
 FT = Float32
 #Read in from toml
@@ -91,7 +91,7 @@ device = Flux.gpu
 quick_arg = true
 net = NoiseConditionalScoreNetwork(;
                                     noised_channels = inchannels,
-                                    context_channels,
+                                    context_channels = context_channels,
                                     context = true,
                                     shift_input = quick_arg,
                                     shift_output = quick_arg,
@@ -111,8 +111,13 @@ opt_smooth = ExponentialMovingAverage(ema_rate);
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
-lossfn = x -> score_matching_loss(score_model, x);
-function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
+
+function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
+    x = y[:,:,1:noised_channels,:]
+    c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
+    return score_matching_loss(score_model, x; c = c)
+end
+function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn_c, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
     grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
     Flux.Optimise.update!(opt, ps, grad)
     Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
@@ -123,8 +128,8 @@ end # myid() == 1
 ##
 
 # Run Models
-nsteps = 10000
-const SLEEP_DURATION = 1e-3
+nsteps = 14 * 10000
+const SLEEP_DURATION = 1e-2
 
 @distributed for i in workers()
     id = myid()
@@ -146,12 +151,14 @@ const SLEEP_DURATION = 1e-3
         gate_written::Bool = false
         while ~gate_written
             if gate_open(gates, gate_id)
+                #=
                 if gate_id ≤ halfworkers
                     gated_array[:, 2, gate_id] .= my_vorticity.var
-                    
                 else
                     gated_array[:, 2, gate_id] .= gated_array[:, 1, gate_id]
                 end
+                =#
+                gated_array[:, 2, gate_id] .= gated_array[:, 1, gate_id]
                 gated_array[:, 1, gate_id] .= my_vorticity.var
                 close_gate!(gates, gate_id)
                 # println("Closing gate $gate_id")
@@ -175,8 +182,8 @@ if myid() == 1
             # println(gated_array[1, :])
             println(j)
             
-            rbatch = copy(reshape(gated_array, (128, 64, 2, batchsize)))
-            cpu_batch[:, :, 1:2, :] .= (rbatch[1:2:end, :, :, :] + rbatch[2:2:end, :, :, :]) / (2σ)
+            rbatch = copy(reshape(gated_array, (128, 64, 2, batchsize)));
+            cpu_batch[:, :, 1:2, :] .= (rbatch[1:2:end, :, :, :] + rbatch[2:2:end, :, :, :]) / (2σ);
             open_all!(gates)
             mock_callback(device(cpu_batch))
             # mock_callback(device(batch))
