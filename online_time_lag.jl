@@ -3,6 +3,7 @@ using Statistics
 using ProgressBars
 using Flux
 using CliMAgen
+import CliMAgen: GaussianFourierProjecti64
 
 using Distributed
 using LinearAlgebra, Statistics
@@ -21,7 +22,7 @@ end
 spectral_grid = SpectralGrid(trunc=31, nlev=1)
 my_vorticity_on_1 = MyInterpolatedVorticity(spectral_grid, schedule = Schedule(every=Day(1)))
 
-gated_array = SharedArray{spectral_grid.NF}(my_vorticity_on_1.interpolator.locator.npoints, Distributed.nworkers())
+gated_array = SharedArray{spectral_grid.NF}(my_vorticity_on_1.interpolator.locator.npoints, 2, Distributed.nworkers())
 gated_array .= 0.0
 # julia --project -p 8
 # open is true, closed is false. Open means we can write to the array
@@ -56,8 +57,18 @@ atmp1 = (rtmp1[1:2:end, :] + rtmp1[2:2:end, :])/2
 atmp2 = (rtmp2[1:2:end, :] + rtmp2[2:2:end, :])/2
 σ = quantile(abs.(atmp2[:]), 0.9)
 sigmax = norm(atmp1 - atmp2) / σ * 1.2
+##
+function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) where {FT}
+    Random.seed!(1234) # same thing every time
+    W = randn(FT, embed_dim ÷ 2, embed_dim2) .* scale
+    return GaussianFourierProjection(W)
+end
 
-
+gfp = GaussianFourierProjection(64, 64, 30.0f0)
+cpu_batch = zeros(Float32, 64, 64, 3, nworkers())
+halfworkers = nworkers() ÷ 2
+cpu_batch[:, :, 3, 1:halfworkers] .= gfp(0.0)
+cpu_batch[:, :, 3, halfworkers+1:end] .= gfp(1.0)
 ## Define Score-Based Diffusion Model
 FT = Float32
 #Read in from toml
@@ -65,6 +76,8 @@ batchsize = nworkers()
 inchannels = 1
 sigma_min = FT(1e-2);
 sigma_max = FT(sigmax);
+context_channels=2
+context = true
 nwarmup = 5000;
 gradnorm = FT(1.0);
 learning_rate = FT(2e-4);
@@ -78,6 +91,8 @@ device = Flux.gpu
 quick_arg = true
 net = NoiseConditionalScoreNetwork(;
                                     noised_channels = inchannels,
+                                    context_channels,
+                                    context = true,
                                     shift_input = quick_arg,
                                     shift_output = quick_arg,
                                     mean_bypass = quick_arg,
@@ -125,13 +140,19 @@ const SLEEP_DURATION = 1e-3
     add!(model.callbacks, my_vorticity)
     simulation = initialize!(model)
     run!(simulation, period=Day(30))
-    
+    gated_array[:, 1, gate_id] .= my_vorticity.var
     for _ in 1:nsteps
         run!(simulation, period=Day(1))
         gate_written::Bool = false
         while ~gate_written
             if gate_open(gates, gate_id)
-                gated_array[:, gate_id] .= my_vorticity.var
+                if gate_id ≤ halfworkers
+                    gated_array[:, 2, gate_id] .= my_vorticity.var
+                    
+                else
+                    gated_array[:, 2, gate_id] .= gated_array[:, 1, gate_id]
+                end
+                gated_array[:, 1, gate_id] .= my_vorticity.var
                 close_gate!(gates, gate_id)
                 # println("Closing gate $gate_id")
                 gate_written = true
@@ -153,10 +174,11 @@ if myid() == 1
             j[] += 1
             # println(gated_array[1, :])
             println(j)
-            rbatch = copy(reshape(gated_array, (128, 64, 1, batchsize)))
-            batch = (rbatch[1:2:end, :, :, :] + rbatch[2:2:end, :, :, :]) / (2σ)
+            
+            rbatch = copy(reshape(gated_array, (128, 64, 2, batchsize)))
+            cpu_batch[:, :, 1:2, :] .= (rbatch[1:2:end, :, :, :] + rbatch[2:2:end, :, :, :]) / (2σ)
             open_all!(gates)
-            mock_callback(device(batch))
+            mock_callback(device(cpu_batch))
             # mock_callback(device(batch))
             # println("All gates opened.")
         else
