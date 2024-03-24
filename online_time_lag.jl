@@ -67,8 +67,8 @@ end
 gfp = GaussianFourierProjection(64, 64, 30.0f0)
 cpu_batch = zeros(Float32, 64, 64, 3, nworkers())
 halfworkers = nworkers() ÷ 2
-# cpu_batch[:, :, 3, 1:halfworkers] .= gfp(0.0f0)
-cpu_batch[:, :, 3, :] .= gfp(1.0f0)
+cpu_batch[:, :, 3, 1:halfworkers] .= gfp(0.0f0)
+cpu_batch[:, :, 3, halfworks+1:end] .= gfp(1.0f0)
 ## Define Score-Based Diffusion Model
 FT = Float32
 #Read in from toml
@@ -128,7 +128,7 @@ end # myid() == 1
 ##
 
 # Run Models
-nsteps = 14 * 10000
+nsteps = 25 * 10000 #140 * 10000 takes 11 hours
 const SLEEP_DURATION = 1e-2
 
 @distributed for i in workers()
@@ -151,14 +151,13 @@ const SLEEP_DURATION = 1e-2
         gate_written::Bool = false
         while ~gate_written
             if gate_open(gates, gate_id)
-                #=
+
                 if gate_id ≤ halfworkers
                     gated_array[:, 2, gate_id] .= my_vorticity.var
                 else
                     gated_array[:, 2, gate_id] .= gated_array[:, 1, gate_id]
                 end
-                =#
-                gated_array[:, 2, gate_id] .= gated_array[:, 1, gate_id]
+                # gated_array[:, 2, gate_id] .= gated_array[:, 1, gate_id]
                 gated_array[:, 1, gate_id] .= my_vorticity.var
                 close_gate!(gates, gate_id)
                 # println("Closing gate $gate_id")
@@ -197,3 +196,5 @@ end
 
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
+
+CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_online_time_lag_2.bson")

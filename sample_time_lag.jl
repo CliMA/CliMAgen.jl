@@ -22,11 +22,13 @@ time_steps, Δt, init_x = setup_sampler(
     num_steps=nsteps,
 )
 
+x0 = copy(init_x)
+
 samples = Euler_Maruyama_sampler(score_model, init_x, time_steps, Δt; c=ctrain[:, :, :, 1:nsamples], rng = rng)
 samples = cpu(samples)
 
 
-colorrange = (-1.0, 1.0)
+colorrange = (-1.5, 1.5)
 fig = Figure()
 ax = Axis(fig[1, 1]; title = "ai next timestep")
 heatmap!(ax, samples[:,:,1,1]; colorrange, colormap = :balance)
