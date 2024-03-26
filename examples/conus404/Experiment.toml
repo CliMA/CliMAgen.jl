@@ -8,7 +8,9 @@ nogpu             = false
 
 [data]
 batchsize         = 64
-standard_scaling  = true
+standard_scaling  = false
+low_pass          = true
+low_pass_k        = 8
 n_pixels		  = 128
 
 [model]

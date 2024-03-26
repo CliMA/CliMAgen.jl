@@ -624,6 +624,8 @@ Helper function that loads conus404 images and returns loaders.
 """
 function get_data_conus404(batchsize;
                            standard_scaling=true,
+                           low_pass=false,
+                           low_pass_k=nothing,
                            FT=Float32,
                            save=false,
                            read=false,
@@ -655,7 +657,7 @@ function get_data_conus404(batchsize;
             Δp[Δp .== 0] .= FT(1)
             scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
         else
-            scaling = Conus404Preprocessing{FT}(xtrain)
+            scaling = Conus404Preprocessing{FT}(xtrain; low_pass=low_pass, low_pass_k=low_pass_k)
         end
         JLD2.save_object(preprocess_params_file, scaling)
     elseif read

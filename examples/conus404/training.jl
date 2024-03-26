@@ -26,6 +26,8 @@ function run_training(params; FT=Float32)
     batchsize = params.data.batchsize
 
     standard_scaling = params.data.standard_scaling
+    low_pass = params.data.low_pass
+    low_pass_k = params.data.low_pass_k
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
 
     sigma_min::FT = params.model.sigma_min
@@ -70,6 +72,8 @@ function run_training(params; FT=Float32)
     dataloaders = get_data_conus404(
         batchsize;
         standard_scaling=standard_scaling,
+        low_pass=low_pass,
+        low_pass_k=low_pass_k,
         FT=FT,
         save=true,
         preprocess_params_file=preprocess_params_file
