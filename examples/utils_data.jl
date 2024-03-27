@@ -619,18 +619,7 @@ function get_data_celeba_hq(batchsize; resolution=32, gender=:male, FT=Float32)
     return (; loader_train, loader_test)
 end
 
-"""
-Helper function that loads conus404 images and returns loaders.
-"""
-function get_data_conus404(batchsize;
-                           standard_scaling=true,
-                           low_pass=false,
-                           low_pass_k=nothing,
-                           FT=Float32,
-                           save=false,
-                           read=false,
-                           preprocess_params_file)
-    @assert xor(read, save)
+function get_raw_data_conus404(; FT=Float32)
     fname_train = "/central/groups/esm/zhaoyi/conus404/wy1980_1989_T2MEAN.hdf5"
     fid_train = HDF5.h5open(fname_train, "r")
     data_train = HDF5.read(fid_train["data"])
@@ -639,30 +628,17 @@ function get_data_conus404(batchsize;
     fid_test = HDF5.h5open(fname_test, "r")
     data_test = HDF5.read(fid_test["data"])
     xtest = FT.(data_test)
+    return (; xtrain, xtest)
+end
 
-    if save
-        if standard_scaling
-            #scale means and spatial variations separately
-            x̄ = mean(xtrain, dims=(1, 2))
-            maxtrain_mean = maximum(x̄, dims=4)
-            mintrain_mean = minimum(x̄, dims=4)
-            Δ̄ = maxtrain_mean .- mintrain_mean
-            xp = xtrain .- x̄
-            maxtrain_p = maximum(xp, dims=(1, 2, 4))
-            mintrain_p = minimum(xp, dims=(1, 2, 4))
-            Δp = maxtrain_p .- mintrain_p
-            
-            # To prevent dividing by zero
-            Δ̄[Δ̄ .== 0] .= FT(1)
-            Δp[Δp .== 0] .= FT(1)
-            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
-        else
-            scaling = Conus404Preprocessing{FT}(xtrain; low_pass=low_pass, low_pass_k=low_pass_k)
-        end
-        JLD2.save_object(preprocess_params_file, scaling)
-    elseif read
-        scaling = JLD2.load_object(preprocess_params_file)
-    end
+"""
+Helper function that loads conus404 images and returns loaders.
+"""
+function get_data_conus404(batchsize;
+                           FT=Float32,
+                           preprocess_params_file)
+    xtrain, xtest = get_raw_data(FT)
+    scaling = JLD2.load_object(preprocess_params_file)
     xtrain .= apply_preprocessing(xtrain, scaling)
     # apply the same rescaler as on training set
     xtest .= apply_preprocessing(xtest, scaling)

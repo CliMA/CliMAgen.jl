@@ -13,7 +13,7 @@ using CliMAgen: WarmupSchedule, ExponentialMovingAverage
 using CliMAgen: train!, load_model_and_optimizer
 
 package_dir = pkgdir(CliMAgen)
-include(joinpath(package_dir,"examples/conus404/preprocessing.jl"))
+include(joinpath(package_dir,"examples/conus404/preprocessing_utils.jl"))
 include(joinpath(package_dir,"examples/utils_data.jl")) # for data loading
 include("analysis.jl") # for analysis
 
@@ -28,7 +28,7 @@ function run_training(params; FT=Float32)
     standard_scaling = params.data.standard_scaling
     low_pass = params.data.low_pass
     low_pass_k = params.data.low_pass_k
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
 
     sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
@@ -71,11 +71,7 @@ function run_training(params; FT=Float32)
     # set up dataset
     dataloaders = get_data_conus404(
         batchsize;
-        standard_scaling=standard_scaling,
-        low_pass=low_pass,
-        low_pass_k=low_pass_k,
         FT=FT,
-        save=true,
         preprocess_params_file=preprocess_params_file
     )
 

@@ -1,62 +1,50 @@
-using FFTW
-using Statistics
-using CliMAgen: AbstractPreprocessing
-import CliMAgen: apply_preprocessing, invert_preprocessing
+using TOML
 
-struct Conus404Preprocessing{FT, A} <: AbstractPreprocessing{FT}
-    low_pass::Bool
-    low_pass_k::Union{Nothing, Int}
-    temperature_mean_map::A
-    temperature_std_map::A
+using CliMAgen
+package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/conus404/preprocessing_utils.jl"))
+include(joinpath(package_dir,"examples/utils_data.jl"))
+
+function run_preprocess(params; FT=Float32)
+    # unpack params
+    savedir = params.experiment.savedir
+    standard_scaling = params.data.standard_scaling
+    low_pass = params.data.low_pass
+    low_pass_k = params.data.low_pass_k
+    preprocess_params_file_train = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
+    preprocess_params_file_test = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_test.jld2")
+
+    # set up dataset
+    xtrain, xtest = get_raw_data_conus404(
+        FT=FT,
+    )
+    save_preprocessing_params(
+        xtrain, preprocess_params_file_train; 
+        standard_scaling=standard_scaling,
+        low_pass=low_pass,
+        low_pass_k=low_pass_k,
+        FT=FT,
+    )
+    save_preprocessing_params(
+        xtest, preprocess_params_file_test; 
+        standard_scaling=standard_scaling,
+        low_pass=low_pass,
+        low_pass_k=low_pass_k,
+        FT=FT,
+    )
+       
 end
 
-function Conus404Preprocessing{FT}(xtrain; low_pass = false, low_pass_k = nothing) where {FT}
-    if low_pass
-        xtrain = lowpass_filter(xtrain, low_pass_k)
-    end
-    temporal_mean = mean(xtrain, dims = 4)
-    temporal_std = std(xtrain, dims = 4)
-    return Conus404Preprocessing{FT, typeof(temporal_mean)}(low_pass, low_pass_k, temporal_mean, temporal_std)
+function main(; experiment_toml="Experiment.toml")
+    FT = Float32
+
+    # read experiment parameters from file
+    params = TOML.parsefile(experiment_toml)
+    params = CliMAgen.dict2nt(params)
+
+    run_preprocess(params; FT=FT)
 end
 
-function apply_preprocessing(x, scaling::Conus404Preprocessing)
-    temperature_channel = 1
-    x̃ = similar(x)
-    x̃[:,:,temperature_channel,:] .= @. (x[:,:,temperature_channel,:] - scaling.temperature_mean_map)/scaling.temperature_std_map
-    return x̃
-end
-
-
-function invert_preprocessing(x̃, scaling::Conus404Preprocessing)
-    temperature_channel = 1
-    x = similar(x̃)
-    x[:,:,temperature_channel,:] .= @. x̃[:,:,temperature_channel,:] * scaling.temperature_std_map  + scaling.temperature_mean_map
-    return x
-end
-
-    
-"""
-    lowpass_filter(x, k)
-
-Lowpass filters the data `x`, assumed to be structured as
-dxdxCxB, where d is the number of spatial pixels, C is the number
-of channels, and B is the number of batch members, such that
-all power above wavenumber `k` = kx = ky is set to zero.
-"""
-function lowpass_filter(x, k)
-    d = size(x)[1]
-    if iseven(k)
-        k_ny = Int64(k/2+1)
-    else
-        k_ny = Int64((k+1)/2)
-    end
-    FT = eltype(x)
-    y = Complex{FT}.(x)
-    fft!(y, (1,2));
-    # Filter. The indexing here is specific to how `fft!` stores the 
-    # Fourier transformed image.
-    y[:,k_ny:(d-k_ny),:,:] .= Complex{FT}(0);
-    y[k_ny:(d-k_ny),:,:,:] .= Complex{FT}(0);
-    ifft!(y, (1,2))
-    return real(y)
+if abspath(PROGRAM_FILE) == @__FILE__
+    main(experiment_toml=ARGS[1])
 end
