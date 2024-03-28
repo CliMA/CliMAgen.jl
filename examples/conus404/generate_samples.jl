@@ -57,12 +57,12 @@ function generate_samples(params; FT=Float32, real_space = true)
             device,
             n_pixels,
             inchannels;
-            num_images=nsamples,
+            num_images=samples_per_batch,
             num_steps=nsteps,
         )
         batch .= Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, rng = MersenneTwister(b))
         if real_space
-            samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(invert_preprocessing(batch, scaling))
+            samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= invert_preprocessing(cpu(batch), scaling)
         else
             samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(batch)
         end
