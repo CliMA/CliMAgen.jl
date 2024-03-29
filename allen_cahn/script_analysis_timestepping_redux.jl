@@ -104,8 +104,6 @@ time_steps, Δt, init_x = setup_sampler(
 )
 rng = MersenneTwister(1234)
 
-
-
 tlag = 0
 t = tlag/60
 τ0 = reshape(gfp(t), (size(xtrain)[1], size(xtrain)[2], 1, 1))
