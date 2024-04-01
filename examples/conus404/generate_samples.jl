@@ -12,21 +12,18 @@ using TOML
 using CliMAgen
 package_dir = pkgdir(CliMAgen)
 include(joinpath(package_dir,"examples/conus404/preprocessing_utils.jl"))
-function generate_samples(params; FT=Float32, real_space = true)
+function generate_samples(params; FT=Float32)
     # unpack params, including preprocessing numbers
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
     n_pixels = params.data.n_pixels
-    standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
-    scaling = JLD2.load_object(preprocess_params_file)
     inchannels = params.model.inchannels
     nsamples = params.sampling.nsamples_generate
     nsteps = params.sampling.nsteps
     sampler = params.sampling.sampler
-    samples_file = params.sampling.samples_file
+    samples_file = "samples.hdf5"
     
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
@@ -61,12 +58,7 @@ function generate_samples(params; FT=Float32, real_space = true)
             num_steps=nsteps,
         )
         batch .= Euler_Maruyama_ld_sampler(model, init_x, time_steps, Δt, rng = MersenneTwister(b))
-        if real_space
-            samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= invert_preprocessing(cpu(batch), scaling)
-        else
-            samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(batch)
-        end
-        
+        samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(batch)
     end
     samplesdir = savedir
     !ispath(samplesdir) && mkpath(samplesdir)
@@ -76,16 +68,16 @@ function generate_samples(params; FT=Float32, real_space = true)
     close(fid)
 end
 
-function main(; experiment_toml="Experiment.toml", real_space = true)
+function main(; experiment_toml="Experiment.toml")
     FT = Float32
 
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
 
-    generate_samples(params; FT=FT, real_space = real_space)
+    generate_samples(params; FT=FT)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(;experiment_toml=ARGS[1], real_space = ARGS[2] == "true")
+    main(;experiment_toml=ARGS[1])
 end

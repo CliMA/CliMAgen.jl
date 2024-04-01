@@ -22,6 +22,8 @@ function run_analysis(params; FT=Float32)
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
     standard_scaling = params.data.standard_scaling
+    # always use the preprocessing parameters derived 
+    # from the training data for this step
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
     inchannels = params.model.inchannels
     nsamples = params.sampling.nsamples_analysis

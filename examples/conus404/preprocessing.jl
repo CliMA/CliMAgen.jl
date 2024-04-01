@@ -15,9 +15,7 @@ function run_preprocess(params; FT=Float32)
     preprocess_params_file_test = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_test.jld2")
 
     # set up dataset
-    xtrain, xtest = get_raw_data_conus404(
-        FT=FT,
-    )
+    xtrain, xtest = get_raw_data_conus404(FT=FT)
     save_preprocessing_params(
         xtrain, preprocess_params_file_train; 
         standard_scaling=standard_scaling,
@@ -41,7 +39,7 @@ function main(; experiment_toml="Experiment.toml")
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
-
+    !ispath(params.experiment.savedir) && mkpath(params.experiment.savedir)
     run_preprocess(params; FT=FT)
 end
 

@@ -1,22 +1,22 @@
 [experiment]
 project           = "CliMAgen.jl"
 name              = "conus404_test"
-savedir           = "output"
+savedir           = "output_zmuv"
 rngseed           = 123
 logging           = true
 nogpu             = false
 
 [data]
-batchsize         = 100
+batchsize         = 128
 standard_scaling  = false
-low_pass          = true
+low_pass          = false
 low_pass_k        = 8
 n_pixels		  = 128
 
 [model]
 inchannels        = 1
 dropout_p         = 0.0
-sigma_max         = 90.0
+sigma_max         = 580.0
 sigma_min         = 1e-2
 mean_bypass       = true
 shift_input       = true
@@ -43,7 +43,7 @@ nepochs           = 100
 freq_chckpt       = 50
 
 [sampling]
-nsteps            = 1000
+nsteps            = 250
 nsamples_analysis = 100
 nsamples_generate = 100
 nimages           = 25

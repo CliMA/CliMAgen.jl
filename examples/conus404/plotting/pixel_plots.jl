@@ -1,19 +1,19 @@
-function pixel_plots(xreal, xfake)
+function pixel_plots(x1, x2, labels, plotname)
     fig = Figure(resolution=(800, 800), fontsize=24)
     n_boot = 100
     n_grid = 200
     cil = 0.99
-    min_x, max_x = -2, 2 # need to be adjusted for our temperature range!
-    real_l, real_u = get_pdf_bci(xreal[:], min_x, max_x, n_grid, n_boot, cil)
-    fake_l, fake_u = get_pdf_bci(xfake[:], min_x, max_x, n_grid, n_boot, cil)
-    ax = CairoMakie.Axis(fig[1,1], xlabel="Temperature", ylabel="Probability density", title="Test data")
-    band!(LinRange(min_x, max_x, n_grid), real_l, real_u, color=(:orange, 0.3), label="real high res.")
-    lines!(LinRange(min_x, max_x, n_grid), real_l, color=(:orange, 0.5), strokewidth = 1.5)
-    lines!(LinRange(min_x, max_x, n_grid), real_u, color=(:orange, 0.5), strokewidth = 1.5)
-    band!(LinRange(min_x, max_x, n_grid), fake_l, fake_u, color=(:purple, 0.3), label="generated high res.")
-    lines!(LinRange(min_x, max_x, n_grid), fake_l, color=(:purple, 0.5), strokewidth = 1.5)
-    lines!(LinRange(min_x, max_x, n_grid), fake_u, color=(:purple, 0.5), strokewidth = 1.5)
+    min_x, max_x = 250, 330 # need to be adjusted for our temperature range!
+    x1_l, x1_u = get_pdf_bci(x1[:], min_x, max_x, n_grid, n_boot, cil)
+    x2_l, x2_u = get_pdf_bci(x2[:], min_x, max_x, n_grid, n_boot, cil)
+    ax = CairoMakie.Axis(fig[1,1], xlabel="Temperature", ylabel="Probability density")
+    band!(LinRange(min_x, max_x, n_grid), x1_l, x1_u, color=(:orange, 0.3), label=labels[1])
+    lines!(LinRange(min_x, max_x, n_grid), x1_l, color=(:orange, 0.5), strokewidth = 1.5)
+    lines!(LinRange(min_x, max_x, n_grid), x1_u, color=(:orange, 0.5), strokewidth = 1.5)
+    band!(LinRange(min_x, max_x, n_grid), x2_l, x2_u, color=(:purple, 0.3), label=labels[2])
+    lines!(LinRange(min_x, max_x, n_grid), x2_l, color=(:purple, 0.5), strokewidth = 1.5)
+    lines!(LinRange(min_x, max_x, n_grid), x2_u, color=(:purple, 0.5), strokewidth = 1.5)
     xlims!(ax, min_x, max_x)
     axislegend(; position= :lt, labelsize=16)
-    save("fig:pixel_values_ch1.png", fig, px_per_unit = 2)
+    save(plotname, fig, px_per_unit = 2)
 end

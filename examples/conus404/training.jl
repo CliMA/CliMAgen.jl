@@ -28,10 +28,12 @@ function run_training(params; FT=Float32)
     standard_scaling = params.data.standard_scaling
     low_pass = params.data.low_pass
     low_pass_k = params.data.low_pass_k
+    # we always train with the preprocessing parameters derived from the
+    # training data.
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
 
-    sigma_min::FT = params.model.sigma_min
     sigma_max::FT = params.model.sigma_max
+    sigma_min::FT = params.model.sigma_min
     dropout_p::FT = params.model.dropout_p
     inchannels = params.model.inchannels
     shift_input = params.model.shift_input
@@ -75,6 +77,9 @@ function run_training(params; FT=Float32)
         preprocess_params_file=preprocess_params_file
     )
 
+    # if this is the first time running, compute sigma max
+    # reduce(max,map(compute_sigma_max, dataloaders[1]))
+    
     # set up model and optimizers
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     loss_file = joinpath(savedir, "losses.txt")
