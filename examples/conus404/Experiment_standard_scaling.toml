@@ -1,4 +1,4 @@
-˘[experiment]
+[experiment]
 project           = "CliMAgen.jl"
 name              = "conus404_test"
 savedir           = "output_standard_scaling"
