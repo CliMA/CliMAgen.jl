@@ -1,4 +1,4 @@
-struct MyInterpolatedVorticity{Grid, NF_model, Grid_model} <: SpeedyWeather.AbstractCallback
+struct MyInterpolatedField{Grid, NF_model, Grid_model, FieldName} <: SpeedyWeather.AbstractCallback
     "Interpolate only when scheduled"
     schedule::Schedule
 
@@ -10,25 +10,29 @@ struct MyInterpolatedVorticity{Grid, NF_model, Grid_model} <: SpeedyWeather.Abst
 
     "Interpolator to interpolate model grid into var"
     interpolator::RingGrids.AnvilInterpolator{NF_model, Grid_model}
+
+    "Symbol for Field"
+    field_name::FieldName
 end
 
-function MyInterpolatedVorticity(
+function MyInterpolatedField(
     SG::SpectralGrid;
     layer::Integer = 1,
     nlat_half::Integer = 32,
     NF::Type{<:AbstractFloat} = Float32,
     Grid::Type{<:RingGrids.AbstractGrid} = FullGaussianGrid{NF},
-    schedule::Schedule = Schedule(every=Day(1))
+    schedule::Schedule = Schedule(every=Day(1)),
+    field_name::Symbol = :temp_grid
 )
     n_points = RingGrids.get_npoints(Grid, nlat_half)
     var = zeros(Grid, nlat_half) 
     interpolator = RingGrids.AnvilInterpolator(SG.NF, SG.Grid, SG.nlat_half, n_points)
     RingGrids.update_locator!(interpolator, RingGrids.get_latdlonds(var)...)
-    MyInterpolatedVorticity{Grid, SG.NF, SG.Grid}(schedule, layer, var, interpolator)
+    MyInterpolatedField{Grid, SG.NF, SG.Grid, Symbol}(schedule, layer, var, interpolator, field_name)
 end
 
 function SpeedyWeather.initialize!(
-    callback::MyInterpolatedVorticity,
+    callback::MyInterpolatedField,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::ModelSetup,
@@ -37,18 +41,16 @@ function SpeedyWeather.initialize!(
 end
 
 function SpeedyWeather.callback!(
-    callback::MyInterpolatedVorticity,
+    callback::MyInterpolatedField,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::ModelSetup,
 )
     isscheduled(callback.schedule, progn.clock) || return nothing
     k = callback.layer
-    (;vor_grid) = diagn.layers[k].grid_variables
+    field =getfield(diagn.layers[k].grid_variables, callback.field_name)
     (;var, interpolator) = callback
-    RingGrids.interpolate!(var, vor_grid, interpolator)
+    RingGrids.interpolate!(var, field, interpolator)
 end
 
-SpeedyWeather.finish!(::MyInterpolatedVorticity, args...) = nothing
-
-##
+SpeedyWeather.finish!(::MyInterpolatedField, args...) = nothing

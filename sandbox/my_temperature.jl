@@ -1,4 +1,4 @@
-struct MyInterpolatedVorticity{Grid, NF_model, Grid_model} <: SpeedyWeather.AbstractCallback
+struct MyInterpolatedTemperature{Grid, NF_model, Grid_model} <: SpeedyWeather.AbstractCallback
     "Interpolate only when scheduled"
     schedule::Schedule
 
@@ -12,7 +12,7 @@ struct MyInterpolatedVorticity{Grid, NF_model, Grid_model} <: SpeedyWeather.Abst
     interpolator::RingGrids.AnvilInterpolator{NF_model, Grid_model}
 end
 
-function MyInterpolatedVorticity(
+function MyInterpolatedTemperature(
     SG::SpectralGrid;
     layer::Integer = 1,
     nlat_half::Integer = 32,
@@ -24,11 +24,11 @@ function MyInterpolatedVorticity(
     var = zeros(Grid, nlat_half) 
     interpolator = RingGrids.AnvilInterpolator(SG.NF, SG.Grid, SG.nlat_half, n_points)
     RingGrids.update_locator!(interpolator, RingGrids.get_latdlonds(var)...)
-    MyInterpolatedVorticity{Grid, SG.NF, SG.Grid}(schedule, layer, var, interpolator)
+    MyInterpolatedTemperature{Grid, SG.NF, SG.Grid}(schedule, layer, var, interpolator)
 end
 
 function SpeedyWeather.initialize!(
-    callback::MyInterpolatedVorticity,
+    callback::MyInterpolatedTemperature,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::ModelSetup,
@@ -37,18 +37,16 @@ function SpeedyWeather.initialize!(
 end
 
 function SpeedyWeather.callback!(
-    callback::MyInterpolatedVorticity,
+    callback::MyInterpolatedTemperature,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::ModelSetup,
 )
     isscheduled(callback.schedule, progn.clock) || return nothing
     k = callback.layer
-    (;vor_grid) = diagn.layers[k].grid_variables
+    (;temp_grid) = diagn.layers[k].grid_variables
     (;var, interpolator) = callback
-    RingGrids.interpolate!(var, vor_grid, interpolator)
+    RingGrids.interpolate!(var, temp_grid, interpolator)
 end
 
-SpeedyWeather.finish!(::MyInterpolatedVorticity, args...) = nothing
-
-##
+SpeedyWeather.finish!(::MyInterpolatedTemperature, args...) = nothing
