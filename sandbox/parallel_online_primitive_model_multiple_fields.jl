@@ -57,12 +57,12 @@ for my_field in my_fields
 end
 # run
 simulation = initialize!(model)
-run!(simulation, period=Day(30))
+run!(simulation, period=Day(100))
 tmp1 = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(fields) * length(layers))
 for (i, my_field) in enumerate(my_fields)
     tmp1[:, i] = copy(my_fields[i].var)
 end
-run!(simulation, period=Day(30))
+run!(simulation, period=Day(100))
 tmp2 = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(fields) * length(layers))
 for (i, my_field) in enumerate(my_fields)
     tmp2[:, i] = copy(my_fields[i].var)
