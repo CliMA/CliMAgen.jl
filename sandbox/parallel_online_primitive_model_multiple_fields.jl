@@ -16,7 +16,7 @@ end
 @everywhere using StochasticStir
 @everywhere using SharedArrays
 
-@everywhere include("my_vorticity.jl")
+@everywhere include("my_field.jl")
 fields =  [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [1]
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
@@ -64,12 +64,15 @@ for (i, my_field) in enumerate(my_fields)
 end
 run!(simulation, period=Day(30))
 tmp2 = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(fields) * length(layers))
-tmp2 = copy(my_vorticity.var)
+for (i, my_field) in enumerate(my_fields)
+    tmp2[:, i] = copy(my_fields[i].var)
+end
 # sigma max
 n_fields = length(fields) * length(layers)
-rtmp1 = reshape(tmp1, (128, 64, n_fields))
+rtmp1 = reshape(tmp1, (128, 64, n_fields)) 
 rtmp2 = reshape(tmp2, (128, 64, n_fields))
-σ = reshape([quantile(abs.(rtmp2[:, :, i]), 0.9) for i in 1:n_fields], (1, 1, n_fields))
+μ = mean((rtmp1 + rtmp2)/2, dims = (1, 2))
+σ = reshape([quantile(abs.((rtmp2[:, :, i] + rtmp1[:,:,i])/2 .- μ[i])[:], 0.95) for i in 1:n_fields], (1, 1, n_fields))
 sigmax = norm((rtmp1 - rtmp2) ./ σ)  * 1.2
 
 ## Define Score-Based Diffusion Model
@@ -123,7 +126,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 10000 # 10000
+nsteps = 10 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -146,7 +149,7 @@ const SLEEP_DURATION = 1e-3
     end
     # initialize and run
     simulation = initialize!(model)
-    run!(simulation, period=Day(30))
+    run!(simulation, period=Day(100))
     
     for _ in 1:nsteps
         run!(simulation, period=Day(1))
@@ -178,7 +181,7 @@ if myid() == 1
             # println(gated_array[1, :])
             println(j)
             rbatch = copy(reshape(gated_array, (128, 64, length(my_fields), batchsize)))
-            batch = rbatch ./ reshape(σ, (1, 1, length(my_fields), 1))
+            batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
             open_all!(gates)
             mock_callback(device(batch))
             # mock_callback(device(batch))

@@ -1,5 +1,5 @@
 include("sampler.jl")
-using GLMakie
+using CairoMakie
 nsamples = 1
 nsteps = 250
 Ny = 64
@@ -25,3 +25,5 @@ rbatch = copy(reshape(gated_array, (128, 64, 1, batchsize)))
 batch = rbatch / (2σ)
 heatmap!(ax, Array(batch[:,:,1,1]); colorrange, colormap = :balance)
 display(fig)
+
+save("after_training.png", fig)
