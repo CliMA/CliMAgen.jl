@@ -7,7 +7,7 @@ using CliMAgen
 using Distributed
 using LinearAlgebra, Statistics
 
-if nworkers() < 32
+if nworkers() < 8
     addprocs(8)
 end
 
@@ -108,7 +108,7 @@ end # myid() == 1
 ##
 
 # Run Models
-nsteps = 10000
+nsteps = 4000 # 10000
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()

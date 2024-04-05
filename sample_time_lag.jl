@@ -10,8 +10,8 @@ ctrain = zeros(Float32, Ny, Ny, 2, nsamples)
 
 rbatch = copy(reshape(gated_array, (128, 64, 2, batchsize)));
 batch = (rbatch[1:2:end, :, :, :] + rbatch[2:2:end, :, :, :]) / (2σ)
-ctrain[:, :, 1, :] .= Float32.(batch[:, :, 2, [8]])
-ctrain[:, :, 2, :] .= cpu_batch[:, :, 3, [8]]
+ctrain[:, :, 1, :] .= Float32.(cpu_batch[:, :, 2, [8]])
+ctrain[:, :, 2, :] .= cpu_batch[:, :, 3, :]
 
 time_steps, Δt, init_x = setup_sampler(
     score_model_smooth,
@@ -30,26 +30,27 @@ samples = cpu(samples)
 
 colorrange = (-1.5, 1.5)
 fig = Figure()
-ax = Axis(fig[1, 1]; title = "ai next timestep")
+ax = Axis(fig[1, 1]; title = "ai current timestep")
 heatmap!(ax, samples[:,:,1,1]; colorrange, colormap = :balance)
 ax = Axis(fig[1, 2]; title = "ai next timestep")
 heatmap!(ax, samples[:,:,1,8]; colorrange, colormap = :balance)
 ax = Axis(fig[2, 1]; title = "training data current timestep")
-heatmap!(ax, batch[:,:,2,8]; colorrange, colormap = :balance)
+heatmap!(ax, cpu_batch[:,:,2,8]; colorrange, colormap = :balance)
 ax = Axis(fig[2, 2]; title = "training data next timestep")
-heatmap!(ax, batch[:,:,1,8]; colorrange, colormap = :balance)
+heatmap!(ax, cpu_batch[:,:,1,8]; colorrange, colormap = :balance)
 display(fig)
 
 fig2 = Figure() 
 ax = Axis(fig2[1,1]; title = "context")
-heatmap!(ax, batch[:, :, 2, 8]; colorrange, colormap = :balance)
+heatmap!(ax, cpu_batch[:, :, 2, 8]; colorrange, colormap = :balance)
 ax = Axis(fig2[1,2]; title = "truth")
-heatmap!(ax, batch[:, :, 1, 8]; colorrange, colormap = :balance)
+heatmap!(ax, cpu_batch[:, :, 1, 8]; colorrange, colormap = :balance)
 for i in 3:9
     ii = (i-1)÷3 + 1
     jj = (i-1)%3 + 1
-    ax = Axis(fig2[ii, jj]; title = "ai")
-    heatmap!(ax, samples[:,:,1,i-2]; colorrange, colormap = :balance)
+    ai_ind = i-2
+    ax = Axis(fig2[ii, jj]; title = "ai $ai_ind")
+    heatmap!(ax, samples[:,:,1,ai_ind]; colorrange, colormap = :balance)
 end
 display(fig2)
 
