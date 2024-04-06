@@ -195,3 +195,5 @@ end
 
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
+
+# CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_multiple_fields_invariant_density.bson")
