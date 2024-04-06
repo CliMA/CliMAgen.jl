@@ -19,14 +19,44 @@ lat, lon = RingGrids.get_latdlonds(my_fields[1].var)
 lon = reshape(lon, (128, 64))[:,1]
 lat = reshape(lat, (128, 64))[1, :]
 
-colorrange = (-1.0, 1.0)
-fig = Figure()
-ax = Axis(fig[1, 1]; title = "ai")
-heatmap!(ax, lon, lat, Array(samples)[:,:,1,1]; colorrange, colormap = :balance)
-ax = Axis(fig[1, 2]; title = "training data")
+p = 0.05
 rbatch = copy(reshape(gated_array, (128, 64, length(my_fields), batchsize)))
 batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
-heatmap!(ax, lon, lat, Array(batch[:,:,1,1]); colorrange, colormap = :balance)
+fig = Figure(resolution = (900, 600))
+
+ax = Axis(fig[1, 1]; title = "ai: T")
+colorrange1 = (quantile(Array(samples[:,:,1,1])[:], p),  quantile(Array(samples[:,:,1,1])[:], 1-p))
+heatmap!(ax, lon, lat, Array(samples)[:,:,1,1]; colorrange1, colormap = :thermometer)
+ax = Axis(fig[1, 2]; title = "training data: T")
+heatmap!(ax, lon, lat, Array(batch[:,:,1,1]); colorrange1, colormap = :thermometer)
+
+ax = Axis(fig[1, 1]; title = "ai: T")
+colorrange1 = (quantile(Array(samples[:,:,1,1])[:], p),  quantile(Array(samples[:,:,1,1])[:], 1-p))
+heatmap!(ax, lon, lat, Array(samples)[:,:,1,1]; colorrange1, colormap = :thermometer)
+ax = Axis(fig[1, 2]; title = "training data: T")
+heatmap!(ax, lon, lat, Array(batch[:,:,1,1]); colorrange1, colormap = :thermometer)
+
+ax = Axis(fig[1, 1+2]; title = "ai: ω")
+ind = 2
+colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p),)
+heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
+ax = Axis(fig[1, 2+2]; title = "training data: ω")
+heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
+
+ax = Axis(fig[2, 1]; title = "ai: humidity")
+ind = 3
+colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  quantile(Array(samples[:,:,ind,1])[:], 1-p))
+heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :blues)
+ax = Axis(fig[2, 2]; title = "training data: humidity")
+heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :blues)
+
+ax = Axis(fig[2, 1+2]; title = "ai: div")
+ind = 4
+colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p))
+heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
+ax = Axis(fig[2, 2+2]; title = "training data: div")
+heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
+
 display(fig)
 
 save("after_training_multipe_fields.png", fig)

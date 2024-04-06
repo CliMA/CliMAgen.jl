@@ -16,14 +16,15 @@ time_steps, Δt, init_x = setup_sampler(
 samples = Euler_Maruyama_sampler(score_model_smooth, init_x, time_steps, Δt)
 
 
-colorrange = (-1.0, 1.0)
 fig = Figure()
+p = 0.05
+colorrange1 = (quantile(Array(samples[:,:,1,1])[:], p),  quantile(Array(samples[:,:,1,1])[:], 1-p))
 ax = Axis(fig[1, 1]; title = "ai")
-heatmap!(ax, Array(samples[:,:,1,1]); colorrange, colormap = :balance)
+heatmap!(ax, Array(samples[:,:,1,1]); colorrange1, colormap = :thermometer)
 ax = Axis(fig[1, 2]; title = "training data")
 rbatch = copy(reshape(gated_array, (128, 64, 1, batchsize)))
 batch = rbatch / (2σ)
-heatmap!(ax, Array(batch[:,:,1,1]); colorrange, colormap = :balance)
+heatmap!(ax, Array(batch[:,:,1,1]); colorrange, colormap = :thermometer)
 display(fig)
 
 save("after_training.png", fig)
