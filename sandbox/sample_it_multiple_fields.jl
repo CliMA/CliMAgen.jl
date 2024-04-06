@@ -22,7 +22,7 @@ lat = reshape(lat, (128, 64))[1, :]
 p = 0.05
 rbatch = copy(reshape(gated_array, (128, 64, length(my_fields), batchsize)))
 batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
-fig = Figure(resolution = (900, 600))
+fig = Figure(resolution = (1200, 600))
 
 ax = Axis(fig[1, 1]; title = "ai: T")
 colorrange1 = (quantile(Array(samples[:,:,1,1])[:], p),  quantile(Array(samples[:,:,1,1])[:], 1-p))
