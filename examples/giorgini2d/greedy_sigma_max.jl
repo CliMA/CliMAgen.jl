@@ -28,9 +28,9 @@ f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
 # Obtain precomputed trajectory, reshape
 fid = h5open(f_path, "r")
 trj = read(fid, "timeseries")
-M, N, L = size(trj)
+M, N, _, L = size(trj)
 trj = reshape(trj, (M * N, L))
-decorrelation = read(fid, "decorrelation")
+# decorrelation = read(fid, "decorrelation")
 close(fid)
 
 using Random

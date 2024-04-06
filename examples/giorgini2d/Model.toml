@@ -1,5 +1,5 @@
 [param_group]
-alpha = 0.0
+alpha = 1.0
 beta = 0.0
 gamma = 0.0
 sigma = 0.0

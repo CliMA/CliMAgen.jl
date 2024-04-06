@@ -131,7 +131,21 @@ for i in 1:N, j in 1:N
     generative_response[i, j, :] .= [reshape(hsra[k][:, 1], (N, N))[i, j] for k in eachindex(hsra)]
 end
 
+##
+L = 100
+xrange = reshape(collect(range(-0.5, 0.5, length = L)), (1, 1, 1, L))
+x = dev(CuArray(trj[:, :, [1], 1:L] * 0 .+ xrange) ) 
+
+sx = Array(CliMAgen.score(model, x, Float32(0.0)))
+sx_flat = mean(sx, dims = (1,2, 3))[:]
+xx = xrange[:]
+exact_sx = 4 * xx .* (1 .- (4*xx).^2)
+
+##
 hfile = h5open(f_path[1:end-5] * "_generative_response.hdf5", "w")
 hfile["generative response"] = generative_response
 hfile["generative response no hack"] = sra
+hfile["generative constant apply"] = sx_flat 
+hfile["generative constant exact"] = exact_sx
+hfile["generative constant x"] = xx
 close(hfile)

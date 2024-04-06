@@ -3,10 +3,13 @@
 @info "Training Score Function"
 include("training.jl")
 main() 
+@info "Analysis"
+include("analysis.jl")
+main() 
 @info "Generating Score Response"
-include("generate_score_response.jl")
+include("generate_score_response_allen_cahn.jl")
 
-@info "Generating Linear Response"
-include("generate_linear_response.jl")
-@info "Generating Numerical Response"
-include("generate_numerical_response.jl")
+#@info "Generating Linear Response"
+#include("generate_linear_response.jl")
+#@info "Generating Numerical Response"
+#include("generate_numerical_response.jl")

@@ -40,7 +40,7 @@ function run_analysis(params, f_path, savedir; FT=Float32)
         @info "Sampling on CPU"
     end
 
-    train_dataloader, test_dataloader = get_data(f_path, "snapshots", nsamples)
+    train_dataloader, test_dataloader = get_data(f_path, "timeseries", nsamples)
     x_dataloader = test_dataloader
     train = cat([x for x in x_dataloader]..., dims=4)
     xtrain = train[:,:,1:noised_channels,:]

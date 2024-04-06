@@ -6,19 +6,19 @@ nogpu             = false
 savedir           = "output"
 
 [data]
-batchsize         = 32
+batchsize         = 128
 fraction          = 1.0
 
 [model]
 noised_channels   = 1
-sigma_max         = 28.0
+sigma_max         = 14.0
 sigma_min         = 1e-2
 dropout_p         = 0.0
-mean_bypass       = true
-shift_input       = true
-shift_output      = true
-scale_mean_bypass = true
-gnorm             = true
+mean_bypass       = false
+shift_input       = false
+shift_output      = false
+scale_mean_bypass = false
+gnorm             = false
 proj_kernelsize   = 3
 outer_kernelsize  = 3
 middle_kernelsize = 3
