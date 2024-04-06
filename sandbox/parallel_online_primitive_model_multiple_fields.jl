@@ -114,6 +114,21 @@ opt_smooth = ExponentialMovingAverage(ema_rate);
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
+
+
+#=
+@info "Starting from checkpoint"
+checkpoint_path = "checkpoint_online_time_lag.bson"
+# BSON.@load checkpoint_path score_model score_model_smooth opt opt_smooth
+BSON.@load checkpoint_path model model_smooth opt opt_smooth
+score_model = device(model)
+score_model_smooth = device(model_smooth)
+# model parameters
+ps = Flux.params(score_model);
+# setup smoothed parameters
+ps_smooth = Flux.params(score_model_smooth);
+=#
+
 lossfn = x -> score_matching_loss(score_model, x);
 function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
     grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
@@ -137,7 +152,8 @@ const SLEEP_DURATION = 1e-3
     ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
     land_sea_mask = AquaPlanetMask(spectral_grid)
     orography = NoOrography(spectral_grid)
-    model = PrimitiveWetModel(; spectral_grid, ocean)
+    # initial_conditions = InitialConditions(; vordiv = StartWithRandomVorticity(amplitude = 0.0f0))
+    model = PrimitiveWetModel(; spectral_grid, ocean) # , initial_conditions)
     model.feedback.verbose = false
     # callbacks
     my_fields = []
@@ -149,6 +165,8 @@ const SLEEP_DURATION = 1e-3
     end
     # initialize and run
     simulation = initialize!(model)
+    Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
+    simulation.prognostic_variables.layers[1].timesteps[1].vor .+= randn(Float32, Nx, Ny) * Float32(1e-10)
     run!(simulation, period=Day(100))
     
     for _ in 1:nsteps
