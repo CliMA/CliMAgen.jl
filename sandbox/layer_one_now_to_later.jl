@@ -17,7 +17,7 @@ end
 @everywhere using SharedArrays
 
 @everywhere include("my_field.jl")
-fields =  [:temp_grid, :vor_grid, :humid_grid, :div_grid]
+fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [1] #  3, 4, 5]
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
 
@@ -28,7 +28,7 @@ for layer in layers, field in fields
     push!(my_fields, my_field)
 end
 
-gated_array = SharedArray{spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields), Distributed.nworkers())
+gated_array = SharedArray{spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields)*2, Distributed.nworkers())
 gated_array .= 0.0
 # julia --project -p 8
 # open is true, closed is false. Open means we can write to the array
@@ -74,6 +74,8 @@ rtmp2 = reshape(tmp2, (128, 64, n_fields))
 μ = mean((rtmp1 + rtmp2)/2, dims = (1, 2))
 σ = reshape([quantile(abs.((rtmp2[:, :, i] + rtmp1[:,:,i])/2 .- μ[i])[:], 0.95) for i in 1:n_fields], (1, 1, n_fields))
 sigmax = norm((rtmp1 - rtmp2) ./ σ)  * 1.2
+μ = vcat(μ[:], μ[:])
+σ = vcat(σ[:], σ[:])
 
 ## Define Score-Based Diffusion Model
 @info "Defining Score Model"
@@ -81,6 +83,7 @@ FT = Float32
 #Read in from toml
 batchsize = nworkers()
 inchannels = length(my_fields)
+context_channels = length(my_fields)
 sigma_min = FT(1e-2);
 sigma_max = FT(sigmax);
 nwarmup = 5000;
@@ -96,6 +99,8 @@ device = Flux.gpu
 quick_arg = true
 net = NoiseConditionalScoreNetwork(;
                                     noised_channels = inchannels,
+                                    context_channels = context_channels,
+                                    context = true,
                                     shift_input = quick_arg,
                                     shift_output = quick_arg,
                                     mean_bypass = quick_arg,
@@ -129,8 +134,12 @@ ps = Flux.params(score_model);
 ps_smooth = Flux.params(score_model_smooth);
 =#
 
-lossfn = x -> score_matching_loss(score_model, x);
-function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
+function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
+    x = y[:,:,1:noised_channels,:]
+    c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
+    return score_matching_loss(score_model, x; c = c)
+end
+function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn_c, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
     grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
     Flux.Optimise.update!(opt, ps, grad)
     Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
@@ -168,20 +177,21 @@ const SLEEP_DURATION = 1e-3
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
     simulation.prognostic_variables.layers[1].timesteps[1].vor .+= randn(Float32, Nx, Ny) * Float32(1e-10)
     run!(simulation, period=Day(100))
-    
+    for (i, my_field) in enumerate(my_fields)
+        gated_array[:, i, gate_id] .= my_field.var
+    end
     for _ in 1:nsteps
         run!(simulation, period=Day(1))
         gate_written::Bool = false
         while ~gate_written
             if gate_open(gates, gate_id)
                 for (i, my_field) in enumerate(my_fields)
+                    gated_array[:, i+length(my_fields), gate_id] .= gated_array[:, i, gate_id] 
                     gated_array[:, i, gate_id] .= my_field.var
                 end
                 close_gate!(gates, gate_id)
-                # println("Closing gate $gate_id")
                 gate_written = true
             else
-                # println("Gate $gate_id closed, sleep.")
                 sleep(SLEEP_DURATION)
             end
         end
@@ -196,16 +206,12 @@ if myid() == 1
     while j[] <= nsteps
         if all_closed(gates)
             j[] += 1
-            # println(gated_array[1, :])
             println(j)
-            rbatch = copy(reshape(gated_array, (128, 64, length(my_fields), batchsize)))
-            batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
+            rbatch = copy(reshape(gated_array, (128, 64, length(my_fields)*2, batchsize)))
+            batch = (rbatch .- reshape(μ, (1, 1, length(my_fields) * 2, 1))) ./ reshape(σ, (1, 1, length(my_fields) * 2, 1))
             open_all!(gates)
             mock_callback(device(batch))
-            # mock_callback(device(batch))
-            # println("All gates opened.")
         else
-            # println("Gates still open: $gates")
             sleep(SLEEP_DURATION)
         end
     end
@@ -214,4 +220,4 @@ end
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
-# CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_multiple_fields_invariant_density_multiple_layers_2.bson")
+CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_temperature_timestep.bson")

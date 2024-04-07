@@ -129,6 +129,7 @@ function lossfn_c(y; noised_channels = inchannels, context_channels=context_chan
     c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
     return score_matching_loss(score_model, x; c = c)
 end
+
 function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn_c, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
     grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
     Flux.Optimise.update!(opt, ps, grad)
