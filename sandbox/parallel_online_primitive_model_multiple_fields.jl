@@ -18,7 +18,7 @@ end
 
 @everywhere include("my_field.jl")
 fields =  [:temp_grid, :vor_grid, :humid_grid, :div_grid]
-layers = [1] #  3, 4, 5]
+layers = [1, 2] #  3, 4, 5]
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
 
 my_fields = []
@@ -157,7 +157,7 @@ const SLEEP_DURATION = 1e-3
     model.feedback.verbose = false
     # callbacks
     my_fields = []
-    for field in fields, layer in layers
+    for layer in layers, field in fields
         my_field_on_1 = MyInterpolatedField(spectral_grid; schedule = Schedule(every=Day(1)), field_name = field, layer = layer)
         my_field = deepcopy(my_field_on_1)
         push!(my_fields, my_field)
@@ -214,4 +214,4 @@ end
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
-# CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_multiple_fields_invariant_density_multiple_layers_2.bson")
+# 

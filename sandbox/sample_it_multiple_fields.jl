@@ -27,9 +27,9 @@ batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1,
 M = length(fields)
 N = length(layers)
 
-for j in 1:N
-    for i in 1:M
-        ii = (i-1)*N + j
+# for j in 1:N
+    # for i in 1:M
+        # ii = (i-1)*N + j
         fig = Figure(resolution = (1200, 600))
         ax = Axis(fig[1, 1]; title = "ai: T")
         colorrange1 = (quantile(Array(samples[:,:,1,1])[:], p),  quantile(Array(samples[:,:,1,1])[:], 1-p))
@@ -64,7 +64,7 @@ for j in 1:N
         ax = Axis(fig[2, 2+2]; title = "training data: div")
         heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
         save("after_training_multipe_fields_layer_$j.png", fig)
-    end
-end
+    # end
+# end
 display(fig)
 
