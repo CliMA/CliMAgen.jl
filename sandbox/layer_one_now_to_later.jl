@@ -17,7 +17,7 @@ end
 @everywhere using SharedArrays
 
 @everywhere include("my_field.jl")
-fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
+fields =  [:temp_grid, :vor_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [1] #  [2, 3, 4, 5]
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
 
@@ -220,4 +220,4 @@ end
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
-CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_temperature_timestep.bson")
+CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_temperature_vorticity_timestep.bson")
