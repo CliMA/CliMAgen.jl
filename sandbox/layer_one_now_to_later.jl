@@ -3,6 +3,7 @@ using Statistics
 using ProgressBars
 using Flux
 using CliMAgen
+using BSON
 
 using Distributed
 using LinearAlgebra, Statistics
@@ -17,7 +18,7 @@ end
 @everywhere using SharedArrays
 
 @everywhere include("my_field.jl")
-fields =  [:temp_grid, :vor_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
+fields =  [:temp_grid, :vor_grid, :humid_grid, :div_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [1] #  [2, 3, 4, 5]
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
 
@@ -95,6 +96,7 @@ epsilon = FT(1e-8);
 ema_rate = FT(0.999);
 device = Flux.gpu
 
+#=
 # Create network
 quick_arg = true
 net = NoiseConditionalScoreNetwork(;
@@ -119,11 +121,11 @@ opt_smooth = ExponentialMovingAverage(ema_rate);
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
+=#
 
 
-#=
 @info "Starting from checkpoint"
-checkpoint_path = "checkpoint_online_time_lag.bson"
+checkpoint_path = "checkpoint_temperature_vorticity_humidity_divergence_timestep.bson"
 # BSON.@load checkpoint_path score_model score_model_smooth opt opt_smooth
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
 score_model = device(model)
@@ -132,7 +134,6 @@ score_model_smooth = device(model_smooth)
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
-=#
 
 function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
     x = y[:,:,1:noised_channels,:]
@@ -150,13 +151,13 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 10000 # 10000 takes 1.5 hours
+nsteps = 10 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
     id = myid()
     gate_id = id-1
-    Random.seed!(1234+id)
+    Random.seed!(12345+id)
     # model
     ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
     land_sea_mask = AquaPlanetMask(spectral_grid)
@@ -220,4 +221,4 @@ end
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
-CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_temperature_vorticity_timestep.bson")
+# CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_temperature_vorticity_humidity_divergence_timestep.bson")

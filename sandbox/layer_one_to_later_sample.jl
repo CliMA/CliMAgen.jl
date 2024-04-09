@@ -8,7 +8,7 @@ resolution = (128, 64)
 
 rng = MersenneTwister(1234)
 
-ctrain = zeros(Float32, resolution..., 1, nsamples)
+ctrain = zeros(Float32, resolution..., length(my_fields), nsamples)
 
 lat, lon = RingGrids.get_latdlonds(my_fields[1].var)
 lon = reshape(lon, (128, 64))[:,1]
@@ -16,7 +16,7 @@ lat = reshape(lat, (128, 64))[1, :]
 rbatch = copy(reshape(gated_array, (128, 64, 2*length(my_fields), batchsize)))
 batch = (rbatch .- reshape(μ, (1, 1, length(my_fields) * 2, 1))) ./ reshape(σ, (1, 1, length(my_fields) * 2, 1))
 
-ctrain[:, :, 1, :] .= Float32.(batch[:, :, 2, [8]])
+ctrain[:, :, :, :] .= Float32.(batch[:, :, (1 + length(my_fields)):end, [8]])
 
 time_steps, Δt, init_x = setup_sampler(
     score_model_smooth,
@@ -34,7 +34,7 @@ samples = cpu(samples)
 
 
 p = 0.03
-colorrange = (quantile(samples[:], p), quantile(samples[:], 1-p))
+colorrange = (quantile(samples[:, :, 1, :][:], p), quantile(samples[:, :, 1, :][:], 1-p))
 colorrange_difference = (-0.5, 0.5)
 fig = Figure()
 i = 1
@@ -47,12 +47,40 @@ for i in 1:2
     heatmap!(ax,lon, lat, samples[:,:,1,i] - ctrain[:,:,1,i]; colorrange = colorrange_difference, colormap = :balance, interpolate = true)
 end
 ax = Axis(fig[3, 1]; title = "training data current timestep")
-heatmap!(ax,lon, lat, batch[:,:,2,8]; colorrange, colormap = :thermometer, interpolate = true)
+heatmap!(ax,lon, lat, batch[:,:,1 + length(my_fields),8]; colorrange, colormap = :thermometer, interpolate = true)
 ax = Axis(fig[3, 2]; title = "training data next timestep")
 heatmap!(ax,lon, lat, batch[:,:,1,8]; colorrange, colormap = :thermometer, interpolate = true)
 ax = Axis(fig[3, 3]; title = "training difference $i")
-heatmap!(ax,lon, lat, batch[:,:,1,8] - batch[:,:,2,8]; colorrange = colorrange_difference, colormap = :balance, interpolate = true)
+heatmap!(ax,lon, lat, batch[:,:,1,8] - batch[:,:,1 + length(my_fields),8]; colorrange = colorrange_difference, colormap = :balance, interpolate = true)
 display(fig)
+
+#=
+##
+p = 0.03
+
+M = length(fields)
+for ind in 1:4
+    colorrange = (quantile(samples[:, :, ind, :][:], p), quantile(samples[:, :, ind, :][:], 1-p))
+    colorrange_difference = (-0.5, 0.5)
+    fig = Figure()
+    i = 1
+    for i in 1:2
+        ax = Axis(fig[i, 1]; title = "ai current timestep sample $i")
+        heatmap!(ax,lon, lat, ctrain[:,:,ind,i]; colorrange, colormap = :thermometer, interpolate = true)
+        ax = Axis(fig[i, 2]; title = "ai next timestep sample $i")
+        heatmap!(ax,lon, lat, samples[:,:,ind,i]; colorrange, colormap = :thermometer, interpolate = true)
+        ax = Axis(fig[i, 3]; title = "ai difference $i")
+        heatmap!(ax,lon, lat, samples[:,:,ind,i] - ctrain[:,:,ind,i]; colorrange = colorrange_difference, colormap = :balance, interpolate = true)
+    end
+    ax = Axis(fig[3, 1]; title = "training data current timestep")
+    heatmap!(ax,lon, lat, batch[:,:,ind + M,8]; colorrange, colormap = :thermometer, interpolate = true)
+    ax = Axis(fig[3, 2]; title = "training data next timestep")
+    heatmap!(ax,lon, lat, batch[:,:,ind,8]; colorrange, colormap = :thermometer, interpolate = true)
+    ax = Axis(fig[3, 3]; title = "training difference $i")
+    heatmap!(ax,lon, lat, batch[:,:,ind,8] - batch[:,:, ind + M,8]; colorrange = colorrange_difference, colormap = :balance, interpolate = true)
+    display(fig)
+    save("layer_one_to_later_$ind.png", fig)
+end
 
 ##
 @info "Timestepping"
@@ -79,6 +107,6 @@ fig2 = Figure()
 ax = Axis(fig2[1,1]; title = "timestep $dynamic_steps")
 heatmap!(ax,lon, lat, us[:,:,1,end]; colorrange, colormap = :thermometer, interpolate = true)
 display(fig2)
-
+=#
 
 

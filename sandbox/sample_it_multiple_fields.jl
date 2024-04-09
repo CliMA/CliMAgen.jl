@@ -30,41 +30,47 @@ N = length(layers)
 # for j in 1:N
     # for i in 1:M
         # ii = (i-1)*N + j
-        fig = Figure(resolution = (1200, 600))
-        ax = Axis(fig[1, 1]; title = "ai: T")
-        colorrange1 = (quantile(Array(samples[:,:,1,1])[:], p),  quantile(Array(samples[:,:,1,1])[:], 1-p))
-        heatmap!(ax, lon, lat, Array(samples)[:,:,1,1]; colorrange1, colormap = :thermometer)
-        ax = Axis(fig[1, 2]; title = "training data: T")
-        heatmap!(ax, lon, lat, Array(batch[:,:,1,1]); colorrange1, colormap = :thermometer)
+for j in 1:N
+    fig = Figure(resolution = (1200, 600))
+    ax = Axis(fig[1, 1]; title = "layer $j, ai: T")
+    ind = 1 + (j-1) * M
+    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  quantile(Array(samples[:,:,ind,1])[:], 1-p))
+    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :thermometer)
+    ax = Axis(fig[1, 2]; title = "layer $j, training data: T")
+    heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :thermometer)
 
-        ax = Axis(fig[1, 1]; title = "ai: T")
-        colorrange1 = (quantile(Array(samples[:,:,1,1])[:], p),  quantile(Array(samples[:,:,1,1])[:], 1-p))
-        heatmap!(ax, lon, lat, Array(samples)[:,:,1,1]; colorrange1, colormap = :thermometer)
-        ax = Axis(fig[1, 2]; title = "training data: T")
-        heatmap!(ax, lon, lat, Array(batch[:,:,1,1]); colorrange1, colormap = :thermometer)
+    ax = Axis(fig[1, 1+2]; title = "layer $j, ai: ω")
+    ind = 2 + (j-1) * M
+    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p),)
+    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
+    ax = Axis(fig[1, 2+2]; title = "layer $j, training data: ω")
+    heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
 
-        ax = Axis(fig[1, 1+2]; title = "ai: ω")
-        ind = 2
-        colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p),)
-        heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
-        ax = Axis(fig[1, 2+2]; title = "training data: ω")
-        heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
+    ax = Axis(fig[2, 1]; title = "layer $j, ai: humidity")
+    ind = 3 + (j-1) * M
+    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  quantile(Array(samples[:,:,ind,1])[:], 1-p))
+    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :blues)
+    ax = Axis(fig[2, 2]; title = "layer $j, training data: humidity")
+    heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :blues)
 
-        ax = Axis(fig[2, 1]; title = "ai: humidity")
-        ind = 3
-        colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  quantile(Array(samples[:,:,ind,1])[:], 1-p))
-        heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :blues)
-        ax = Axis(fig[2, 2]; title = "training data: humidity")
-        heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :blues)
-
-        ax = Axis(fig[2, 1+2]; title = "ai: div")
-        ind = 4
-        colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p))
-        heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
-        ax = Axis(fig[2, 2+2]; title = "training data: div")
-        heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
-        save("after_training_multipe_fields_layer_$j.png", fig)
+    ax = Axis(fig[2, 1+2]; title = "layer $j, ai: div")
+    ind = 4 + (j-1) * M
+    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p))
+    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
+    ax = Axis(fig[2, 2+2]; title = "layer $j, training data: div")
+    heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
+    save("after_training_multipe_fields_layer_$j.png", fig)
+end
     # end
 # end
 display(fig)
 
+##
+fig2 = Figure(resolution = (1200, 600))
+j = 2
+ax = Axis(fig2[1, 1]; title = "ai: T")
+colorrange1 = (quantile(Array(samples[:,:,1 + (j-1) * M,1])[:], p),  quantile(Array(samples[:,:,1 + (j-1) * M,1])[:], 1-p))
+heatmap!(ax, lon, lat, Array(samples)[:,:,1 + (j-1) * M,1]; colorrange1, colormap = :thermometer)
+ax = Axis(fig2[1, 2]; title = "training data: T")
+heatmap!(ax, lon, lat, Array(batch[:,:,1 + (j-1) * M,1]); colorrange1, colormap = :thermometer)
+display(fig2)
