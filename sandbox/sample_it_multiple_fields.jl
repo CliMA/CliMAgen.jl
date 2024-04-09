@@ -1,7 +1,7 @@
 include("sampler.jl")
 using CairoMakie
 nsamples = 1
-nsteps = 250
+nsteps = 250 * 2
 resolution = (128, 64)
 time_steps, Δt, init_x = setup_sampler(
     score_model_smooth,

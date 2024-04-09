@@ -19,7 +19,7 @@ end
 
 @everywhere include("my_field.jl")
 fields =  [:temp_grid, :vor_grid, :humid_grid, :div_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
-layers = [1] #  [2, 3, 4, 5]
+layers = [1,2,3,4,5] #  [2, 3, 4, 5]
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
 
 my_fields = []
