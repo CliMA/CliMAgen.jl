@@ -18,6 +18,7 @@ end
 @everywhere using SharedArrays
 
 @everywhere include("my_field.jl")
+@everywhere include("my_pressure.jl")
 fields =  [:temp_grid, :vor_grid, :humid_grid, :div_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [1,2,3,4,5] #  [2, 3, 4, 5]
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
@@ -28,6 +29,9 @@ for layer in layers, field in fields
     my_field = deepcopy(my_field_on_1)
     push!(my_fields, my_field)
 end
+# add pressure
+my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
+push!(my_fields, my_field)
 
 gated_array = SharedArray{spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields)*2, Distributed.nworkers())
 gated_array .= 0.0
@@ -59,17 +63,17 @@ end
 # run
 simulation = initialize!(model)
 run!(simulation, period=Day(100))
-tmp1 = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(fields) * length(layers))
+tmp1 = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(my_fields))
 for (i, my_field) in enumerate(my_fields)
     tmp1[:, i] = copy(my_fields[i].var)
 end
 run!(simulation, period=Day(100))
-tmp2 = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(fields) * length(layers))
+tmp2 = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(my_fields))
 for (i, my_field) in enumerate(my_fields)
     tmp2[:, i] = copy(my_fields[i].var)
 end
 # sigma max
-n_fields = length(fields) * length(layers)
+n_fields = length(my_fields)
 rtmp1 = reshape(tmp1, (128, 64, n_fields)) 
 rtmp2 = reshape(tmp2, (128, 64, n_fields))
 μ = mean((rtmp1 + rtmp2)/2, dims = (1, 2))
@@ -132,8 +136,7 @@ ps_smooth = Flux.params(score_model_smooth);
 
 #=
 @info "Starting from checkpoint"
-checkpoint_path = "checkpoint_temperature_vorticity_humidity_divergence_timestep.bson"
-# BSON.@load checkpoint_path score_model score_model_smooth opt opt_smooth
+checkpoint_path = "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
 score_model = device(model)
 score_model_smooth = device(model_smooth)
@@ -159,13 +162,13 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 10 * 10000 # 10000 takes 1.5 hours
+nsteps = 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
     id = myid()
     gate_id = id-1
-    Random.seed!(12345+id)
+    Random.seed!(19 * 15 +id)
     # model
     ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
     land_sea_mask = AquaPlanetMask(spectral_grid)
@@ -181,6 +184,9 @@ const SLEEP_DURATION = 1e-3
         push!(my_fields, my_field)
         add!(model.callbacks, my_field)
     end
+    my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
+    add!(model.callbacks, my_field)
+    push!(my_fields, my_field)
     # initialize and run
     simulation = initialize!(model)
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
@@ -220,6 +226,11 @@ if myid() == 1
             batch = (rbatch .- reshape(μ, (1, 1, length(my_fields) * 2, 1))) ./ reshape(σ, (1, 1, length(my_fields) * 2, 1))
             open_all!(gates)
             mock_callback(device(batch))
+            if j[]%10000 == 0 
+                tmp = j[]
+                @info "saving model"
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_$tmp.bson")
+            end
         else
             sleep(SLEEP_DURATION)
         end
@@ -229,4 +240,7 @@ end
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
-CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson")
+include("layer_one_to_later_sample.jl")
+
+# CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson")
+CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson")
