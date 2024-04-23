@@ -11,7 +11,7 @@ using TOML
 
 using CliMAgen
 package_dir = pkgdir(CliMAgen)
-include(joinpath(package_dir,"examples/conus404/preprocessing_utils.jl"))
+
 function generate_samples(params; FT=Float32)
     # unpack params, including preprocessing numbers
     savedir = params.experiment.savedir
@@ -40,7 +40,7 @@ function generate_samples(params; FT=Float32)
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
-    model = device(model)
+    model = device(model_smooth)
     
     # sample from the trained model
     # first allocate memory to hold the samples
@@ -61,6 +61,7 @@ function generate_samples(params; FT=Float32)
         samples[:,:,:,(b-1)*samples_per_batch+1:b*samples_per_batch] .= cpu(batch)
     end
     samplesdir = savedir
+    samples_file = "samples_smooth.hdf5"
     !ispath(samplesdir) && mkpath(samplesdir)
     hdf5_path=joinpath(samplesdir, samples_file)
     fid = HDF5.h5open(hdf5_path, "w")

@@ -7,11 +7,11 @@ logging           = true
 nogpu             = false
 
 [data]
-batchsize         = 128
+batchsize         = 64
 standard_scaling  = true
 low_pass          = false
 low_pass_k        = 8
-n_pixels		  = 128
+n_pixels          = 128
 
 [model]
 inchannels        = 1
@@ -39,7 +39,7 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 100
+nepochs           = 150
 freq_chckpt       = 50
 
 [sampling]

@@ -62,7 +62,7 @@ function run_analysis(params; FT=Float32)
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
-    model = device(model)
+    model = device(model_smooth)
 
     # sample from the trained model
     time_steps, Δt, init_x = setup_sampler(

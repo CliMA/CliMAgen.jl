@@ -14,7 +14,7 @@ include(joinpath(package_dir,"examples/conus404/plotting/pixel_plots.jl"))
 function run_postprocessing(params; FT=Float32, subset_preprocess_params = "train")
     # unpack params
     savedir = params.experiment.savedir
-    samples_file = params.sampling.samples_file
+    samples_file = "samples_smooth.hdf5"
     hdf5_path=joinpath(savedir, samples_file)
     fid = HDF5.h5open(hdf5_path, "r")
     samples = HDF5.read(fid["generated_samples"])
@@ -23,7 +23,7 @@ function run_postprocessing(params; FT=Float32, subset_preprocess_params = "trai
     preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_$(subset_preprocess_params).jld2")
     scaling = JLD2.load_object(preprocess_params_file)
     # convert to real space
-    samples .= invert_preprocessing(samples, scaling)
+    samples_real_space = invert_preprocessing(samples, scaling)
 
     # read training and testing dataset
     xtrain, xtest = get_raw_data_conus404(; FT)
@@ -36,9 +36,14 @@ function run_postprocessing(params; FT=Float32, subset_preprocess_params = "trai
     idx = StatsBase.sample(id_arr, ndata)
     xtest = xtest[:,:,:,idx]
     
-    pixel_plots(xtrain, samples, ["training", "generated"], joinpath(savedir,"train_samples_$(subset_preprocess_params).png"))
-    pixel_plots(xtest, samples, ["test", "generated"],joinpath(savedir,"test_samples_$(subset_preprocess_params).png"))
+    pixel_plots(xtrain, samples_real_space, ["training", "generated"], joinpath(savedir,"train_samples_$(subset_preprocess_params).png"))
+    pixel_plots(xtest, samples_real_space, ["test", "generated"],joinpath(savedir,"test_samples_$(subset_preprocess_params).png"))
     pixel_plots(xtrain, xtest, ["training", "test"], joinpath(savedir,"train_test.png"))
+
+
+    # Try also in preproc space
+    xtrain_pp = apply_preprocessing(xtrain, scaling);
+    pixel_plots(xtrain_pp, samples, ["training", "generated"], joinpath(savedir,"train_samples_$(subset_preprocess_params)_pp.png"))
 
     HDF5.close(fid)
 end
