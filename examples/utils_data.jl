@@ -517,8 +517,10 @@ end
 """
 Helper function that loads MNIST images and returns loaders.
 """
-function get_data_mnist(batchsize; tilesize=32, FT=Float32)
+function get_data_mnist(batchsize; fraction=1.0f0, tilesize=32, FT=Float32)
     xtrain, _ = MLDatasets.MNIST(:train; Tx=FT)[:]
+    ndata = Int(round(size(xtrain)[end]*fraction))
+    xtrain = xtrain[:,:,1:1:ndata]
     xtrain = Images.imresize(xtrain, (tilesize, tilesize))
     xtrain = reshape(xtrain, tilesize, tilesize, 1, :)
     xtrain = @. 2xtrain - 1
@@ -526,6 +528,8 @@ function get_data_mnist(batchsize; tilesize=32, FT=Float32)
     loader_train = DataLoaders.DataLoader(xtrain, batchsize)
 
     xtest, _ = MLDatasets.MNIST(:test; Tx=FT)[:]
+    ndata = Int(round(size(xtest)[end]*fraction))
+    xtest = xtest[:,:,1:1:ndata]
     xtest = Images.imresize(xtest, (tilesize, tilesize))
     xtest = reshape(xtest, tilesize, tilesize, 1, :)
     xtest = @. 2xtest - 1
