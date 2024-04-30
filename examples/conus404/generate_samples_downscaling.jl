@@ -38,7 +38,7 @@ function generate_samples_downscaling(params; FT=Float32)
     savedir = params.experiment.savedir
     rngseed = params.experiment.rngseed
     nogpu = params.experiment.nogpu
-    batchsize = params.data.batchsize
+    batchsize = 64
     standard_scaling = params.data.standard_scaling
     n_pixels = params.data.n_pixels
     inchannels = params.model.inchannels
@@ -48,8 +48,9 @@ function generate_samples_downscaling(params; FT=Float32)
     samples_file = "downscaled_samples.hdf5"
     # we always train with the preprocessing parameters derived from the
     # training data.
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
-    
+    preprocess_params_file_train = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
+    preprocess_params_file_test = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_test.jld2")
+
     # set up rng
     rngseed > 0 && Random.seed!(rngseed)
 
@@ -69,15 +70,17 @@ function generate_samples_downscaling(params; FT=Float32)
     
     # sample from the trained model
     (xtrain, xtest) = get_raw_data_conus404(; FT=Float32)
-    xtrain_lores = lowpass_filter(xtrain, 8)
-    xtest_lores = lowpass_filter(xtest, 8)
+    xtrain_lores = lowpass_filter(xtrain, 8) # guess
+    xtest_lores = lowpass_filter(xtest, 8) # guess
 
-    scaling = JLD2.load_object(preprocess_params_file)
-    xtrain_pp_lores = apply_preprocessing(xtrain_lores, scaling)
-    # apply the same rescaler as on training set
-    xtest_pp_lores = apply_preprocessing(xtest_lores, scaling)
+    scaling_train = JLD2.load_object(preprocess_params_file_train)
+    scaling_test = JLD2.load_object(preprocess_params_file_test)
+
+    xtrain_pp_lores = apply_preprocessing(xtrain_lores, scaling_train)
+    xtest_pp_lores = apply_preprocessing(xtest_lores, scaling_test)
 
     idx = Int.(ceil.(rand(batchsize)*size(xtrain)[end]))
+    random_samples  = zeros(FT, (n_pixels, n_pixels, inchannels,batchsize*2))
     samples_train = zeros(FT, (n_pixels, n_pixels, inchannels,batchsize))
     samples_test = zeros(FT, (n_pixels, n_pixels, inchannels,batchsize))
     tf = 0.6f0 # guess 
@@ -99,13 +102,28 @@ function generate_samples_downscaling(params; FT=Float32)
             num_steps=nsteps,
         )
     samples_test .= cpu(Euler_Maruyama_sampler(model, init_x, time_steps, Δt, rng = MersenneTwister(123)))
-    samplesdir = savedir
+    # Compute random samples for comparison
+    time_steps, Δt, init_x = setup_sampler(
+        model,
+        device,
+        n_pixels,
+        inchannels;
+        num_images=batchsize*2,
+        num_steps=nsteps,
+    )
+    random_samples .= cpu(Euler_Maruyama_sampler(model, init_x, time_steps, Δt, rng = MersenneTwister(2)))
+
+    samplesdir = joinpath(savedir, "downscaling")
+    !ispath(samplesdir) && mkpath(samplesdir)
+
     samples_file = "samples_downscaled_smooth.hdf5"
     !ispath(samplesdir) && mkpath(samplesdir)
     hdf5_path=joinpath(samplesdir, samples_file)
     fid = HDF5.h5open(hdf5_path, "w")
-    fid["generated_samples_train"] = invert_preprocessing(samples_train, scaling)
-    fid["generated_samples_test"] = invert_preprocessing(samples_test, scaling)
+    fid["downscaled_samples_train"] = invert_preprocessing(samples_train, scaling_train)
+    fid["downscaled_samples_test"] = invert_preprocessing(samples_test, scaling_test)
+    fid["random_samples_train"] = invert_preprocessing(random_samples[:,:,:,1:batchsize], scaling_train)
+    fid["random_samples_test"] = invert_preprocessing(random_samples[:,:,:,(batchsize+1):end], scaling_test)
     fid["data_train"] = xtrain[:,:,:,idx]
     fid["data_test"] = xtest[:,:,:,idx]
     fid["data_train_lores"] = xtrain_lores[:,:,:,idx]

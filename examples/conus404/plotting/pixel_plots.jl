@@ -3,7 +3,7 @@ function pixel_plots(x1, x2, labels, plotname)
     n_boot = 100
     n_grid = 200
     cil = 0.99
-    min_x, max_x = -2, 2 # need to be adjusted for our temperature range!
+    min_x, max_x = 240, 320 # need to be adjusted for our temperature range!
     x1_l, x1_u = get_pdf_bci(x1[:], min_x, max_x, n_grid, n_boot, cil)
     x2_l, x2_u = get_pdf_bci(x2[:], min_x, max_x, n_grid, n_boot, cil)
     ax = CairoMakie.Axis(fig[1,1], xlabel="Temperature", ylabel="Probability density")
