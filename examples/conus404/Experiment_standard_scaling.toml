@@ -1,20 +1,22 @@
 [experiment]
 project           = "CliMAgen.jl"
 name              = "conus404_test"
-savedir           = "output"
+savedir           = "output_standard_scaling"
 rngseed           = 123
 logging           = true
 nogpu             = false
 
 [data]
 batchsize         = 64
-standard_scaling  = false
-n_pixels		  = 128
+standard_scaling  = true
+low_pass          = false
+low_pass_k        = 8
+n_pixels          = 128
 
 [model]
 inchannels        = 1
 dropout_p         = 0.0
-sigma_max         = 90.0
+sigma_max         = 260.0
 sigma_min         = 1e-2
 mean_bypass       = true
 shift_input       = true
@@ -37,13 +39,13 @@ ema_rate          = 0.999
 nwarmup           = 5000
 
 [training]
-nepochs           = 100
+nepochs           = 150
 freq_chckpt       = 50
 
 [sampling]
-nsteps            = 1000
+nsteps            = 250
 nsamples_analysis = 100
-nsamples_generate = 100
+nsamples_generate = 500
 nimages           = 25
 sampler           = "euler"
 samples_file      = "samples.hdf5"
