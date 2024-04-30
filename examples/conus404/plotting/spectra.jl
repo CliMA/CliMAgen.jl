@@ -1,7 +1,7 @@
 using HDF5
 using CairoMakie
 include("../../utils_analysis.jl")
-savedir = "../output_standard_scaling_dropout/downscaling"
+savedir = "../output_zmuv/downscaling"
 hdf5_path = joinpath(savedir,"samples_downscaled_smooth.hdf5")
 fid = HDF5.h5open(hdf5_path, "r")
 train_samples = HDF5.read(fid["downscaled_samples_train"]);
