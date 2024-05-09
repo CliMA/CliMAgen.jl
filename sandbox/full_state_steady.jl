@@ -20,9 +20,10 @@ end
 @everywhere include("my_field.jl")
 @everywhere include("my_pressure.jl")
 # trunc_val = 31
-const trunc_val = 43
-fields =  [:temp_grid, :vor_grid, :humid_grid, :div_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
-layers = [1, 2, 3, 4, 5] #  [2, 3, 4, 5]
+const trunc_val = 31
+const add_pressure_field = false
+fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
+layers = [1] #  [1, 2, 3, 4, 5]
 spectral_grid = SpectralGrid(trunc=trunc_val, nlev=5)
 
 my_fields = []
@@ -32,10 +33,11 @@ for layer in layers, field in fields
     push!(my_fields, my_field)
 end
 # add pressure
-my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
-push!(my_fields, my_field)
-
-gated_array = SharedArray{spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields)*2, Distributed.nworkers())
+if add_pressure_field
+    my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
+    push!(my_fields, my_field)
+end
+gated_array = SharedArray{spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields), Distributed.nworkers())
 gated_array .= 0.0
 # julia --project -p 8
 # open is true, closed is false. Open means we can write to the array
@@ -93,7 +95,7 @@ FT = Float32
 #Read in from toml
 batchsize = nworkers()
 inchannels = length(my_fields)
-context_channels = length(my_fields)
+context_channels = 0 # length(my_fields)
 sigma_min = FT(1e-3);
 sigma_max = FT(sigmax);
 nwarmup = 5000;
@@ -107,19 +109,19 @@ device = Flux.gpu
 
 
 # Create network
-#=
 quick_arg = true
 kernel_size = 3
-kernel_sizes = [3, 2, 1, 0]
+kernel_sizes = [0, 0, 0, 0] # [3, 2, 1, 0]
+channel_scale = 1
 net = NoiseConditionalScoreNetwork(;
-                                    channels = 5 .* [32, 64, 128, 256],
+                                    channels = channel_scale .* [32, 64, 128, 256],
                                     proj_kernelsize   = kernel_size + kernel_sizes[1],
                                     outer_kernelsize  = kernel_size + kernel_sizes[2],
                                     middle_kernelsize = kernel_size + kernel_sizes[3],
                                     inner_kernelsize  = kernel_size + kernel_sizes[4],
                                     noised_channels = inchannels,
                                     context_channels = context_channels,
-                                    context = true,
+                                    context = false,
                                     shift_input = quick_arg,
                                     shift_output = quick_arg,
                                     mean_bypass = quick_arg,
@@ -138,7 +140,6 @@ opt_smooth = ExponentialMovingAverage(ema_rate);
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
-=#
 
 @info "Starting from checkpoint"
 checkpoint_path = "new_checkpoint_large_temperature_vorticity_humidity_divergence_pressure_trunc_$(trunc_val).bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
@@ -152,8 +153,8 @@ ps_smooth = Flux.params(score_model_smooth);
 
 function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
     x = y[:,:,1:noised_channels,:]
-    c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
-    return score_matching_loss(score_model, x; c = c)
+    # c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
+    return vanilla_score_matching_loss(score_model, x)
 end
 function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn_c, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
     grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
@@ -188,9 +189,11 @@ const SLEEP_DURATION = 1e-3
         push!(my_fields, my_field)
         add!(model.callbacks, my_field)
     end
-    my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
-    add!(model.callbacks, my_field)
-    push!(my_fields, my_field)
+    if add_pressure_field
+        my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
+        add!(model.callbacks, my_field)
+        push!(my_fields, my_field)
+    end
     # initialize and run
     simulation = initialize!(model)
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
@@ -205,7 +208,6 @@ const SLEEP_DURATION = 1e-3
         while ~gate_written
             if gate_open(gates, gate_id)
                 for (i, my_field) in enumerate(my_fields)
-                    gated_array[:, i+length(my_fields), gate_id] .= gated_array[:, i, gate_id] 
                     gated_array[:, i, gate_id] .= my_field.var
                 end
                 close_gate!(gates, gate_id)
@@ -244,8 +246,6 @@ end
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
-include("layer_one_to_later_sample.jl")
+# include("layer_one_to_later_sample.jl")
 
-# CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson")
-# CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson")
-CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "new_checkpoint_large_temperature_vorticity_humidity_divergence_pressure_trunc_$(trunc_val).bson")
+CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "steady_temperature_trunc_$(trunc_val).bson")
