@@ -86,8 +86,6 @@ rtmp2 = reshape(tmp2, (128, 64, n_fields))
 μ = mean((rtmp1 + rtmp2)/2, dims = (1, 2))
 σ = reshape([quantile(abs.((rtmp2[:, :, i] + rtmp1[:,:,i])/2 .- μ[i])[:], 0.99) for i in 1:n_fields], (1, 1, n_fields))
 sigmax = norm((rtmp1 - rtmp2) ./ σ)  * 1.2
-μ = vcat(μ[:], μ[:])
-σ = vcat(σ[:], σ[:])
 
 ## Define Score-Based Diffusion Model
 @info "Defining Score Model"
@@ -141,6 +139,7 @@ ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
 
+#=
 @info "Starting from checkpoint"
 checkpoint_path = "new_checkpoint_large_temperature_vorticity_humidity_divergence_pressure_trunc_$(trunc_val).bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
@@ -150,6 +149,7 @@ score_model_smooth = device(model_smooth)
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
+=#
 
 function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
     x = y[:,:,1:noised_channels,:]
@@ -228,14 +228,14 @@ if myid() == 1
         if all_closed(gates)
             j[] += 1
             println(j)
-            rbatch = copy(reshape(gated_array, (128, 64, length(my_fields)*2, batchsize)))
-            batch = (rbatch .- reshape(μ, (1, 1, length(my_fields) * 2, 1))) ./ reshape(σ, (1, 1, length(my_fields) * 2, 1))
+            rbatch = copy(reshape(gated_array, (128, 64, length(my_fields), batchsize)))
+            batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
             open_all!(gates)
             mock_callback(device(batch))
             if j[]%40000 == 0 
                 tmp = j[]
                 @info "saving model"
-                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_trunc_$(trunc_val)_timestep_$tmp.bson")
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_trunc_$(trunc_val)_timestep_$tmp.bson")
             end
         else
             sleep(SLEEP_DURATION)
