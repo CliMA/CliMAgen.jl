@@ -105,7 +105,7 @@ epsilon = FT(1e-8);
 ema_rate = FT(0.999);
 device = Flux.gpu
 
-
+#=
 # Create network
 quick_arg = true
 kernel_size = 3
@@ -138,10 +138,10 @@ opt_smooth = ExponentialMovingAverage(ema_rate);
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
+=#
 
-#=
 @info "Starting from checkpoint"
-checkpoint_path = "new_checkpoint_large_temperature_vorticity_humidity_divergence_pressure_trunc_$(trunc_val).bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
+checkpoint_path = "steady_temperature_trunc_31.bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
 score_model = device(model)
 score_model_smooth = device(model_smooth)
@@ -149,7 +149,7 @@ score_model_smooth = device(model_smooth)
 ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
-=#
+
 
 function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
     x = y[:,:,1:noised_channels,:]
@@ -173,7 +173,7 @@ const SLEEP_DURATION = 1e-3
 @distributed for i in workers()
     id = myid()
     gate_id = id-1
-    Random.seed!(19+id)
+    Random.seed!(1998+id)
     # model
     ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
     land_sea_mask = AquaPlanetMask(spectral_grid)
@@ -247,5 +247,6 @@ toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
 # include("layer_one_to_later_sample.jl")
+include("sample_it_multiple_fields.jl")
 
 CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "steady_temperature_trunc_$(trunc_val).bson")

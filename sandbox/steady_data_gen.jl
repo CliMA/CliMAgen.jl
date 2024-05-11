@@ -52,10 +52,10 @@ simulation = initialize!(model)
 @info "Run for 100 days"
 run!(simulation, period=Day(100))
 @info "Gather Timeseries"
-steps = 10
+steps = 4000
 timeseries = zeros(spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(my_fields), steps)
 for j in ProgressBar(1:steps)
-    run!(simulation, period=Day(1))
+    run!(simulation, period=Day(14))
     for (i, my_field) in enumerate(my_fields)
         timeseries[:, i, j] = copy(my_fields[i].var)
     end
@@ -63,7 +63,8 @@ end
 
 n_fields = length(my_fields)
 r_timeseries = reshape(timeseries, (128, 64, n_fields, steps)) 
-μ = mean(timeseries, dims = (1, 2, 4))
-σ = reshape([quantile(abs.(r_timeseries .- μ)[:], 0.99) for i in 1:n_fields], (1, 1, n_fields, 1))
+μ = mean(r_timeseries, dims = (1, 2, 4))
+μ_drift = mean(r_timeseries, dims = (1, 2))
+σ = reshape([quantile(abs.(r_timeseries[:, :, i, :] .- μ)[:], 0.99) for i in 1:n_fields], (1, 1, n_fields, 1))
 
 rescaled_timeseries = (r_timeseries .- μ) ./ σ

@@ -1,6 +1,6 @@
 include("sampler.jl")
 using CairoMakie
-nsamples = 1
+nsamples = 10
 nsteps = 250 * 2
 resolution = (128, 64)
 time_steps, Δt, init_x = setup_sampler(
@@ -31,14 +31,16 @@ N = length(layers)
     # for i in 1:M
         # ii = (i-1)*N + j
 for j in 1:N
-    fig = Figure(resolution = (1200, 600))
-    ax = Axis(fig[1, 1]; title = "layer $j, ai: T")
+    fig = Figure(resolution = (1200, 300))
     ind = 1 + (j-1) * M
     colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  quantile(Array(samples[:,:,ind,1])[:], 1-p))
-    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :thermometer)
-    ax = Axis(fig[1, 2]; title = "layer $j, training data: T")
+    ax = Axis(fig[1, 1]; title = "layer $j, training data: T")
     heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :thermometer)
-
+    for k in 1:4
+        ax = Axis(fig[1, 1 + k]; title = "layer $j, ai: T, sample $k")
+        heatmap!(ax, lon, lat, Array(samples)[:,:,ind,k]; colorrange1, colormap = :thermometer)
+    end
+    #=
     ax = Axis(fig[1, 1+2]; title = "layer $j, ai: ω")
     ind = 2 + (j-1) * M
     colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p),)
@@ -59,13 +61,14 @@ for j in 1:N
     heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
     ax = Axis(fig[2, 2+2]; title = "layer $j, training data: div")
     heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
+    =#
     save("after_training_multipe_fields_layer_$j.png", fig)
 end
     # end
 # end
-display(fig)
 
 ##
+#=
 fig2 = Figure(resolution = (1200, 600))
 j = 2
 ax = Axis(fig2[1, 1]; title = "ai: T")
@@ -74,3 +77,4 @@ heatmap!(ax, lon, lat, Array(samples)[:,:,1 + (j-1) * M,1]; colorrange1, colorma
 ax = Axis(fig2[1, 2]; title = "training data: T")
 heatmap!(ax, lon, lat, Array(batch[:,:,1 + (j-1) * M,1]); colorrange1, colormap = :thermometer)
 display(fig2)
+=#
