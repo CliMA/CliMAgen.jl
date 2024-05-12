@@ -12,6 +12,8 @@ examples/uniform/experiments
 *.nc 
 *.txt
 *.jld2
+*.h5
+*.hdf5
 *.jpg
 *.jpeg
 *.gif
