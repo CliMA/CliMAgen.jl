@@ -4,6 +4,7 @@ using ProgressBars
 using Flux
 using CliMAgen
 using BSON
+using HDF5
 
 using Distributed
 using LinearAlgebra, Statistics
@@ -75,6 +76,9 @@ timeseries = read(hfile["timeseries"])
 μ = read(hfile, "shift")
 σ = read(hfile, "scaling")
 sigmax = read(hfile["sigmax"])
+close(hfile)
+hfile = h5open("steady_data_2.hdf5", "r")
+timeseries2 = read(hfile["timeseries"])
 close(hfile)
 @info "Loaded steady data"
 
@@ -173,7 +177,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 12 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -229,6 +233,7 @@ end
 # HAPPENING ON PROC 1
 if myid() == 1
     losses = Float64[]
+    losses_2 = Float64[]
     tic = Base.time()
     j = Ref(1)      # needs to be mutable somehow
     while j[] <= nsteps
@@ -242,7 +247,9 @@ if myid() == 1
             if j[]%100 == 0
                 loss = generalization_loss(timeseries)
                 push!(losses, loss)
-                @info "Loss at step $(j[]) is $loss"
+                loss2 = generalization_loss(timeseries2)
+                push!(losses_2, loss2)
+                @info "Loss at step $(j[]) is $loss and $loss2"
             end
             if j[]%40000 == 0 
                 tmp = j[]
@@ -257,6 +264,7 @@ end
 
 hfile = h5open("losses.hdf5", "w")
 hfile["losses"] = losses
+hfile["losses_2"] = losses_2
 close(hfile)
 
 toc = Base.time()
