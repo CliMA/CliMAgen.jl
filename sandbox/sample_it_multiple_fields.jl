@@ -67,6 +67,13 @@ end
     # end
 # end
 
+fig = Figure()
+ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch /100", ylabel = "loss")
+lines!(ax, losses, color = :red, label = "loss 1")
+scatter!(ax, losses_2, color = (:blue, 0.25), label = "loss 2")
+axislegend(ax, position = :rt)
+save("losses.png", fig)
+
 ##
 #=
 fig2 = Figure(resolution = (1200, 600))
