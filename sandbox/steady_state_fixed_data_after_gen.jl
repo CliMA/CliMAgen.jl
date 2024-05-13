@@ -136,7 +136,7 @@ end
 # one epoch has 500 steps 
 losses = Float64[]
 losses2 = Float64[]
-for i in ProgressBar(1:120)
+for i in ProgressBar(1:1000)
     one_epoch(timeseries)
     loss1 = generalization_loss(timeseries)
     loss2 = generalization_loss(timeseries2)
@@ -162,7 +162,7 @@ using CairoMakie
 
 fig = Figure()
 ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
-lines!(ax, losses, color = :red, label = "loss fixed data")
+lines!(ax, losses2, color = :red, label = "loss fixed data")
 scatter!(ax, losses_online[5:5:end], color = (:blue, 0.25), label = "loss online training")
 axislegend(ax, position = :rt)
 save("losses_fixed_vs_online.png", fig)
@@ -182,10 +182,6 @@ time_steps, Δt, init_x = setup_sampler(
 )
 
 samples = Euler_Maruyama_sampler(score_model_smooth, init_x, time_steps, Δt)
-
-
-M = length(fields)
-N = length(layers)
 
 # for j in 1:N
     # for i in 1:M

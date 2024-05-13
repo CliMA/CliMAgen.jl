@@ -177,7 +177,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 6 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 3 * 6 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
