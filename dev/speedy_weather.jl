@@ -1,13 +1,9 @@
 using SpeedyWeather
 using Distributions    # just for Uniform(a,b)
 using Random
-# Random.seed!(12345)
+Random.seed!(12345)
 
 include("speedy_diagnostics.jl")
-
-add_pressure_field = false
-fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
-layers = [5] #  [5, 4, 3, 2, 1] # bottom to top
 
 function generate_parameters(; default = false)
     if default
@@ -118,7 +114,10 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
 end
 
 # Check if the simulation runs 
-parameters = generate_parameters(default=true)
+add_pressure_field = false
+fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
+layers = [5]           #  [5, 4, 3, 2, 1] # bottom to top
+parameters = generate_parameters(; default=true)
 simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
 run!(simulation, period=Day(100))
 plot(my_fields[1].var)
