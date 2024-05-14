@@ -116,6 +116,7 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
     return simulation
 end
 
+# Check if the simulation runs
 parameters = generate_parameters(default=true)
 simulation = speedy_sim(; parameters, layers, fields, add_pressure_field)
 run!(simulation, period=Day(100))
