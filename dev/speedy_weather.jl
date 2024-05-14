@@ -7,7 +7,7 @@ include("speedy_diagnostics.jl")
 
 add_pressure_field = false
 fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
-layers = [1] #  [1, 2, 3, 4, 5]
+layers = [5] #  [5, 4, 3, 2, 1] # bottom to top
 
 function generate_parameters(; default = false)
     if default
@@ -57,17 +57,6 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
     @info "Building Simulation"
     spectral_grid = SpectralGrid(trunc=31, nlev=5)
 
-    my_fields = []
-    for layer in layers, field in fields
-        my_field_on_1 = MyInterpolatedField(spectral_grid; schedule = Schedule(every=Day(1)), field_name = field, layer = layer)
-        my_field = deepcopy(my_field_on_1)
-        push!(my_fields, my_field)
-    end
-    if add_pressure_field
-        my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
-        push!(my_fields, my_field)
-    end
-
     model = PrimitiveWetModel(;
         spectral_grid,
 
@@ -99,13 +88,25 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
         # Surface fluxes
         boundary_layer_drag = BulkRichardsonDrag(spectral_grid),
         surface_wind = SurfaceWind(spectral_grid,
-            f_wind= parameters.f_wind,          # surface wind scale, default 0.95
-            V_gust= parameters.V_gust,         # wind gusts, default 5m/s
+            f_wind = parameters.f_wind,          # surface wind scale, default 0.95
+            V_gust = parameters.V_gust,         # wind gusts, default 5m/s
         ),
 
         # use Earth's orography
         orography = EarthOrography(spectral_grid),
     )
+
+    my_fields = []
+    for layer in layers, field in fields
+        my_field = MyInterpolatedField(spectral_grid; schedule = Schedule(every=Day(1)), field_name = field, layer = layer)
+        push!(my_fields, my_field)
+        add!(model.callbacks, my_field)
+    end
+    if add_pressure_field
+        my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
+        push!(my_fields, my_field)
+        add!(model.callbacks, my_field)
+    end
 
     simulation = initialize!(model)
 
@@ -113,10 +114,11 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
     orography_scale = parameters.orography_scale
     model.orography.orography .*= orography_scale
     model.orography.geopot_surf .*= orography_scale
-    return simulation
+    return simulation, my_fields
 end
 
-# Check if the simulation runs
+# Check if the simulation runs 
 parameters = generate_parameters(default=true)
-simulation = speedy_sim(; parameters, layers, fields, add_pressure_field)
+simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
 run!(simulation, period=Day(100))
+plot(my_fields[1].var)
