@@ -15,14 +15,20 @@ using SharedArrays
 
 # load steady_data 
 @info "Loading steady data"
-hfile = h5open("steady_data.hdf5", "r")
+hfile = h5open("steady_data_c.hdf5", "r")
 timeseries = read(hfile["timeseries"])
 μ = read(hfile, "shift")
 σ = read(hfile, "scaling")
 sigmax = read(hfile["sigmax"])
 close(hfile)
-hfile = h5open("steady_data_2.hdf5", "r")
+hfile = h5open("steady_data_2_c.hdf5", "r")
 timeseries2 = read(hfile["timeseries"])
+close(hfile)
+hfile = h5open("steady_data.hdf5", "r")
+timeseries_u = read(hfile["timeseries"])
+close(hfile)
+hfile = h5open("steady_data_2.hdf5", "r")
+timeseries2_u = read(hfile["timeseries"])
 close(hfile)
 @info "Loaded steady data"
 
@@ -136,113 +142,26 @@ end
 # one epoch has 500 steps 
 losses = Float64[]
 losses2 = Float64[]
+losses_u = Float64[]
+losses2_u = Float64[]
 for i in ProgressBar(1:1000)
     one_epoch(timeseries)
     loss1 = generalization_loss(timeseries)
     loss2 = generalization_loss(timeseries2)
+    loss3 = generalization_loss(timeseries_u)
+    loss4 = generalization_loss(timeseries2_u)
     push!(losses, loss1)
     push!(losses2, loss2)
-    @info "Epoch $i: loss1 = $loss1, loss2 = $loss2"
+    push!(losses_u, loss3)
+    push!(losses2_u, loss4)
+    println("Epoch $i: loss1 = $loss1, loss2 = $loss2")
+    println("Epoch $i: loss3 = $loss3, loss4 = $loss4")
+    println("---------")
 end
 
-hfile = h5open("losses_fixed_data.hdf5", "w")
+hfile = h5open("losses_fixed_data_correlated.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses2
+hfile["losses_u"] = losses_u
+hfile["losses_2_u"] = losses2_u
 close(hfile)
-
-##
-hfile = h5open("losses.hdf5", "r")
-losses_online = read(hfile["losses"])
-close(hfile)
-##
-losses[20]
-losses_online[5]
-##
-using CairoMakie
-
-fig = Figure()
-ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
-lines!(ax, losses2, color = :red, label = "loss fixed data")
-scatter!(ax, losses_online[5:5:end], color = (:blue, 0.25), label = "loss online training")
-axislegend(ax, position = :rt)
-save("losses_fixed_vs_online.png", fig)
-
-##
-epochs = 1:length(losses)
-inds = 50:1000
-
-fig = Figure()
-ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
-lines!(ax, losses2[1:end], color = :red, label = "loss fixed data")
-scatter!(ax, losses_online[5:5:end], color = (:blue, 0.25), label = "loss online training")
-xlims!(ax, 50, 1000)
-ylims!(ax, 0.0045 , losses_online[200])
-axislegend(ax, position = :rt)
-save("losses_fixed_vs_online_zoom.png", fig)
-##
-
-fig = Figure()
-ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
-epochs = 1:length(losses)
-inds = 50:1000
-lines!(ax, epochs[inds], losses[inds], color = :red, label = "loss fixed data")
-lines!(ax, epochs[inds], losses2[inds], color = (:blue, 0.25), label = "loss generalization data")
-axislegend(ax, position = :rt)
-save("losses_generalization_vs_data.png", fig)
-
-##
-include("sampler.jl")
-nsamples = 10
-nsteps = 250 * 2
-resolution = (128, 64)
-time_steps, Δt, init_x = setup_sampler(
-    score_model_smooth,
-    device,
-    resolution,
-    inchannels;
-    num_images=nsamples,
-    num_steps=nsteps,
-)
-
-samples = Euler_Maruyama_sampler(score_model_smooth, init_x, time_steps, Δt)
-
-# for j in 1:N
-    # for i in 1:M
-        # ii = (i-1)*N + j
-N = 1
-M = 1
-p = 0.05
-for j in 1:N
-    fig = Figure(resolution = (1200, 300))
-    ind = 1 + (j-1) * M
-    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  quantile(Array(samples[:,:,ind,1])[:], 1-p))
-    ax = Axis(fig[1, 1]; title = "layer $j, training data: T")
-    heatmap!(ax, Array(timeseries[:,:,ind,1]); colorrange1, colormap = :thermometer)
-    for k in 1:4
-        ax = Axis(fig[1, 1 + k]; title = "layer $j, ai: T, sample $k")
-        heatmap!(ax, Array(samples)[:,:,ind,k]; colorrange1, colormap = :thermometer)
-    end
-    #=
-    ax = Axis(fig[1, 1+2]; title = "layer $j, ai: ω")
-    ind = 2 + (j-1) * M
-    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p),)
-    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
-    ax = Axis(fig[1, 2+2]; title = "layer $j, training data: ω")
-    heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
-
-    ax = Axis(fig[2, 1]; title = "layer $j, ai: humidity")
-    ind = 3 + (j-1) * M
-    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  quantile(Array(samples[:,:,ind,1])[:], 1-p))
-    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :blues)
-    ax = Axis(fig[2, 2]; title = "layer $j, training data: humidity")
-    heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :blues)
-
-    ax = Axis(fig[2, 1+2]; title = "layer $j, ai: div")
-    ind = 4 + (j-1) * M
-    colorrange1 = (quantile(Array(samples[:,:,ind,1])[:], p),  -quantile(Array(samples[:,:,ind,1])[:], p))
-    heatmap!(ax, lon, lat, Array(samples)[:,:,ind,1]; colorrange1, colormap = :balance)
-    ax = Axis(fig[2, 2+2]; title = "layer $j, training data: div")
-    heatmap!(ax, lon, lat, Array(batch[:,:,ind,1]); colorrange1, colormap = :balance)
-    =#
-    save("fixed_after_training_multipe_fields_layer_$j.png", fig)
-end
