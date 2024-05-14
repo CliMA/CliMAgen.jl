@@ -92,6 +92,7 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
         orography = EarthOrography(spectral_grid),
     )
 
+    # callbacks 
     my_fields = []
     for layer in layers, field in fields
         my_field = MyInterpolatedField(spectral_grid; schedule = Schedule(every=Day(1)), field_name = field, layer = layer)
@@ -110,6 +111,8 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
     orography_scale = parameters.orography_scale
     model.orography.orography .*= orography_scale
     model.orography.geopot_surf .*= orography_scale
+    # not verbose 
+    model.feedback.verbose = false
     return simulation, my_fields
 end
 
@@ -119,5 +122,5 @@ fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [5]           #  [5, 4, 3, 2, 1] # bottom to top
 parameters = generate_parameters(; default=true)
 simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
-run!(simulation, period=Day(100))
+run!(simulation, period=Day(10))
 plot(my_fields[1].var)
