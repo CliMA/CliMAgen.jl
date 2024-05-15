@@ -78,7 +78,7 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
         large_scale_condensation = ImplicitCondensation(spectral_grid),
         shortwave_radiation = NoShortwave(),
         longwave_radiation = NoLongwave(),
-        vertical_diffusion = NoVerticalDiffusion(),
+        # vertical_diffusion = NoVerticalDiffusion(),
         # vertical_diffusion = BulkRichardsonDiffusion(spectral_grid), # maybe needed
 
         # Surface fluxes

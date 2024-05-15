@@ -165,3 +165,37 @@ hfile["losses_2"] = losses2
 hfile["losses_u"] = losses_u
 hfile["losses_2_u"] = losses2_u
 close(hfile)
+
+##
+
+hfile = h5open("losses.hdf5", "r")
+losses_online = read(hfile["losses"])
+close(hfile)
+##
+losses[20]
+losses_online[5]
+##
+using CairoMakie
+
+fig = Figure()
+ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
+lines!(ax, losses2_u, color = (:red,0.5), label = "loss fixed data")
+lines!(ax, losses_online[5:5:end], color = (:blue, 0.5), label = "loss online training")
+axislegend(ax, position = :rt)
+xlims!(ax, 10, 500)
+ylims!(ax, 0.0045 , losses2_u[end])
+save("losses_fixed_vs_online_correlated.png", fig)
+
+##
+# In terms of gradient descent steps
+fig = Figure()
+ax = Axis(fig[1, 1]; title = "losses", xlabel ="1k batch updates", ylabel = "loss")
+scale = 0.5
+tmp = scale * (1:length(losses2_u))
+tmp2 = scale * (1:length(losses_online[5:5:end]))
+lines!(ax, tmp, losses2_u, color = (:red,0.5), label = "loss fixed data")
+lines!(ax, tmp2, losses_online[5:5:end], color = (:blue, 0.5), label = "loss online training")
+axislegend(ax, position = :rt)
+xlims!(ax, scale * 10, scale * 500)
+ylims!(ax, 0.0045 , losses2_u[end])
+save("losses_fixed_vs_online_correlated_steps.png", fig)
