@@ -169,8 +169,17 @@ close(hfile)
 ##
 
 hfile = h5open("losses.hdf5", "r")
-losses_online = read(hfile["losses"])
+losses_online = read(hfile["losses_2"])
 close(hfile)
+
+hfile = h5open("losses_fixed_data_correlated.hdf5", "r")
+losses2_u = read(hfile["losses_2_u"]) 
+close(hfile)
+
+hfile = h5open("losses_more_cap.hdf5", "r")
+losses2_c = read(hfile["losses_2"]) 
+close(hfile)
+
 ##
 losses[20]
 losses_online[5]
@@ -181,8 +190,19 @@ fig = Figure()
 ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
 lines!(ax, losses2_u, color = (:red,0.5), label = "loss fixed data")
 lines!(ax, losses_online[5:5:end], color = (:blue, 0.5), label = "loss online training")
+lines!(ax, losses2_c, color = (:orange, 0.5), label = "loss fixed data more capacity")
 axislegend(ax, position = :rt)
-xlims!(ax, 10, 500)
+xlims!(ax, 10, 710)
+ylims!(ax, 0.0045 , losses2_u[end])
+save("losses_fixed_vs_online_correlated_mc.png", fig)
+##
+
+fig = Figure()
+ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
+lines!(ax, losses2_u, color = (:red,0.5), label = "loss fixed data")
+lines!(ax, losses_online[5:5:end], color = (:blue, 0.5), label = "loss online training")
+axislegend(ax, position = :rt)
+xlims!(ax, 10, 710)
 ylims!(ax, 0.0045 , losses2_u[end])
 save("losses_fixed_vs_online_correlated.png", fig)
 
@@ -196,6 +216,6 @@ tmp2 = scale * (1:length(losses_online[5:5:end]))
 lines!(ax, tmp, losses2_u, color = (:red,0.5), label = "loss fixed data")
 lines!(ax, tmp2, losses_online[5:5:end], color = (:blue, 0.5), label = "loss online training")
 axislegend(ax, position = :rt)
-xlims!(ax, scale * 10, scale * 500)
+xlims!(ax, scale * 10, scale * 710)
 ylims!(ax, 0.0045 , losses2_u[end])
 save("losses_fixed_vs_online_correlated_steps.png", fig)

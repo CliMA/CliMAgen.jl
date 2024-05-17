@@ -104,8 +104,8 @@ device = Flux.gpu
 # Create network
 quick_arg = true
 kernel_size = 3
-kernel_sizes = [3, 2, 1, 0]
-channel_scale = 5
+kernel_sizes = [0, 0, 0, 0] # [3, 2, 1, 0]
+channel_scale = 1
 net = NoiseConditionalScoreNetwork(;
                                     channels = channel_scale .* [32, 64, 128, 256],
                                     proj_kernelsize   = kernel_size + kernel_sizes[1],
@@ -167,9 +167,11 @@ function generalization_loss(y; noised_channels = inchannels, context_channels=c
 end
 
 function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn_c, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
-    grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
-    Flux.Optimise.update!(opt, ps, grad)
-    Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
+    for i in 1:8
+        grad = Flux.gradient(() -> sum(lossfn(batch[:,:,:,[i]])), ps)
+        Flux.Optimise.update!(opt, ps, grad)
+        Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
+    end
     return nothing
 end
 
@@ -177,7 +179,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 6 * 6 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 3 * 6 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -244,7 +246,7 @@ if myid() == 1
             batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
             open_all!(gates)
             mock_callback(device(batch))
-            if j[]%500 == 0
+            if j[]%100 == 0
                 loss = generalization_loss(timeseries)
                 push!(losses, loss)
                 loss2 = generalization_loss(timeseries2)
@@ -254,7 +256,7 @@ if myid() == 1
             if j[]%40000 == 0 
                 tmp = j[]
                 @info "saving model"
-                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_trunc_$(trunc_val)_timestep_$tmp.bson")
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "cyclic_checkpoint_steady_trunc_$(trunc_val)_timestep_$tmp.bson")
             end
         else
             sleep(SLEEP_DURATION)
@@ -262,9 +264,10 @@ if myid() == 1
     end
 end
 
-hfile = h5open("losses_more_cap.hdf5", "w")
+hfile = h5open("losses_cyclic.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
-hfile["skip"] = 500
 close(hfile)
 
+toc = Base.time()
+println("Time for the simulation is $((toc-tic)/60) minutes.")
