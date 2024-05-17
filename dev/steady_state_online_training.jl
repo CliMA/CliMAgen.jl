@@ -23,21 +23,11 @@ end
 # trunc_val = 31
 const trunc_val = 31
 const add_pressure_field = false
-fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
-layers = [1] #  [1, 2, 3, 4, 5]
-spectral_grid = SpectralGrid(trunc=trunc_val, nlev=5)
+fields =  [:temp_grid] 
+layers = [5]
+parameters = generate_parameters(; default=true)
+simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
 
-my_fields = []
-for layer in layers, field in fields
-    my_field_on_1 = MyInterpolatedField(spectral_grid; schedule = Schedule(every=Day(1)), field_name = field, layer = layer)
-    my_field = deepcopy(my_field_on_1)
-    push!(my_fields, my_field)
-end
-# add pressure
-if add_pressure_field
-    my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
-    push!(my_fields, my_field)
-end
 gated_array = SharedArray{spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields), Distributed.nworkers())
 gated_array .= 0.0
 # julia --project -p 8
@@ -55,18 +45,6 @@ open_all!(gates)
 if myid() == 1
 Random.seed!(1234) 
 
-# model
-ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
-land_sea_mask = AquaPlanetMask(spectral_grid)
-orography = NoOrography(spectral_grid)
-model = PrimitiveWetModel(; spectral_grid, ocean) 
-model.feedback.verbose = false
-# callbacks
-for my_field in my_fields 
-    add!(model.callbacks, my_field)
-end
-# run
-simulation = initialize!(model)
 # sigma max
 n_fields = length(my_fields)
 # load steady_data 
@@ -134,19 +112,6 @@ ps = Flux.params(score_model);
 # setup smoothed parameters
 ps_smooth = Flux.params(score_model_smooth);
 
-#=
-@info "Starting from checkpoint"
-checkpoint_path = "steady_temperature_trunc_31.bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
-BSON.@load checkpoint_path model model_smooth opt opt_smooth
-score_model = device(model)
-score_model_smooth = device(model_smooth)
-# model parameters
-ps = Flux.params(score_model);
-# setup smoothed parameters
-ps_smooth = Flux.params(score_model_smooth);
-=#
-
-
 function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
     x = y[:,:,1:noised_channels,:]
     # c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
@@ -167,11 +132,9 @@ function generalization_loss(y; noised_channels = inchannels, context_channels=c
 end
 
 function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn_c, ps_smooth = ps_smooth, opt_smooth = opt_smooth)
-    for i in 1:8
-        grad = Flux.gradient(() -> sum(lossfn(batch[:,:,:,[i]])), ps)
-        Flux.Optimise.update!(opt, ps, grad)
-        Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
-    end
+    grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
+    Flux.Optimise.update!(opt, ps, grad)
+    Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
     return nothing
 end
 
@@ -179,7 +142,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 3 * 6 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 6 * 6 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -187,27 +150,11 @@ const SLEEP_DURATION = 1e-3
     gate_id = id-1
     Random.seed!(1998+id)
     # model
-    ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
-    land_sea_mask = AquaPlanetMask(spectral_grid)
-    orography = NoOrography(spectral_grid)
-    # initial_conditions = InitialConditions(; vordiv = StartWithRandomVorticity(amplitude = 0.0f0))
-    model = PrimitiveWetModel(; spectral_grid, ocean) # , initial_conditions)
-    model.feedback.verbose = false
-    # callbacks
-    my_fields = []
-    for layer in layers, field in fields
-        my_field_on_1 = MyInterpolatedField(spectral_grid; schedule = Schedule(every=Day(1)), field_name = field, layer = layer)
-        my_field = deepcopy(my_field_on_1)
-        push!(my_fields, my_field)
-        add!(model.callbacks, my_field)
-    end
-    if add_pressure_field
-        my_field = MyInterpolatedPressure(spectral_grid; schedule = Schedule(every=Day(1)))
-        add!(model.callbacks, my_field)
-        push!(my_fields, my_field)
-    end
-    # initialize and run
-    simulation = initialize!(model)
+    fields =  [:temp_grid] 
+    layers = [5]
+    parameters = generate_parameters(; default=true)
+    simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
+    
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
     simulation.prognostic_variables.layers[1].timesteps[1].vor .+= randn(Float32, Nx, Ny) * Float32(1e-10)
     run!(simulation, period=Day(100))
@@ -256,7 +203,7 @@ if myid() == 1
             if j[]%40000 == 0 
                 tmp = j[]
                 @info "saving model"
-                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "cyclic_checkpoint_steady_trunc_$(trunc_val)_timestep_$tmp.bson")
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_trunc_$(trunc_val)_timestep_$tmp.bson")
             end
         else
             sleep(SLEEP_DURATION)
@@ -264,35 +211,10 @@ if myid() == 1
     end
 end
 
-hfile = h5open("losses_cyclic.hdf5", "w")
+hfile = h5open("losses.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
 close(hfile)
 
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
-
-##
-#=
-fig = Figure()
-ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
-lines!(ax, losses2_u, color = (:red,0.5), label = "fixed data")
-lines!(ax, losses_online[5:5:end], color = (:blue, 0.5), label = "online training")
-lines!(ax, losses2_c, color = (:orange, 0.5), label = "online training more capacity")
-lines!(ax, losses[5:5:end], color = (:green, 0.5), label = "cyclic online training")
-axislegend(ax, position = :ct)
-xlims!(ax, 10, 710)
-ylims!(ax, 0.0045 , losses2_u[end])
-save("losses_fixed_vs_online_correlated_mc_cyclic.png", fig)
-
-fig = Figure()
-ax = Axis(fig[1, 1]; title = "losses", xlabel ="epoch", ylabel = "loss")
-lines!(ax, losses2_u, color = (:red,0.5), label = "fixed data")
-lines!(ax, losses_online[5:5:end], color = (:blue, 0.5), label = "online training")
-lines!(ax, losses2_c, color = (:orange, 0.5), label = "online training more capacity")
-lines!(ax, losses[5:5:end], color = (:green, 0.5), label = "cyclic online training")
-axislegend(ax, position = :ct)
-xlims!(ax, 10, 320)
-ylims!(ax, 0.0045 , losses2_u[end])
-save("losses_fixed_vs_online_correlated_mc_cyclic_p2.png", fig)
-=#

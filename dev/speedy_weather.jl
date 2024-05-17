@@ -49,6 +49,50 @@ function generate_parameters(; default = false)
     return parameters
 end
 
+function custom_parameters(; 
+    rotation = 7.29e-5, 
+
+    relax_time_slow = 40*Day(1),
+    relax_time_fast = 4*Day(1),
+    Tmin = 200,
+    Tmax = 315,
+    ΔTy = 60,
+    Δθz = 10,
+
+    time_scale = 4*Hour(1),
+    relative_humidity = 0.7,
+
+    f_wind = 0.95,
+    V_gust = 5,
+
+    orography_scale = 1
+    )
+    parameters = (; rotation, relax_time_slow, relax_time_fast, Tmin, Tmax, ΔTy, Δθz, time_scale, relative_humidity, f_wind, V_gust, orography_scale)
+    return parameters
+end
+
+function custom_random_parameters(; 
+    rotation = rand(Uniform(-1e-4, 1e-4)),
+
+    relax_time_slow = Second(round(Int, 24*3600*rand(Uniform(20,80)))),
+    relax_time_fast = Second(round(Int, 24*3600*rand(Uniform(2,8)))),
+    Tmin = rand(Uniform(190,210)),
+    Tmax = rand(Uniform(305,325)),
+    ΔTy = rand(Uniform(50,70)),
+    Δθz = rand(Uniform(5,15)),
+
+    time_scale = Second(round(Int, 3600*rand(Uniform(2,16)))),
+    relative_humidity = rand(Uniform(0.6,0.8)),
+
+    f_wind = rand(Uniform(0,1)),
+    V_gust = rand(Uniform(0,10)),
+
+    orography_scale = rand(Uniform(0,1))
+    )
+    parameters = (; rotation, relax_time_slow, relax_time_fast, Tmin, Tmax, ΔTy, Δθz, time_scale, relative_humidity, f_wind, V_gust, orography_scale)
+    return parameters
+end
+
 function speedy_sim(; parameters, layers, fields, add_pressure_field)
     @info "Building Simulation"
     spectral_grid = SpectralGrid(trunc=31, nlev=5)
