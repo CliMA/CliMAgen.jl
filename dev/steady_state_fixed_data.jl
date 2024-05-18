@@ -10,18 +10,16 @@ using LinearAlgebra, Statistics
 
 using Random
 using SpeedyWeather
-using StochasticStir
-using SharedArrays
 
 # load steady_data 
 @info "Loading steady data"
-hfile = h5open("steady_data.hdf5", "r")
+hfile = h5open("steady_default_data_correlated.hdf5", "r")
 timeseries = read(hfile["timeseries"])
 μ = read(hfile, "shift")
 σ = read(hfile, "scaling")
 sigmax = read(hfile["sigmax"])
 close(hfile)
-hfile = h5open("steady_data_2.hdf5", "r")
+hfile = h5open("steady_default_data.hdf5", "r")
 timeseries2 = read(hfile["timeseries"])
 close(hfile)
 @info "Loaded steady data"
@@ -142,7 +140,11 @@ for i in ProgressBar(1:1000)
     loss2 = generalization_loss(timeseries2)
     push!(losses, loss1)
     push!(losses2, loss2)
-    @info "Epoch $i: loss1 = $loss1, loss2 = $loss2"
+    println("Epoch $i: loss1 = $loss1, loss2 = $loss2")
+    if i%100 == 0
+        @info "saving epoch $i"
+        CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "steady_state_fixed_data_epoch_$i.bson")
+    end
 end
 
 CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "steady_state_fixed_data.bson")

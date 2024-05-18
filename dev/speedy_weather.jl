@@ -157,10 +157,12 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
     model.orography.geopot_surf .*= orography_scale
     # not verbose 
     model.feedback.verbose = false
+    simulation.model.time_stepping = Leapfrog(simulation.model.spectral_grid; Δt_at_T31 = Second(1500))
     return simulation, my_fields
 end
 
 # Check if the simulation runs 
+#=
 add_pressure_field = false
 fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [5]           #  [5, 4, 3, 2, 1] # bottom to top
@@ -168,3 +170,4 @@ parameters = generate_parameters(; default=true)
 simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
 run!(simulation, period=Day(10))
 plot(my_fields[1].var)
+=#

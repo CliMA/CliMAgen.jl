@@ -15,11 +15,10 @@ end
 
 @everywhere using Random
 @everywhere using SpeedyWeather
-@everywhere using StochasticStir
 @everywhere using SharedArrays
 
-@everywhere include("my_field.jl")
-@everywhere include("my_pressure.jl")
+@everywhere include("speedy_diagnostics.jl")
+@everywhere include("speedy_weather.jl")
 # trunc_val = 31
 const trunc_val = 31
 const add_pressure_field = false
@@ -28,7 +27,7 @@ layers = [5]
 parameters = generate_parameters(; default=true)
 simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
 
-gated_array = SharedArray{spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields), Distributed.nworkers())
+gated_array = SharedArray{simulation.model.spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields), Distributed.nworkers())
 gated_array .= 0.0
 # julia --project -p 8
 # open is true, closed is false. Open means we can write to the array
@@ -49,13 +48,13 @@ Random.seed!(1234)
 n_fields = length(my_fields)
 # load steady_data 
 @info "Loading steady data"
-hfile = h5open("steady_data.hdf5", "r")
+hfile = h5open("steady_default_data.hdf5", "r")
 timeseries = read(hfile["timeseries"])
 μ = read(hfile, "shift")
 σ = read(hfile, "scaling")
 sigmax = read(hfile["sigmax"])
 close(hfile)
-hfile = h5open("steady_data_2.hdf5", "r")
+hfile = h5open("steady_default_data_correlated.hdf5", "r")
 timeseries2 = read(hfile["timeseries"])
 close(hfile)
 @info "Loaded steady data"
@@ -142,7 +141,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 6 * 6 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 20 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -203,7 +202,7 @@ if myid() == 1
             if j[]%40000 == 0 
                 tmp = j[]
                 @info "saving model"
-                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_trunc_$(trunc_val)_timestep_$tmp.bson")
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_online_timestep_$tmp.bson")
             end
         else
             sleep(SLEEP_DURATION)
@@ -211,7 +210,7 @@ if myid() == 1
     end
 end
 
-hfile = h5open("losses.hdf5", "w")
+hfile = h5open("losses_online.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
 close(hfile)
