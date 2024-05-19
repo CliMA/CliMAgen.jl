@@ -6,8 +6,14 @@ using Flux
 using CliMAgen
 using BSON
 using HDF5
+using CUDA
 
 include("sampler.jl")
+
+hfile = h5open("losses_fixed_data.hdf5", "r")
+losses = read(hfile["losses_2"])
+close(hfile)
+best_epoch = round(Int, argmin(losses)÷100) * 100
 
 device = Flux.gpu
 
@@ -17,7 +23,7 @@ function load_model(checkpoint_path)
     return score_model_smooth
 end
 
-score_model_smooth = load_model("steady_state_fixed_data_epoch_100.bson")
+score_model_smooth = load_model("steady_state_fixed_data_epoch_$best_epoch.bson")
 
 nsamples = 16
 nsteps = 250
@@ -33,18 +39,18 @@ time_steps, Δt, init_x = setup_sampler(
     num_steps=nsteps,
 )
 
-samples = Euler_Maruyama_sampler(score_model_smooth, init_x, time_steps, Δt)
+samples = Array(Euler_Maruyama_sampler(score_model_smooth, init_x, time_steps, Δt))
 
 hfile = h5open("steady_default_data.hdf5", "r")
 timeseries = read(hfile["timeseries"])
-μ = read(hfile, "shift")
-σ = read(hfile, "scaling")
+shift = read(hfile, "shift")
+scale = read(hfile, "scaling")
 lon = read(hfile["lon"])
 lat = read(hfile["lat"])
 close(hfile)
 
-physical_timeseries = σ .* timeseries .+ μ
-physical_samples = Array(σ .* samples .+ μ)
+physical_timeseries = scale .* timeseries .+ shift
+physical_samples = scale .* samples .+ shift
 
 ##
 ensemble_indices = collect(1:nsamples)
