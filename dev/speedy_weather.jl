@@ -96,15 +96,15 @@ end
 function speedy_sim(; parameters, layers, fields, add_pressure_field)
     @info "Building Simulation"
     spectral_grid = SpectralGrid(trunc=31, nlev=5)
-
+    ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
     model = PrimitiveWetModel(;
         spectral_grid,
-
+        ocean,
         planet = Earth(spectral_grid,
             rotation=parameters.rotation, # default 7.29e-5 1/s
         ),
-
         # Held-Suarez forcing but not its drag
+        #=
         temperature_relaxation = HeldSuarez(spectral_grid,
             relax_time_slow=parameters.relax_time_slow,  # default 40 days
             relax_time_fast=parameters.relax_time_fast,  # default 4 days
@@ -113,17 +113,18 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
             ΔTy=parameters.ΔTy,             # default 60K
             Δθz=parameters.Δθz,             # default 10K
         ),
-
+        =#
         # other physics
         convection = SimplifiedBettsMiller(spectral_grid,
             time_scale= parameters.time_scale,                # default 4 hours
             relative_humidity=parameters.relative_humidity,   # default 0.7
         ),
+        
         large_scale_condensation = ImplicitCondensation(spectral_grid),
-        shortwave_radiation = NoShortwave(),
-        longwave_radiation = NoLongwave(),
+        # shortwave_radiation = NoShortwave(),
+        # longwave_radiation = NoLongwave(),
         # vertical_diffusion = NoVerticalDiffusion(),
-        # vertical_diffusion = BulkRichardsonDiffusion(spectral_grid), # maybe needed
+        vertical_diffusion = BulkRichardsonDiffusion(spectral_grid), # maybe needed
 
         # Surface fluxes
         boundary_layer_drag = BulkRichardsonDrag(spectral_grid),
@@ -157,7 +158,7 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
     model.orography.geopot_surf .*= orography_scale
     # not verbose 
     model.feedback.verbose = false
-    simulation.model.time_stepping = Leapfrog(simulation.model.spectral_grid; Δt_at_T31 = Second(1500))
+    simulation.model.time_stepping = Leapfrog(simulation.model.spectral_grid; Δt_at_T31 = Second(1800))
     return simulation, my_fields
 end
 

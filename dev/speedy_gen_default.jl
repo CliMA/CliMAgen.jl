@@ -66,6 +66,8 @@ for j in ProgressBar(1:steps)
     end
 end
 
+
+r_timeseries = copy(reshape(timeseries, (128, 64, n_fields, steps)) )
 rescaled_timeseries = (r_timeseries .- μ) ./ σ
 
 hfile = h5open("steady_default_data_correlated.hdf5", "w")
