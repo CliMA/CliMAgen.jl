@@ -167,8 +167,9 @@ end
 add_pressure_field = false
 fields =  [:temp_grid] # [:temp_grid, :vor_grid, :humid_grid, :div_grid]
 layers = [5]           #  [5, 4, 3, 2, 1] # bottom to top
-parameters = generate_parameters(; default=true)
+# parameters = generate_parameters(; default=true)
+parameters = custom_parameters(; rotation = -1e-4)
 simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
-run!(simulation, period=Day(10))
-plot(my_fields[1].var)
+run!(simulation, period=Day(100))
+SpeedyWeather.plot(my_fields[1].var)
 =#
