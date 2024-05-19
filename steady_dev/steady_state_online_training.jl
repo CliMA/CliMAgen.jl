@@ -151,12 +151,12 @@ const SLEEP_DURATION = 1e-3
     # model
     fields =  [:temp_grid] 
     layers = [5]
-    parameters = custom_parameters(; rotation = Float32((id-5.5)/3.5 * 1e-4))# generate_parameters(; default=true)
+    parameters = generate_parameters(; default=true)
     simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
     
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
     simulation.prognostic_variables.layers[1].timesteps[1].vor .+= randn(Float32, Nx, Ny) * Float32(1e-10)
-    run!(simulation, period=Day(1200))
+    run!(simulation, period=Day(100))
     run!(simulation, period=Day(1 + (gate_id-1) * 365/8))
     for (i, my_field) in enumerate(my_fields)
         gated_array[:, i, gate_id] .= my_field.var
@@ -200,10 +200,10 @@ if myid() == 1
                 push!(losses_2, loss2)
                 @info "Loss at step $(j[]) is $loss and $loss2"
             end
-            if j[]%40000 == 0 
+            if j[]%20000 == 0 
                 tmp = j[]
                 @info "saving model"
-                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_multiple_rotation_online_timestep_$tmp.bson")
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_online_timestep_$tmp.bson")
             end
         else
             sleep(SLEEP_DURATION)
@@ -211,8 +211,7 @@ if myid() == 1
     end
 end
 
-
-hfile = h5open("losses_online_rotation.hdf5", "w")
+hfile = h5open("losses_online.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
 close(hfile)
