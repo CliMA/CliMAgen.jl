@@ -93,7 +93,7 @@ function custom_random_parameters(;
     return parameters
 end
 
-function speedy_sim(; parameters, layers, fields, add_pressure_field)
+function speedy_sim(; parameters, layers, fields, add_pressure_field, timestep = Second(1800))
     @info "Building Simulation"
     spectral_grid = SpectralGrid(trunc=31, nlev=5)
     ocean = ConstantOceanClimatology(spectral_grid)
@@ -159,7 +159,7 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field)
     model.orography.geopot_surf .*= orography_scale
     # not verbose 
     model.feedback.verbose = false
-    simulation.model.time_stepping = Leapfrog(simulation.model.spectral_grid; Δt_at_T31 = Second(1800))
+    simulation.model.time_stepping = Leapfrog(simulation.model.spectral_grid; Δt_at_T31 = timestep)
     return simulation, my_fields
 end
 

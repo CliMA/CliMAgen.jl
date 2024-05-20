@@ -78,34 +78,12 @@ ema_rate = FT(0.999);
 device = Flux.gpu
 
 
-# Create network
-quick_arg = true
-kernel_size = 3
-kernel_sizes = [0, 0, 0, 0] # [3, 2, 1, 0]
-channel_scale = 1
-net = NoiseConditionalScoreNetwork(;
-                                    channels = channel_scale .* [32, 64, 128, 256],
-                                    proj_kernelsize   = kernel_size + kernel_sizes[1],
-                                    outer_kernelsize  = kernel_size + kernel_sizes[2],
-                                    middle_kernelsize = kernel_size + kernel_sizes[3],
-                                    inner_kernelsize  = kernel_size + kernel_sizes[4],
-                                    noised_channels = inchannels,
-                                    context_channels = context_channels,
-                                    context = false,
-                                    shift_input = quick_arg,
-                                    shift_output = quick_arg,
-                                    mean_bypass = quick_arg,
-                                    scale_mean_bypass = quick_arg,
-                                    gnorm = quick_arg,
-                                    )
-score_model = VarianceExplodingSDE(sigma_max, sigma_min, net)
-score_model = device(score_model)
-score_model_smooth = deepcopy(score_model)
-opt = Flux.Optimise.Optimiser(WarmupSchedule{FT}(nwarmup),
-                              Flux.Optimise.ClipNorm(gradnorm),
-                              Flux.Optimise.Adam(learning_rate,(beta_1, beta_2), epsilon)
-) 
-opt_smooth = ExponentialMovingAverage(ema_rate);
+# 
+@info "Loading checkpoint"
+checkpoint_path = "steady_state_fixed_data_epoch_1000.bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
+BSON.@load checkpoint_path model model_smooth opt opt_smooth
+score_model = device(model)
+score_model_smooth = device(model_smooth)
 # model parameters
 ps = Flux.params(score_model);
 # setup smoothed parameters
@@ -151,13 +129,12 @@ const SLEEP_DURATION = 1e-3
     # model
     fields =  [:temp_grid] 
     layers = [5]
-    parameters = custom_parameters(; rotation = Float32((id-5.5)/3.5 * 1e-4))
-    simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field, timestep = Second(1500))
+    parameters = generate_parameters(; default=true)
+    simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
     
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
     simulation.prognostic_variables.layers[1].timesteps[1].vor .+= randn(Float32, Nx, Ny) * Float32(1e-10)
     run!(simulation, period=Day(100))
-    run!(simulation, period=Day(1 + (gate_id-1) * 365/8))
     for (i, my_field) in enumerate(my_fields)
         gated_array[:, i, gate_id] .= my_field.var
     end
@@ -200,10 +177,10 @@ if myid() == 1
                 push!(losses_2, loss2)
                 @info "Loss at step $(j[]) is $loss and $loss2"
             end
-            if j[]%20000 == 0 
+            if j[]%40000 == 0 
                 tmp = j[]
                 @info "saving model"
-                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_rotations_steady_online_timestep_$tmp.bson")
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_steady_online_timestep_$tmp.bson")
             end
         else
             sleep(SLEEP_DURATION)
@@ -211,7 +188,7 @@ if myid() == 1
     end
 end
 
-hfile = h5open("losses_online_rotations.hdf5", "w")
+hfile = h5open("losses_online.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
 close(hfile)
