@@ -17,7 +17,7 @@ hfile = h5open("losses_fixed_data.hdf5", "r")
 losses = read(hfile["losses_2"])
 close(hfile)
 best_epoch = round(Int, argmin(losses)÷100) * 100
-best_opoch = best_epoch == 0 ? 100 : best_epoch
+best_epoch = best_epoch == 0 ? 100 : best_epoch
 
 device = Flux.gpu
 
@@ -33,6 +33,7 @@ if fixed_model
 else
     @info "Loading online model"
     model = "checkpoint_steady_online_timestep_200000.bson"
+    # model = "checkpoint_capacity_steady_online_timestep_160000.bson"
 end
 
 score_model_smooth = load_model(model)
@@ -59,6 +60,10 @@ shift = read(hfile, "shift")
 scale = read(hfile, "scaling")
 lon = read(hfile["lon"])
 lat = read(hfile["lat"])
+close(hfile)
+
+hfile = h5open("save_gated_array.hdf5", "r")
+rgated_array = read(hfile["gated_array"])
 close(hfile)
 
 physical_timeseries = scale .* timeseries .+ shift
@@ -95,3 +100,11 @@ if fixed_model
 else 
     save("temperature_histogram_online.png", fig)
 end
+
+##
+fig = Figure(resolution = (800, 800))
+ax = Axis(fig[1,1], xlabel = "Temperature", ylabel = "Frequency")
+hist!(ax, physical_timeseries[:], bins = 100, color = (:blue, 0.5), label = "data", normalization = :pdf)
+hist!(ax, rgated_array[:], bins = 100, color = (:red, 0.5), label = "data later", normalization = :pdf)
+axislegend(ax, position = :rt)
+save("later_save.png", fig)

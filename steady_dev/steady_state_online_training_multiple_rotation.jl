@@ -151,8 +151,10 @@ const SLEEP_DURATION = 1e-3
     # model
     fields =  [:temp_grid] 
     layers = [5]
-    parameters = custom_parameters(; rotation = Float32((id-5.5)/3.5 * 1e-4))
-    simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field, timestep = Second(1500))
+    rotations = collect(range(3e-5, 1e-4, length = nworkers()))
+    parameters = custom_parameters(; rotation = rotations[gate_id])
+
+    simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field) # , timestep = Second(1500)
     
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
     simulation.prognostic_variables.layers[1].timesteps[1].vor .+= randn(Float32, Nx, Ny) * Float32(1e-10)
