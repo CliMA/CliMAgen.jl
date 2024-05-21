@@ -33,3 +33,18 @@ for (i,j) in enumerate(ensemble_indices)
     xlims!(ax, 210, 300)
 end
 save("temperature_pixel_histgrams.png", fig)
+
+
+fig = Figure(resolution = (800, 800))
+ax = Axis(fig[1,1]; xlabel = "Longitude", ylabel = "Latitude")
+hist!(ax, physical_timeseries[:,:,1,1][:],   normalization = :pdf, color = (:blue, 0.5), bins = 100, label = "Early")
+hist!(ax, physical_timeseries[:,:,1,end][:], normalization = :pdf, color = (:red, 0.5), bins = 100, label = "Late")
+axislegend(ax, position = :lt)
+ax = Axis(fig[1,2]; xlabel = "Longitude", ylabel = "Latitude")
+hist!(ax, physical_timeseries[:,:,1,500][:],   normalization = :pdf, color = (:blue, 0.5), bins = 100, label = "Mid")
+hist!(ax, physical_timeseries[:,:,1,end][:], normalization = :pdf, color = (:red, 0.5), bins = 100, label = "Late")
+axislegend(ax, position = :lt)
+drift = mean(physical_timeseries, dims = (1,2))[:]
+ax = Axis(fig[2, 1]; xlabel = "Time", ylabel = "Temperature")
+lines!(ax, drift, color = :black, label = "Drift")
+save("temperature_pixel_histgrams_overlap.png", fig)

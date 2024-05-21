@@ -163,8 +163,8 @@ const SLEEP_DURATION = 1e-3
     # model
     fields =  [:temp_grid] 
     layers = [5]
-    rotations = collect(range(3e-5, 1e-4, length = nworkers()))
-    
+    # rotations = collect(range(3e-5, 1e-4, length = nworkers()))
+    rotations = collect(range(5e-5, 1e-4, length = nworkers()))
     parameters = custom_parameters(; rotation = Float32(rotations[gate_id]))
     simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
     
@@ -207,7 +207,7 @@ if myid() == 1
             j[] += 1
             println(j)
             rbatch = copy(reshape(gated_array[:,1:length(my_fields), :], (128, 64, length(my_fields), batchsize)))
-            batch = reshape(zeros(Float32, size(gated_array)), (128, 64, length(my_fields)+1, batchsize))
+            batch = copy(reshape(gated_array, (128, 64, length(my_fields)+1, batchsize)))
             batch[:,:, 1:length(my_fields), :] .= (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
             open_all!(gates)
             mock_callback(device(batch))

@@ -188,7 +188,7 @@ if myid() == 1
     end
 end
 
-hfile = h5open("losses_online.hdf5", "w")
+hfile = h5open("losses_online_fixed_start.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
 close(hfile)

@@ -151,7 +151,7 @@ const SLEEP_DURATION = 1e-3
     # model
     fields =  [:temp_grid] 
     layers = [5]
-    rotations = collect(range(3e-5, 1e-4, length = nworkers()))
+    rotations = collect(range(5e-5, 1e-4, length = nworkers()))
     parameters = custom_parameters(; rotation = rotations[gate_id])
 
     simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field) # , timestep = Second(1500)

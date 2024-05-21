@@ -93,6 +93,14 @@ function custom_random_parameters(;
     return parameters
 end
 
+
+function SpeedyWeather.land_timestep!(
+    land::SpeedyWeather.PrognosticVariablesLand,
+    time::DateTime,
+    model::PrimitiveEquation)
+    return nothing
+end
+
 function speedy_sim(; parameters, layers, fields, add_pressure_field, timestep = Second(1800))
     @info "Building Simulation"
     spectral_grid = SpectralGrid(trunc=31, nlev=5)
@@ -103,6 +111,7 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field, timestep =
         planet = Earth(spectral_grid,
             rotation=parameters.rotation, # default 7.29e-5 1/s
             seasonal_cycle = false,
+            daily_cycle = false,
         ),
         # Held-Suarez forcing but not its drag
         #=
@@ -151,7 +160,7 @@ function speedy_sim(; parameters, layers, fields, add_pressure_field, timestep =
         add!(model.callbacks, my_field)
     end
 
-    simulation = initialize!(model)
+    simulation = initialize!(model, time = DateTime(2000, 3, 21))
 
     # scale orography manually
     orography_scale = parameters.orography_scale
