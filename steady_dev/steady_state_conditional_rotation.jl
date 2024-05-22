@@ -238,7 +238,7 @@ hfile["losses_2"] = losses_2
 close(hfile)
 =#
 
-
+CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_conditional_rotations_steady_online_latest.bson")
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
 
