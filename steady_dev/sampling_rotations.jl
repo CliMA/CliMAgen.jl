@@ -21,7 +21,7 @@ function load_model(checkpoint_path)
     return score_model_smooth
 end
 
-model = "checkpoint_conditional_rotations_steady_online_timestep_20000.bson"
+model = "checkpoint_conditional_rotations_steady_online_timestep_180000.bson"
 
 function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) where {FT}
     Random.seed!(1234) # same thing every time
@@ -34,7 +34,7 @@ gfp = GaussianFourierProjection(128, 64, 30.0f0)
 score_model_smooth_s = load_model(model)
 
 @info "setting up sampler"
-nsamples = 128
+nsamples = 100
 nsteps = 250
 inchannels = 1
 Ny = 64
@@ -48,21 +48,29 @@ time_steps, Δt, init_x = setup_sampler(
     num_steps=nsteps,
 )
 rng = MersenneTwister(1234)
-ĉ = reshape(gfp(0), 128, 64, 1, 1)
-c = zeros(Float32, 128, 64, 1, nsamples)
-c .= ĉ
-@info "sampling 0"
-samples = Array(Euler_Maruyama_sampler(score_model_smooth_s, init_x, time_steps, Δt; rng, c))
-
-@info "sampling 1"
-ĉ = reshape(gfp(1), 128, 64, 1, 1)
-c = zeros(Float32, 128, 64, 1, nsamples)
-c .= ĉ
-samples2 = Array(Euler_Maruyama_sampler(score_model_smooth_s, init_x, time_steps, Δt; rng, c))
+rotation_rates = [Float32(0.6e-4), Float32(1.1e-4), Float32(1.5e-4), Float32(7.29e-5)]
+a = 5e-5 
+b = 1e-4
+times = (rotation_rates .- a) ./ (b-a)
+sample_list = []
+for i in eachindex(rotation_rates)
+    ĉ = reshape(gfp(times[i]), 128, 64, 1, 1)
+    c = zeros(Float32, 128, 64, 1, nsamples)
+    c .= ĉ
+    @info "sampling $(rotation_rates[i])"
+    samples = Array(Euler_Maruyama_sampler(score_model_smooth_s, init_x, time_steps, Δt; rng, c))
+    hfile = h5open("rotation_rate_samples_$i.hdf5", "w")
+    hfile["samples"] = samples
+    hfile["rotation"] = rotation_rates[i]
+    close(hfile)
+    push!(sample_list, copy(samples))
+end
 
 ##
 fig = Figure() 
 ax = Axis(fig[1,1])
-hist!(ax, samples[:]; normalization = :pdf, bins = 100, color= (:red, 0.5))
-hist!(ax, samples2[:]; normalization = :pdf, bins = 100, color= (:blue, 0.5))
+hist!(ax, sample_list[1][:]; normalization = :pdf, bins = 100, color= (:red, 0.5))
+hist!(ax, sample_list[2][:]; normalization = :pdf, bins = 100, color= (:green, 0.5))
+hist!(ax, sample_list[3][:]; normalization = :pdf, bins = 100, color= (:gray, 0.5))
+hist!(ax, sample_list[end][:]; normalization = :pdf, bins = 100, color= (:blue, 0.5))
 display(fig)
