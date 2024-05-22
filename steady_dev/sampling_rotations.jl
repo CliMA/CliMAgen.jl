@@ -8,6 +8,7 @@ using BSON
 using HDF5
 using CUDA
 using Random
+import CliMAgen: GaussianFourierProjection
 
 include("sampler.jl")
 
@@ -20,7 +21,7 @@ function load_model(checkpoint_path)
     return score_model_smooth
 end
 
-model = "checkpoint_conditional_rotations_steady_online_timestep_200000.bson"
+model = "checkpoint_conditional_rotations_steady_online_timestep_20000.bson"
 
 function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) where {FT}
     Random.seed!(1234) # same thing every time
@@ -29,10 +30,11 @@ function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) w
 end
 
 gfp = GaussianFourierProjection(128, 64, 30.0f0)
-
+@info "loading model"
 score_model_smooth_s = load_model(model)
 
-nsamples = 8
+@info "setting up sampler"
+nsamples = 128
 nsteps = 250
 inchannels = 1
 Ny = 64
@@ -49,4 +51,18 @@ rng = MersenneTwister(1234)
 ĉ = reshape(gfp(0), 128, 64, 1, 1)
 c = zeros(Float32, 128, 64, 1, nsamples)
 c .= ĉ
-samples = Array(Euler_Maruyama_sampler(score_model_smooth, init_x, time_steps, Δt; rng, c))
+@info "sampling 0"
+samples = Array(Euler_Maruyama_sampler(score_model_smooth_s, init_x, time_steps, Δt; rng, c))
+
+@info "sampling 1"
+ĉ = reshape(gfp(1), 128, 64, 1, 1)
+c = zeros(Float32, 128, 64, 1, nsamples)
+c .= ĉ
+samples2 = Array(Euler_Maruyama_sampler(score_model_smooth_s, init_x, time_steps, Δt; rng, c))
+
+##
+fig = Figure() 
+ax = Axis(fig[1,1])
+hist!(ax, samples[:]; normalization = :pdf, bins = 100, color= (:red, 0.5))
+hist!(ax, samples2[:]; normalization = :pdf, bins = 100, color= (:blue, 0.5))
+display(fig)
