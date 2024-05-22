@@ -80,7 +80,7 @@ device = Flux.gpu
 
 # 
 @info "Loading checkpoint"
-checkpoint_path = "steady_state_fixed_data_epoch_1000.bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
+checkpoint_path = "steady_state_fixed_data_epoch_100.bson"# "checkpoint_large_temperature_vorticity_humidity_divergence_pressure_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(10000).bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep.bson" # "checkpoint_large_temperature_vorticity_humidity_divergence_timestep_Base.RefValue{Int64}(130000).bson"
 BSON.@load checkpoint_path model model_smooth opt opt_smooth
 score_model = device(model)
 score_model_smooth = device(model_smooth)
