@@ -8,7 +8,7 @@ layers = [5]
 
 spinup = 365 * 30
 steps = 10000 # 4000
-skip_days = 14 # 14
+skip_days = 7 # 14
 rotation_index = 4
 @info "Rotation index $rotation_index"
 rotation_rates = [Float32(0.6e-4), Float32(1.1e-4), Float32(1.5e-4), Float32(7.29e-5)]
@@ -20,7 +20,7 @@ simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_fi
 run!(simulation, period=Day(spinup))
 
 @info "Gather Timeseries"
-timeseries = zeros(Float32, simulation.model.spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(my_fields), steps)
+timeseries = zeros(simulation.model.spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(my_fields), steps)
 for j in ProgressBar(1:steps)
     run!(simulation, period=Day(skip_days))
     for (i, my_field) in enumerate(my_fields)
@@ -28,7 +28,7 @@ for j in ProgressBar(1:steps)
     end
 end
 
-hfile = h5open("rotation_rate_data_$rotation_index", "w")
+hfile = h5open("rotation_rate_data_$(rotation_index).hdf5", "w")
 hfile["timeseries"] = timeseries 
 hfile["rotation"] = rotation 
 close(hfile)
