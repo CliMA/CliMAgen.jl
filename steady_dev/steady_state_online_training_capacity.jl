@@ -141,7 +141,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 20 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 40 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -204,6 +204,10 @@ if myid() == 1
                 tmp = j[]
                 @info "saving model"
                 CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_capacity_steady_online_timestep_$tmp.bson")
+                hfile = h5open("losses_online_capacity_$tmp.hdf5", "w")
+                hfile["losses"] = losses
+                hfile["losses_2"] = losses_2
+                close(hfile)
             end
         else
             sleep(SLEEP_DURATION)

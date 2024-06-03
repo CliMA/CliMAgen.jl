@@ -119,7 +119,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 20 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 40 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -170,7 +170,7 @@ if myid() == 1
             batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
             open_all!(gates)
             mock_callback(device(batch))
-            if j[]%100 == 0
+            if j[]%500 == 0
                 loss = generalization_loss(timeseries)
                 push!(losses, loss)
                 loss2 = generalization_loss(timeseries2)

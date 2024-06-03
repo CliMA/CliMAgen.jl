@@ -134,7 +134,7 @@ end
 # one epoch has 500 steps 
 losses = Float64[]
 losses2 = Float64[]
-for i in ProgressBar(1:1000)
+for i in ProgressBar(1:4000)
     one_epoch(timeseries)
     loss1 = generalization_loss(timeseries)
     loss2 = generalization_loss(timeseries2)
