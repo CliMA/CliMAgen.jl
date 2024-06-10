@@ -23,6 +23,13 @@ hfile = h5open("steady_default_data.hdf5", "r")
 timeseries2 = read(hfile["timeseries"])
 close(hfile)
 @info "Loaded steady data"
+hfile = h5open("steady_default_data_correlated_part_2.hdf5", "r")
+timeseries3 = read(hfile["timeseries"])
+close(hfile)
+hfile = h5open("steady_default_data_correlated_part_3.hdf5", "r")
+timeseries4 = read(hfile["timeseries"])
+close(hfile)
+
 
 ## Define Score-Based Diffusion Model
 @info "Defining Score Model"
@@ -134,12 +141,18 @@ end
 # one epoch has 500 steps 
 losses = Float64[]
 losses2 = Float64[]
-for i in ProgressBar(1:4000)
+losses_3 = Float64[]
+losses_4 = Float64[]
+for i in ProgressBar(1:800)
     one_epoch(timeseries)
     loss1 = generalization_loss(timeseries)
     loss2 = generalization_loss(timeseries2)
+    loss3 = generalization_loss(timeseries3)
+    loss4 = generalization_loss(timeseries4)
     push!(losses, loss1)
     push!(losses2, loss2)
+    push!(losses_3, loss3)
+    push!(losses_4, loss4)
     println("Epoch $i: loss1 = $loss1, loss2 = $loss2")
     if i%100 == 0
         @info "saving epoch $i"
@@ -152,4 +165,6 @@ CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_sm
 hfile = h5open("losses_fixed_data.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses2
+hfile["losses_3"] = losses_3
+hfile["losses_4"] = losses_4
 close(hfile)

@@ -22,6 +22,8 @@ function load_model(checkpoint_path)
 end
 
 model = "checkpoint_conditional_rotations_steady_online_timestep_180000.bson"
+model = "checkpoint_conditional_rotations_steady_online_timestep_400000.bson"
+model = "checkpoint_conditional_rotations_steady_online_timestep_960000.bson"
 
 function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) where {FT}
     Random.seed!(1234) # same thing every time
@@ -74,3 +76,4 @@ hist!(ax, sample_list[2][:]; normalization = :pdf, bins = 100, color= (:green, 0
 hist!(ax, sample_list[3][:]; normalization = :pdf, bins = 100, color= (:gray, 0.5))
 hist!(ax, sample_list[end][:]; normalization = :pdf, bins = 100, color= (:blue, 0.5))
 display(fig)
+save("rotation_samples.png", fig)

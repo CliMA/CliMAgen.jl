@@ -5,25 +5,13 @@ using Flux
 using CliMAgen
 using BSON
 using HDF5
-using LinearAlgebra, Statistics
 
 using Distributed
+using LinearAlgebra, Statistics
 
 if nworkers() < 8
     addprocs(8)
 end
-
-@everywhere using Random
-@everywhere import CliMAgen: GaussianFourierProjection
-
-function GaussianFourierProjection(embed_dim::Int, embed_dim2::Int, scale::FT) where {FT}
-    Random.seed!(1234) # same thing every time
-    W = randn(FT, embed_dim ÷ 2, embed_dim2) .* scale
-    return GaussianFourierProjection(W)
-end
-
-gfp = GaussianFourierProjection(128, 64, 30.0f0)
-
 
 @everywhere using Random
 @everywhere using SpeedyWeather
@@ -39,7 +27,7 @@ layers = [5]
 parameters = generate_parameters(; default=true)
 simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
 
-gated_array = SharedArray{simulation.model.spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields)+1, Distributed.nworkers())
+gated_array = SharedArray{simulation.model.spectral_grid.NF}(my_fields[1].interpolator.locator.npoints, length(my_fields), Distributed.nworkers())
 gated_array .= 0.0
 # julia --project -p 8
 # open is true, closed is false. Open means we can write to the array
@@ -70,6 +58,13 @@ hfile = h5open("steady_default_data_correlated.hdf5", "r")
 timeseries2 = read(hfile["timeseries"])
 close(hfile)
 @info "Loaded steady data"
+hfile = h5open("steady_default_data_correlated_part_2.hdf5", "r")
+timeseries3 = read(hfile["timeseries"])
+close(hfile)
+hfile = h5open("steady_default_data_correlated_part_3.hdf5", "r")
+timeseries4 = read(hfile["timeseries"])
+close(hfile)
+
 
 ## Define Score-Based Diffusion Model
 @info "Defining Score Model"
@@ -77,7 +72,7 @@ FT = Float32
 #Read in from toml
 batchsize = nworkers()
 inchannels = length(my_fields)
-context_channels = 1 # length(my_fields)
+context_channels = 0 # length(my_fields)
 sigma_min = FT(1e-3);
 sigma_max = FT(sigmax);
 nwarmup = 5000;
@@ -93,8 +88,8 @@ device = Flux.gpu
 # Create network
 quick_arg = true
 kernel_size = 3
-kernel_sizes = [3, 2, 1, 0] # [3, 2, 1, 0]
-channel_scale = 3
+kernel_sizes = [3, 2, 1, 0]
+channel_scale = 4
 net = NoiseConditionalScoreNetwork(;
                                     channels = channel_scale .* [32, 64, 128, 256],
                                     proj_kernelsize   = kernel_size + kernel_sizes[1],
@@ -103,7 +98,7 @@ net = NoiseConditionalScoreNetwork(;
                                     inner_kernelsize  = kernel_size + kernel_sizes[4],
                                     noised_channels = inchannels,
                                     context_channels = context_channels,
-                                    context = true,
+                                    context = false,
                                     shift_input = quick_arg,
                                     shift_output = quick_arg,
                                     mean_bypass = quick_arg,
@@ -125,13 +120,13 @@ ps_smooth = Flux.params(score_model_smooth);
 
 function lossfn_c(y; noised_channels = inchannels, context_channels=context_channels)
     x = y[:,:,1:noised_channels,:]
-    c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
-    return vanilla_score_matching_loss(score_model, x; c)
+    # c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
+    return vanilla_score_matching_loss(score_model, x)
 end
 
 function generalization_loss(y; noised_channels = inchannels, context_channels=context_channels)
     x = y[:,:,1:noised_channels,:]
-    c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
+    # c = y[:,:,(noised_channels+1):(noised_channels+context_channels),:]
     N = size(x)[end]
     batchsize = 10
     M = N ÷ batchsize
@@ -153,7 +148,7 @@ end # myid() == 1
 ##
 @info "Done Defining score model"
 # Run Models
-nsteps = 100 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
+nsteps = 40 * 10000 # 50 * 10000 # 10000 takes 1.5 hours
 const SLEEP_DURATION = 1e-3
 
 @distributed for i in workers()
@@ -163,21 +158,16 @@ const SLEEP_DURATION = 1e-3
     # model
     fields =  [:temp_grid] 
     layers = [5]
-    # rotations = collect(range(3e-5, 1e-4, length = nworkers()))
-    rotations = collect(range(5e-5, 1e-4, length = nworkers()))
-    parameters = custom_parameters(; rotation = Float32(rotations[gate_id]))
+    parameters = generate_parameters(; default=true)
     simulation, my_fields = speedy_sim(; parameters, layers, fields, add_pressure_field)
     
     Nx, Ny = size(simulation.prognostic_variables.layers[1].timesteps[1].vor)
     simulation.prognostic_variables.layers[1].timesteps[1].vor .+= randn(Float32, Nx, Ny) * Float32(1e-10)
-    run!(simulation, period=Day(1000))
+    run!(simulation, period=Day(100))
     run!(simulation, period=Day(1 + (gate_id-1) * 365/8))
     for (i, my_field) in enumerate(my_fields)
         gated_array[:, i, gate_id] .= my_field.var
     end
-    gfp_τ = collect(range(0, 1, length=nworkers()))
-    gated_array[:, length(my_fields)+1, gate_id] .= reshape(gfp(gfp_τ[gate_id]), (128 * 64))
-    
     for _ in 1:nsteps
         run!(simulation, period=Day(1))
         gate_written::Bool = false
@@ -200,32 +190,40 @@ end
 if myid() == 1
     losses = Float64[]
     losses_2 = Float64[]
-    batches = []
+    losses_3 = Float64[]
+    losses_4 = Float64[]
     tic = Base.time()
     j = Ref(1)      # needs to be mutable somehow
     while j[] <= nsteps
         if all_closed(gates)
             j[] += 1
             println(j)
-            rbatch = copy(reshape(gated_array[:,1:length(my_fields), :], (128, 64, length(my_fields), batchsize)))
-            batch = copy(reshape(gated_array, (128, 64, length(my_fields)+1, batchsize)))
-            batch[:,:, 1:length(my_fields), :] .= (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
+            rbatch = copy(reshape(gated_array, (128, 64, length(my_fields), batchsize)))
+            batch = (rbatch .- reshape(μ, (1, 1, length(my_fields), 1))) ./ reshape(σ, (1, 1, length(my_fields), 1))
             open_all!(gates)
             mock_callback(device(batch))
-            #=
-            if j[]%100 == 0
+            if j[]%500 == 0
                 loss = generalization_loss(timeseries)
                 push!(losses, loss)
                 loss2 = generalization_loss(timeseries2)
                 push!(losses_2, loss2)
+                loss3 = generalization_loss(timeseries3)
+                push!(losses_3, loss3)
+                loss4 = generalization_loss(timeseries4)
+                push!(losses_4, loss4)
                 @info "Loss at step $(j[]) is $loss and $loss2"
+                @info "Loss at step $(j[]) is $loss3 and $loss4"
             end
-            =#
             if j[]%20000 == 0 
                 tmp = j[]
                 @info "saving model"
-                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_capacity_conditional_rotations_steady_online_timestep_$tmp.bson")
-                push!(batches, copy(batch))
+                CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_more_capacity_steady_online_timestep_$tmp.bson")
+                hfile = h5open("losses_online_more_capacity_$tmp.hdf5", "w")
+                hfile["losses"] = losses
+                hfile["losses_2"] = losses_2
+                hfile["losses_3"] = losses_3
+                hfile["losses_4"] = losses_4
+                close(hfile)
             end
         else
             sleep(SLEEP_DURATION)
@@ -233,15 +231,12 @@ if myid() == 1
     end
 end
 
-#=
-hfile = h5open("losses_online_rotations_conditional.hdf5", "w")
+hfile = h5open("losses_online_more_capacity.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
+hfile["losses_3"] = losses_3
+hfile["losses_4"] = losses_4
 close(hfile)
-=#
 
-CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_capacity_conditional_rotations_steady_online_latest.bson")
 toc = Base.time()
 println("Time for the simulation is $((toc-tic)/60) minutes.")
-
-rmprocs((collect(1:nworkers()) .+ 1)...)

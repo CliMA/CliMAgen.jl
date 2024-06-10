@@ -58,6 +58,13 @@ hfile = h5open("steady_default_data_correlated.hdf5", "r")
 timeseries2 = read(hfile["timeseries"])
 close(hfile)
 @info "Loaded steady data"
+hfile = h5open("steady_default_data_correlated_part_2.hdf5", "r")
+timeseries3 = read(hfile["timeseries"])
+close(hfile)
+hfile = h5open("steady_default_data_correlated_part_3.hdf5", "r")
+timeseries4 = read(hfile["timeseries"])
+close(hfile)
+
 
 ## Define Score-Based Diffusion Model
 @info "Defining Score Model"
@@ -183,6 +190,8 @@ end
 if myid() == 1
     losses = Float64[]
     losses_2 = Float64[]
+    losses_3 = Float64[]
+    losses_4 = Float64[]
     tic = Base.time()
     j = Ref(1)      # needs to be mutable somehow
     while j[] <= nsteps
@@ -198,7 +207,12 @@ if myid() == 1
                 push!(losses, loss)
                 loss2 = generalization_loss(timeseries2)
                 push!(losses_2, loss2)
+                loss3 = generalization_loss(timeseries3)
+                push!(losses_3, loss3)
+                loss4 = generalization_loss(timeseries4)
+                push!(losses_4, loss4)
                 @info "Loss at step $(j[]) is $loss and $loss2"
+                @info "Loss at step $(j[]) is $loss3 and $loss4"
             end
             if j[]%20000 == 0 
                 tmp = j[]
@@ -207,6 +221,8 @@ if myid() == 1
                 hfile = h5open("losses_online_capacity_$tmp.hdf5", "w")
                 hfile["losses"] = losses
                 hfile["losses_2"] = losses_2
+                hfile["losses_3"] = losses_3
+                hfile["losses_4"] = losses_4
                 close(hfile)
             end
         else
@@ -218,6 +234,8 @@ end
 hfile = h5open("losses_online_capacity.hdf5", "w")
 hfile["losses"] = losses
 hfile["losses_2"] = losses_2
+hfile["losses_3"] = losses_3
+hfile["losses_4"] = losses_4
 close(hfile)
 
 toc = Base.time()

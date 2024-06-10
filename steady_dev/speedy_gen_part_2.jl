@@ -103,3 +103,28 @@ hfile["sigmax"] = sigmax
 hfile["lat"] = lat
 hfile["lon"] = lon
 close(hfile)
+
+
+@info "Gather Timeseries Part 4"
+steps = 4000 # 4000
+skip_days = 1 # 14
+timeseries = zeros(simulation.model.spectral_grid.NF, my_fields[1].interpolator.locator.npoints, length(my_fields), steps)
+for j in ProgressBar(1:steps)
+    run!(simulation, period=Day(skip_days))
+    for (i, my_field) in enumerate(my_fields)
+        timeseries[:, i, j] = copy(my_fields[i].var)
+    end
+end
+
+
+r_timeseries = copy(reshape(timeseries, (128, 64, n_fields, steps)) )
+rescaled_timeseries = (r_timeseries .- μ) ./ σ
+
+hfile = h5open("steady_default_data_correlated_part_3.hdf5", "w")
+hfile["timeseries"] = rescaled_timeseries
+hfile["shift"] = μ
+hfile["scaling"] = σ
+hfile["sigmax"] = sigmax
+hfile["lat"] = lat
+hfile["lon"] = lon
+close(hfile)
