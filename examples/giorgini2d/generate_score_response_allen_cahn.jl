@@ -11,7 +11,7 @@ using CliMAgen: expand_dims, MeanSpatialScaling, StandardScaling, apply_preproce
 using Distributions
 using CUDA
 using Flux 
-using GLMakie
+# using GLMakie
 using FFTW
 
 # run from giorgini2d
@@ -101,6 +101,7 @@ sra = score_response_function(pixel_value, score_values)
 hsra = hack(sra)
 
 ##
+#=
 fig = Figure(resolution = (772, 209))
 N = 32
 lw = 3
@@ -119,6 +120,7 @@ for i in 1:4
     GLMakie.ylims!(ax, (-0.15, 1.1))
 end
 display(fig)
+=#
 ##
 Nt = size(hsra)[end]
 climagen_score = zeros(N, Nt)
@@ -140,6 +142,15 @@ sx = Array(CliMAgen.score(model, x, Float32(0.0)))
 sx_flat = mean(sx, dims = (1,2, 3))[:]
 xx = xrange[:]
 exact_sx = 4 * xx .* (1 .- (4*xx).^2)
+##
+
+score_a = zeros(Float32, M, N, 1, 1)
+base_grid = Float32.(collect(0:31)/32)
+x_grid = reshape(base_grid, (32, 1, 1, 1))
+y_grid = reshape(base_grid, (1, 32, 1, 1))
+x̃ = sin.(2π*x_grid) .* sin.(2π*y_grid) / 4
+x = dev(CuArray(x̃))
+score_a .= Array(CliMAgen.score(model, x, Float32(0.0)))
 
 ##
 hfile = h5open(f_path[1:end-5] * "_generative_response.hdf5", "w")
@@ -148,4 +159,7 @@ hfile["generative response no hack"] = sra
 hfile["generative constant apply"] = sx_flat 
 hfile["generative constant exact"] = exact_sx
 hfile["generative constant x"] = xx
+hfile["generative scores"] = scores
+hfile["analytic function"] = x̃
+hfile["generative score on analytic function "] = score_a
 close(hfile)
