@@ -19,8 +19,6 @@ package_dir = pwd()
 include("./trajectory_utils.jl")
 
 FT = Float32
-experiment_toml = "Experiment.toml"
-model_toml = "Model.toml"
 
 toml_dict = TOML.parsefile(model_toml)
 params = TOML.parsefile(experiment_toml)

@@ -7,9 +7,6 @@ main()
 include("analysis.jl")
 main() 
 @info "Generating Score Response"
+experiment_toml = "ExperimentLinear.toml"
+model_toml = "ModelLinear.toml"
 include("generate_score_response_allen_cahn.jl")
-
-#@info "Generating Linear Response"
-#include("generate_linear_response.jl")
-#@info "Generating Numerical Response"
-#include("generate_numerical_response.jl")
