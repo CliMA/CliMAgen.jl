@@ -221,7 +221,7 @@ if myid() == 1
                 @info "Loss at step $(j[]) is $loss and $loss2"
             end
             =#
-            if j[]%20000 == 0 
+            if j[]%100000 == 0 
                 tmp = j[]
                 @info "saving model"
                 CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "checkpoint_capacity_conditional_rotations_steady_online_timestep_$tmp.bson")

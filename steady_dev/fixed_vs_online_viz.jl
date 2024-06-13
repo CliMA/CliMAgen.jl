@@ -5,6 +5,11 @@ fixed_generalization_loss = read(hfile["losses_3"]) * batch_scale# read(hfile["l
 fixed_test_loss = read(hfile["losses"]) * batch_scale
 close(hfile)
 
+hfile = h5open("losses_more_fixed_data.hdf5", "r")
+more_fixed_generalization_loss = read(hfile["losses_3"]) * batch_scale# read(hfile["losses_2"])
+more_fixed_test_loss = read(hfile["losses"]) * batch_scale
+close(hfile)
+
 hfile = h5open("losses_online.hdf5", "r")
 # yes the order got reversed >.>
 online_loss = read(hfile["losses"])
@@ -22,6 +27,13 @@ hfile = h5open("losses_online_capacity.hdf5", "r")
 online_capacity_test_lost = read(hfile["losses_2"]) * batch_scale
 online_capacity_loss = read(hfile["losses_3"]) * batch_scale
 online_capacity_test_lost_3 = read(hfile["losses_4"]) * batch_scale
+close(hfile)
+
+hfile = h5open("losses_online_more_capacity.hdf5", "r")
+# online_capicity_loss = read(hfile["losses"])
+online_more_capacity_test_lost = read(hfile["losses_2"]) * batch_scale
+online_more_capacity_loss = read(hfile["losses_3"]) * batch_scale
+online_more_capacity_test_lost_3 = read(hfile["losses_4"]) * batch_scale
 close(hfile)
 
 
@@ -52,8 +64,10 @@ steps_rotation_start = collect(eachindex(online_loss_rotation_start)) .* 500 ./s
 fig = Figure(resolution = (1350, 450))
 ax = Axis(fig[1, 1]; title = "Training Loss", xlabel ="$scale steps", ylabel = "loss")
 lines!(ax, steps_fixed, fixed_test_loss, color = (:red, 0.5), label = "fixed data")
+lines!(ax, steps_fixed, more_fixed_test_loss, color = (:IndianRed, 0.5), label = "more fixed data")
 lines!(ax, steps_online, online_test_loss, color = (:blue, 0.5), label = "online training")
 lines!(ax, steps_capacity, online_capacity_test_lost, color = (:orange, 0.5), label = "capacity")
+lines!(ax, steps_capacity, online_more_capacity_test_lost, color = (:green, 0.5), label = "more capacity")
 # lines!(ax, steps_online, online_loss_rotation_test, color = (:purple, 0.5), label = "rotation")
 axislegend(ax, position = :rt)
 xlims!(ax, 0, xmax)
@@ -63,10 +77,12 @@ ylims!(ax, 0.0015, 0.03)
 
 ax = Axis(fig[1, 2]; title = "Generalization Loss", xlabel ="$scale steps", ylabel = "loss")
 lines!(ax, steps_fixed, fixed_generalization_loss, color = (:red, 0.5), label = "fixed data")
+lines!(ax, steps_fixed, more_fixed_generalization_loss, color = (:IndianRed, 0.5), label = "more fixed data")
 lines!(ax, steps_online, online_loss_2, color = (:blue, 0.5), label = "online training")
 # scatter!(ax, steps_online, online_loss_2, color = (:yellow, 0.5), markersize = 3, label = "online training (new loss)")
 # scatter!(ax, steps_online, online_loss_3, color = (:SteelBlue, 0.5), markersize = 3, label = "online training (new loss)")
 lines!(ax, steps_capacity, online_capacity_loss, color = (:orange, 0.5), label = "capacity")
+lines!(ax, steps_capacity, online_more_capacity_loss, color = (:green, 0.5), label = "more capacity")
 # lines!(ax, steps_online, online_loss_rotation, color = (:purple, 0.5), label = "rotation")
 # lines!(ax, steps_online, online_loss_capacity, color = (:orange, 0.5), label = "online training: higher capacity")
 axislegend(ax, position = :ct)
