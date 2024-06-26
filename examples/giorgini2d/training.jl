@@ -77,7 +77,9 @@ function run_training(params, f_path, savedir; FT=Float32)
         loss_data = DelimitedFiles.readdlm(loss_file, ',', skipstart = 1)
         start_epoch = loss_data[end,1]+1
     else
+        channel_scale = 2
         net = NoiseConditionalScoreNetwork(;
+                                           channels = channel_scale .* [32, 64, 128, 256],
                                            noised_channels = inchannels,
                                            shift_input = shift_input,
                                            shift_output = shift_output,
