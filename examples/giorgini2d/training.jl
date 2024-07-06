@@ -77,7 +77,7 @@ function run_training(params, f_path, savedir; FT=Float32)
         loss_data = DelimitedFiles.readdlm(loss_file, ',', skipstart = 1)
         start_epoch = loss_data[end,1]+1
     else
-        channel_scale = 2
+        channel_scale = 1
         net = NoiseConditionalScoreNetwork(;
                                            channels = channel_scale .* [32, 64, 128, 256],
                                            noised_channels = inchannels,
@@ -146,7 +146,7 @@ function main(; model_toml="Model.toml", experiment_toml="Experiment.toml")
     β = FT(toml_dict["param_group"]["beta"])
     γ = FT(toml_dict["param_group"]["gamma"])
     σ = FT(toml_dict["param_group"]["sigma"])
-    f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
+    f_path = "/nobackup1/sandre/ResponseFunctionTrainingData/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
 
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)

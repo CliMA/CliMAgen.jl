@@ -104,7 +104,7 @@ function main(;model_toml="Model.toml", experiment_toml="Experiment.toml")
     β = FT(toml_dict["param_group"]["beta"])
     γ = FT(toml_dict["param_group"]["gamma"])
     σ = FT(toml_dict["param_group"]["sigma"])
-    f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
+    f_path = "/nobackup1/sandre/ResponseFunctionTrainingData/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
 
     # read experiment parameters from file
     params = TOML.parsefile(experiment_toml)

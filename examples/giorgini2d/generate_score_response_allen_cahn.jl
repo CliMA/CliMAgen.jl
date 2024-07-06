@@ -28,7 +28,8 @@ params = CliMAgen.dict2nt(params)
 γ = FT(toml_dict["param_group"]["gamma"])
 σ = FT(toml_dict["param_group"]["sigma"])
 savedir = "$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
-f_path = "data/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
+f_path = "/nobackup1/sandre/ResponseFunctionTrainingData/data_$(α)_$(β)_$(γ)_$(σ).hdf5"
+# f_path = "/nobackup1/sandre/ResponseFunctionTrainingData/data_4.0_$(β)_$(γ)_$(σ).hdf5"
 
 @info "loading data"
 fid = h5open(f_path, "r")
@@ -96,6 +97,20 @@ function hack(score_response_array)
 end
 
 sra = score_response_function(pixel_value, score_values)
+
+hsra = hack(sra)
+generative_response = zeros(N, N, length(hsra))
+for i in 1:N, j in 1:N
+    generative_response[i, j, :] .= [reshape(hsra[k][:, 1], (N, N))[i, j] for k in eachindex(hsra)]
+end
+
+hfile = h5open(f_path[1:end-5] * "_generative_response.hdf5", "w")
+hfile["generative response"] = generative_response
+hfile["generative response no hack"] = sra
+# hfile["generative scores"] = score_values
+# hfile["timeseries"] = pixel_value
+close(hfile)
+#=
 hsra = hack(sra)
 
 ##
@@ -161,3 +176,5 @@ hfile["generative scores"] = scores
 hfile["analytic function"] = x̃
 hfile["generative score on analytic function "] = score_a
 close(hfile)
+
+=#

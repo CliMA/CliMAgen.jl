@@ -1,13 +1,12 @@
 # @info "Generating Data"
 # include("generate_data.jl")
-experiment_toml = "ExperimentNavier.toml"
-model_toml = "ModelNavier.toml"
+experiment_toml = "ExperimentNavier2.toml"
+model_toml = "ModelNavier2.toml"
 
-#=
-@info "Training Score Function"
+
+# @info "Training Score Function"
 include("training.jl")
 main(; experiment_toml, model_toml) 
-=#
 @info "Analysis"
 include("analysis.jl")
 main(; experiment_toml, model_toml) 
