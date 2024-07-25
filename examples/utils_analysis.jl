@@ -185,13 +185,13 @@ function spatial_mean_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2
     data_results = data_results[1,1,:,:]
     plot_array = []
     for channel in 1:inchannels
-        plt = plot(xlabel = "Spatial Mean", ylabel = "Probability density", title = string("Ch:",string(channel)))
-        plot!(plt, data_results[channel,:], seriestype=:stephist, label = "data", norm = true, color = :red)
-        plot!(plt, gen_results[channel,:],  seriestype=:stephist, label ="generated", norm = true, color = :black)
+        plt = Plots.plot(xlabel = "Spatial Mean", ylabel = "Probability density", title = string("Ch:",string(channel)))
+        Plots.plot!(plt, data_results[channel,:], seriestype=:stephist, label = "data", norm = true, color = :red)
+        Plots.plot!(plt, gen_results[channel,:],  seriestype=:stephist, label ="generated", norm = true, color = :black)
         push!(plot_array, plt)
     end
     
-    plot(plot_array..., layout=(1, inchannels))
+    Plots.plot(plot_array..., layout=(1, inchannels))
     Plots.savefig(joinpath(savepath, plotname))
 end
 
@@ -231,9 +231,9 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2, logger=n
         for stat in 1:length(statistics)
             data_cdf = data_results[1, stat, channel, :]
             gen_cdf = gen_results[1, stat, channel, :]
-            plt = plot(gen_cdf, data_cdf, color=:red, label="")
-            plot!(plt, data_cdf, data_cdf, color=:black, linestyle=:dot, label="")
-            plot!(plt,
+            plt = Plots.plot(gen_cdf, data_cdf, color=:red, label="")
+            Plots.plot!(plt, data_cdf, data_cdf, color=:black, linestyle=:dot, label="")
+            Plots.plot!(plt,
                 xlabel="Gen",
                 ylabel="Data",
                 title=string("Ch:", string(channel), ", ", statistic_names[stat]),
@@ -242,7 +242,7 @@ function qq_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2, logger=n
         end
     end
 
-    plot(plot_array..., layout=(inchannels, length(statistics)), aspect_ratio=:equal)
+    Plots.plot(plot_array..., layout=(inchannels, length(statistics)), aspect_ratio=:equal)
     Plots.savefig(joinpath(savepath, plotname))
 end
 
@@ -307,9 +307,9 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2, lo
         lower_gen_spectrum = mapslices(x -> percentile(x[:], 10), gen_results[:, channel, :], dims=2)
         upper_gen_spectrum = mapslices(x -> percentile(x[:], 90), gen_results[:, channel, :], dims=2)
         gen_confidence = (gen_spectrum .- lower_gen_spectrum, upper_gen_spectrum .- gen_spectrum)
-        plt = plot(log2.(k), data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log)
-        plot!(plt, log2.(k), gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
-        plot!(plt,
+        plt = Plots.plot(log2.(k), data_spectrum, ribbon = data_confidence, color=:red, label="", yaxis=:log)
+        Plots.plot!(plt, log2.(k), gen_spectrum, ribbon = gen_confidence, color=:blue, label="")
+        Plots.plot!(plt,
             xlabel="Log2(k)",
             ylabel="Log10(Power)",
             title=string("Ch:", string(channel)),
@@ -317,7 +317,7 @@ function spectrum_plot(data, gen, savepath, plotname; FT=Float32, nspatial=2, lo
         push!(plot_array, plt)
     end
 
-    plot(plot_array..., layout=(inchannels, 1))
+    Plots.plot(plot_array..., layout=(inchannels, 1))
     Plots.savefig(joinpath(savepath, plotname))
 end
 

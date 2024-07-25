@@ -1,3 +1,28 @@
+function sample_in_closure_time(model::CliMAgen.AbstractDiffusionModel,
+        init_x::A,
+        diffusion_time,
+        closure_time_steps,
+        Δt;
+        c=nothing,
+        nspatial=2,
+        rng = MersenneTwister(1234),
+        )::A where {A}
+    x = mean_x = init_x
+    score = similar(x) # Preallocate
+    z = similar(x)
+    diffusion_time = fill!(similar(init_x, size(init_x)[end]), 1) .* diffusion_time
+    @showprogress "Euler-Maruyama Sampling" for time_step in closure_time_steps
+        batch_time_step = fill!(similar(init_x, size(init_x)[end]), 1) .* time_step
+        g = CliMAgen.diffusion(model, FT(0.2))
+        score .= CliMAgen.score(model, x, diffusion_time; c=c)
+        mean_x .= x .+ CliMAgen.expand_dims(g, nspatial+1) .^ 2 .* score ./2 .* Δt
+        x .= mean_x .+ sqrt(Δt) .* CliMAgen.expand_dims(g, nspatial+1) .* randn!(rng, z)
+    end
+    return x
+end
+
+
+
 """
     Euler_Maruyama_sampler(model::CliMAgen.AbstractDiffusionModel,
                            init_x::A,
@@ -183,6 +208,7 @@ function setup_sampler(model::CliMAgen.AbstractDiffusionModel,
                        device,
                        tilesize,
                        noised_channels;
+                       diffusion_time=1,
                        num_images = 5,
                        num_steps=500,
                        ϵ=1.0f-3,
@@ -191,7 +217,7 @@ function setup_sampler(model::CliMAgen.AbstractDiffusionModel,
                        FT=Float32,
                        )
 
-    t = ones(FT, num_images) |> device
+    t = ones(FT, num_images)*diffusion_time |> device
     if nspatial == 2
         init_z = randn(FT, (tilesize, tilesize, noised_channels, num_images)) |> device
         @assert ntime isa Nothing

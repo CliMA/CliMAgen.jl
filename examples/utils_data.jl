@@ -870,6 +870,63 @@ function get_data_context2dturbulence(batchsize;
     return (; loader_train, loader_test)
 end
 
+
+function get_data_vorticity2dturbulence(batchsize;
+                                        rng=Random.GLOBAL_RNG,
+                                        resolution = 512,
+                                        wavenumber = 1.0,
+                                        fraction = 1.0,
+                                        standard_scaling = false,
+                                        FT=Float32,
+                                        read = false,
+                                        save = false,
+                                        preprocess_params_file)
+    fid = h5open("/central/groups/esm/kdeck/datadeps/Turbulence2DContext/jocmnexxzhqrjku9rc32is68ehkcudbg.hdf5", "r")
+    features = HDF5.read(fid, "$(resolution)x$(resolution)x2_wn$(wavenumber)/fields")
+    HDF5.close(fid)
+    xtrain, xtest = MLUtils.splitobs(features, at=0.8);
+    xtrain = xtrain[:,:,[2],:];
+    xtest = xtest[:,:,[2],:];
+
+    if save
+        if standard_scaling
+            maxtrain = maximum(xtrain, dims=(1, 2, 4))
+            mintrain = minimum(xtrain, dims=(1, 2, 4))
+            Δ = maxtrain .- mintrain
+            # To prevent dividing by zero
+            Δ[Δ .== 0] .= FT(1)
+            scaling = StandardScaling{FT}(mintrain, Δ)
+        else
+            #scale means and spatial variations separately
+            x̄ = mean(xtrain, dims=(1, 2))
+            maxtrain_mean = maximum(x̄, dims=4)
+            mintrain_mean = minimum(x̄, dims=4)
+            Δ̄ = maxtrain_mean .- mintrain_mean
+            xp = xtrain .- x̄
+            maxtrain_p = maximum(xp, dims=(1, 2, 4))
+            mintrain_p = minimum(xp, dims=(1, 2, 4))
+            Δp = maxtrain_p .- mintrain_p
+
+            # To prevent dividing by zero
+            Δ̄[Δ̄ .== 0] .= FT(1)
+            Δp[Δp .== 0] .= FT(1)
+            scaling = MeanSpatialScaling{FT}(mintrain_mean, Δ̄, mintrain_p, Δp)
+        end
+        JLD2.save_object(preprocess_params_file, scaling)
+        elseif read
+        scaling = JLD2.load_object(preprocess_params_file)
+    end
+    xtrain .= apply_preprocessing(xtrain, scaling)
+    # apply the same rescaler as on training set
+    xtest .= apply_preprocessing(xtest, scaling)
+
+    xtrain = MLUtils.shuffleobs(rng, xtrain)
+    loader_train = DataLoaders.DataLoader(xtrain, batchsize)
+    loader_test = DataLoaders.DataLoader(xtest, batchsize)
+
+    return (; loader_train, loader_test)
+end
+
 """
 Helper function that tiles an array in the first two spatial dimensions.
 

@@ -22,7 +22,6 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 [compat]
 ArgParse = "1.1"
 BSON = "0.3"
-CUDA = "3, 4, 5"
 DelimitedFiles = "1.9"
 Flux = "0.13, 0.14"
 Functors = "0.4"
