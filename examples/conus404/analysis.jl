@@ -11,6 +11,7 @@ using TOML
 
 using CliMAgen
 package_dir = pkgdir(CliMAgen)
+include(joinpath(package_dir,"examples/conus404/preprocessing_utils.jl"))
 include(joinpath(package_dir,"examples/utils_data.jl"))
 include(joinpath(package_dir,"examples/utils_analysis.jl"))
 
@@ -21,7 +22,13 @@ function run_analysis(params; FT=Float32)
     nogpu = params.experiment.nogpu
     batchsize = params.data.batchsize
     standard_scaling = params.data.standard_scaling
-    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$standard_scaling.jld2")
+    fname_train = params.data.fname_train
+    fname_test = params.data.fname_test
+    precip_channel = params.data.precip_channel
+    precip_floor::FT = params.data.precip_floor
+    # always use the preprocessing parameters derived 
+    # from the training data for this step
+    preprocess_params_file = joinpath(savedir, "preprocessing_standard_scaling_$(standard_scaling)_train.jld2")
     inchannels = params.model.inchannels
     nsamples = params.sampling.nsamples_analysis
     nimages = params.sampling.nimages
@@ -41,13 +48,8 @@ function run_analysis(params; FT=Float32)
     end
 
     # set up dataset
-    dl, _ = get_data_conus404(
-        batchsize;
-        standard_scaling=standard_scaling,
-        FT=FT,
-        read=true,
-        preprocess_params_file=preprocess_params_file
-    )
+    dl, _ = get_data_conus404(fname_train, fname_test, precip_channel, batchsize;
+        precip_floor = precip_floor, FT=FT, preprocess_params_file=preprocess_params_file)
     xtrain = cat([x for x in dl]..., dims=4)
     # To use Images.Gray, we need the input to be between 0 and 1.
     # Obtain max and min here using the whole data set
@@ -61,7 +63,7 @@ function run_analysis(params; FT=Float32)
     # set up model
     checkpoint_path = joinpath(savedir, "checkpoint.bson")
     BSON.@load checkpoint_path model model_smooth opt opt_smooth
-    model = device(model)
+    model = device(model_smooth)
 
     # sample from the trained model
     time_steps, Δt, init_x = setup_sampler(
@@ -79,22 +81,24 @@ function run_analysis(params; FT=Float32)
     end
     samples = cpu(samples)
 
-    # create plot showing distribution of spatial mean of generated and real images
-    spatial_mean_plot(xtrain, samples, savedir, "spatial_mean_distribution.png")
+    for ch in 1:inchannels
+        # create plot showing distribution of spatial mean of generated and real images
+        spatial_mean_plot(xtrain[:,:,[ch],:], samples[:,:,[ch],:], savedir, "spatial_mean_distribution_ch$ch.png")
 
-    # create q-q plot for cumulants of pre-specified scalar statistics
-    qq_plot(xtrain, samples, savedir, "qq_plot.png")
+        # create q-q plot for cumulants of pre-specified scalar statistics
+        qq_plot(xtrain[:,:,[ch],:], samples[:,:,[ch],:], savedir, "qq_plot_ch$ch.png")
 
-    # create plots for comparison of real vs. generated spectra
-    spectrum_plot(xtrain, samples, savedir, "mean_spectra.png")
-
+        # create plots for comparison of real vs. generated spectra
+        spectrum_plot(xtrain[:,:,[ch],:], samples[:,:,[ch],:], savedir, "mean_spectra_ch$ch.png")
+    end
     # create plots with nimages images of sampled data and training data
     # Rescale now using mintrain and maxtrain
     xtrain = @. (xtrain - mintrain) / (maxtrain - mintrain)
     samples = @. (samples - mintrain) / (maxtrain - mintrain)
-
-    heatmap_grid(samples[:, :, [1], 1:nimages], 1, savedir, "$(sampler)_images_ch1.png")
-    heatmap_grid(xtrain[:, :, [1], 1:nimages], 1, savedir, "train_images_ch1.png")
+    for ch in 1:inchannels
+        heatmap_grid(samples[:, :, [ch], 1:nimages], 1, savedir, "$(sampler)_images_ch$ch.png")
+        heatmap_grid(xtrain[:, :, [ch], 1:nimages], 1, savedir, "train_images_ch$ch.png")
+    end
     loss_plot(savedir, "losses.png"; xlog = false, ylog = true)    
 end
 
