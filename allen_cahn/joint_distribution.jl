@@ -3,7 +3,6 @@ hfile = h5open("data/data_1.0_0.0_0.0_0.0.hdf5")
 tseries  = read(hfile["timeseries"])
 close(hfile)
 
-
 skip = 10
 new_tseries = zeros(32, 32, 2, (2000 - skip) * 128)
 rtseries = reshape(tseries, (32, 32, 128, 2000))

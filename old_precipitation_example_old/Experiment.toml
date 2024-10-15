@@ -1,0 +1,47 @@
+[experiment]
+project           = "CliMAgen.jl"
+name              = "ludo"
+rngseed           = 123
+nogpu             = false
+savedir           = "output"
+
+[data]
+batchsize         = 8
+fraction          = 1.0
+
+[model]
+noised_channels   = 1
+context_channels  = 1
+sigma_max         = 300.0
+sigma_min         = 1e-2
+dropout_p         = 0.5
+mean_bypass       = true
+shift_input       = true
+shift_output      = true
+scale_mean_bypass = true
+gnorm             = true
+proj_kernelsize   = 3
+outer_kernelsize  = 3
+middle_kernelsize = 3
+inner_kernelsize  = 3
+periodic          = false
+
+[optimizer]
+learning_rate     = 2e-4
+epsilon           = 1e-8
+beta_1            = 0.9
+beta_2            = 0.999
+gradnorm          = 1.0
+ema_rate          = 0.999
+nwarmup           = 5000
+
+[training]
+nepochs           = 200
+freq_chckpt       = 100
+
+[sampling]
+nsteps            = 250
+nsamples          = 50
+nimages           = 10
+sample_channels   = 1
+sampler           = "euler"
