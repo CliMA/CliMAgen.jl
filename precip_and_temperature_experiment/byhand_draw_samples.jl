@@ -14,7 +14,7 @@ time_steps, Δt, init_x = setup_sampler(
 )
 
 
-ntotal = 1000
+ntotal = 10000
 total_samples = zeros(resolution..., inchannels, ntotal)
 cprelim = zeros(resolution..., context_channels, nsamples)
 rng = MersenneTwister(1234)
@@ -164,3 +164,9 @@ for i in 1:10
     save("samples_hist_temp_$i.png", fig)
 end
 =#
+
+using HDF5
+
+hfile = h5open("temp_pr_samples.hdf5", "w")
+hfile["samples"] = total_samples
+close(hfile)

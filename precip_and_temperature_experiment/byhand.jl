@@ -5,7 +5,7 @@ const extra_scale = 2
 
 # train differently, t = 0 and t = 1 
 # condition using different information (such as global and ensemble average mean surface)
-
+FT = Float32
 include("utils.jl")
 include("process_data.jl")
 files = ["tas_field_month_1.hdf5", "pr_field_1.hdf5"]
@@ -34,7 +34,7 @@ sigma_max = FT.(sigma_max)
 # Define Network
 quick_arg = true
 kernel_size = 3
-kernel_sizes =   [3, 2, 1, 0] # [0, 0, 0, 0] #  
+kernel_sizes =  [0, 0, 0, 0] #   [3, 2, 1, 0] #  
 channel_scale = 2
 net = NoiseConditionalScoreNetwork(;
                                     channels = channel_scale .* [32, 64, 128, 256],
@@ -86,7 +86,7 @@ skipind = N ÷ batchsize
 collections = [i:skipind:N for i in 1:skipind-1]
 skipind2 = Ntest ÷ batchsize
 collections_test = [i+N:skipind2:Ntest+N for i in 1:skipind2-1]
-epochs = 1000
+epochs = 300
 
 losses = []
 losses_test = []

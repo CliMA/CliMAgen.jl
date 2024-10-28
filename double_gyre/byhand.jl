@@ -1,20 +1,14 @@
 using CliMAgen, Flux, HDF5, Random, ProgressBars, Statistics, BSON
 const gfp_scale = 1
 Random.seed!(1234)
-const extra_scale = 1
+const extra_scale = 2
 
 # train differently, t = 0 and t = 1 
 # condition using different information (such as global and ensemble average mean surface)
-
+FT = Float32
 include("utils.jl")
 include("process_data.jl")
-files = ["tas_field_month_1.hdf5", "pr_field_1.hdf5"]
-(; physical_sigma, physical_mu, oldfield, sigma_max) = load_data_from_file(files)
-
-inds = 1:251
-N = length(inds)
-field = ensemble_spatial_average_context(oldfield)
-contextfield = reshape(mean(reshape(field[:,:, end, : ], 192, 96, 251, 45), dims = 4), (192, 96, 1, 251))
+field = FT.(field[:, :, :, :])
 
 # ADAM parameters
 nwarmup = 5000
@@ -26,17 +20,16 @@ epsilon = FT(1e-8);
 ema_rate = FT(0.999);
 # Optimization
 device = Flux.gpu
-inchannels = length(files)
+inchannels = size(field, 3) - 1
 context_channels = 1
 sigma_min = FT.(1e-2)
 sigma_max = FT.(sigma_max)
 
-
 # Define Network
 quick_arg = true
 kernel_size = 3
-kernel_sizes =  [3, 2, 1, 0] #  [0, 0, 0, 0] #  
-channel_scale = 1
+kernel_sizes =   [3, 2, 1, 0] #  [0, 0, 0, 0] #   
+channel_scale = 2
 net = NoiseConditionalScoreNetwork(;
                                     channels = channel_scale .* [32, 64, 128, 256],
                                     proj_kernelsize   = kernel_size + kernel_sizes[1],
@@ -79,15 +72,19 @@ end
 
 ##
 batchsize = 64
-_, _, _, M = size(field)
-field = field[:, :, :, shuffle(1:M)]
+Ma, Mb, Mc, M = size(field)
+field = field[:, :, :, 1:M] # no shuffle on the field to start
 Ntest = M ÷ 10
 N = M - Ntest ≥ 0 ? M - Ntest : 1
 skipind = N ÷ batchsize
 collections = [i:skipind:N for i in 1:skipind-1]
 skipind2 = Ntest ÷ batchsize
-collections_test = [i+N:skipind2:Ntest+N for i in 1:skipind2-1]
-epochs = 1000
+collections_test = [N+1:N + Ntest]
+epochs = 500
+
+contextfield = zeros(Ma, Mb, 1, 2)
+contextfield[:, :, 1, 1] .= field[:, :, end:end, N+1]
+contextfield[:, :, 1, 2] .= field[:, :, end:end, N+2]
 
 losses = []
 losses_test = []
@@ -99,7 +96,7 @@ for epoch in ProgressBar(1:epochs)
         mock_callback(device(batch))
     end
     # evaluate loss 
-    if epoch % 2 == 0
+    if epoch % 1 == 0
         lossvalue = Float32.([0.0])
         for collection in collections
             y = field[:,:,:,collection]
@@ -115,11 +112,11 @@ for epoch in ProgressBar(1:epochs)
     end
     if epoch % 100 == 0
         @info "saving model"
-        CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "experiment2_temp_pr_$epoch.bson")
+        CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "double_gyre_$epoch.bson")
     end
 end
 
-hfile = h5open("temp_pr_losses_2.hdf5", "w")
+hfile = h5open("double_gyre_losses.hdf5", "w")
 hfile["losses"] = [loss[1] for loss in losses]
 hfile["losses_test"] = [loss[1] for loss in losses_test]
 close(hfile)

@@ -81,7 +81,6 @@ hist!(ax, Array(total_samples_physical[index_3[1],index_3[2],1,(ntotal÷2+1):end
 
 n = 2
 ax = Axis(fig[2, 1]; title = "data ($index_1)")
-rfield = (reshape(oldfield, (192, 96, 1, 251, 45)) .* physical_sigma) .+ physical_mu
 hist!(ax, Array(rfield[index_1[1],index_1[2],1, 35-n:35+n, :])[:], bins = binsize, color = (:blue, 0.5), normalization = :pdf)
 hist!(ax, Array(rfield[index_1[1],index_1[2],1, end-5:end, :])[:], bins = binsize, color = (:orange, 0.5), normalization = :pdf)
 # xlims!(ax, 295, 310)
