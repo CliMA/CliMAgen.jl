@@ -1,9 +1,10 @@
 using LinearAlgebra
-hfile = h5open("/nobackup1/sandre/OceananigansData/baroclinic_training_data_3.hdf5")
+
+hfile = h5open("/nobackup1/sandre/OceananigansData/baroclinic_training_data_$casevar.hdf5")
 field = read(hfile["timeseries"])
 close(hfile)
 
-hfile = h5open("/nobackup1/sandre/OceananigansData/baroclinic_double_gyre_3.hdf5")
+hfile = h5open("/nobackup1/sandre/OceananigansData/baroclinic_double_gyre_$casevar.hdf5")
 meanu = read(hfile["mean u"])
 meanv = read(hfile["mean v"])
 meanb = read(hfile["mean b"])

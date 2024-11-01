@@ -6,6 +6,7 @@ const extra_scale = 2
 # train differently, t = 0 and t = 1 
 # condition using different information (such as global and ensemble average mean surface)
 FT = Float32
+casevar = 7
 include("utils.jl")
 include("process_data.jl")
 field = FT.(field[:, :, :, :])
@@ -28,7 +29,7 @@ sigma_max = FT.(sigma_max)
 # Define Network
 quick_arg = true
 kernel_size = 3
-kernel_sizes =   [3, 2, 1, 0] #  [0, 0, 0, 0] #   
+kernel_sizes =  [3, 2, 1, 0] #  [0, 0, 0, 0] #   
 channel_scale = 2
 net = NoiseConditionalScoreNetwork(;
                                     channels = channel_scale .* [32, 64, 128, 256],
@@ -71,20 +72,23 @@ function mock_callback(batch; ps = ps, opt = opt, lossfn = lossfn_c, ps_smooth =
 end
 
 ##
-batchsize = 64
+FT = Float32
+batchsize = 32
 Ma, Mb, Mc, M = size(field)
-field = field[:, :, :, 1:M] # no shuffle on the field to start
+field = FT.(field[:, :, :, 1:M]) # no shuffle on the field to start
 Ntest = M ÷ 10
 N = M - Ntest ≥ 0 ? M - Ntest : 1
 skipind = N ÷ batchsize
 collections = [i:skipind:N for i in 1:skipind-1]
 skipind2 = Ntest ÷ batchsize
-collections_test = [N+1:N + Ntest]
-epochs = 500
+collections_test = [N+i:skipind2:N + Ntest for i in 1:skipind2-1]
+epochs = 1000
 
-contextfield = zeros(Ma, Mb, 1, 2)
-contextfield[:, :, 1, 1] .= field[:, :, end:end, N+1]
-contextfield[:, :, 1, 2] .= field[:, :, end:end, N+2]
+contextfield = zeros(FT, Ma, Mb, 1, 2)
+contextind1 = M 
+contextind2 = N + (M - N) ÷ 2
+contextfield[:, :, 1, 1] .= field[:, :, end:end, contextind1]
+contextfield[:, :, 1, 2] .= field[:, :, end:end, contextind2]
 
 losses = []
 losses_test = []
@@ -116,7 +120,7 @@ for epoch in ProgressBar(1:epochs)
     end
 end
 
-hfile = h5open("double_gyre_losses.hdf5", "w")
+hfile = h5open("double_gyre_losses_$casevar.hdf5", "w")
 hfile["losses"] = [loss[1] for loss in losses]
 hfile["losses_test"] = [loss[1] for loss in losses_test]
 close(hfile)

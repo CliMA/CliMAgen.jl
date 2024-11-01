@@ -3,7 +3,7 @@ using CairoMakie
 
 nsamples = 100
 nsteps = 250 
-resolution = (128, 128)
+resolution = size(field)[1:2]
 time_steps, Δt, init_x = setup_sampler(
     score_model_smooth,
     device,
@@ -38,8 +38,8 @@ stateindex = 1
 ax = Axis(fig[1, 1]; title = "context")
 heatmap!(ax, contextfield[:, :, 1, 1]; colormap = :viridis)
 ax = Axis(fig[1, 2]; title = "ground truth")
-crange = extrema(field[:, :, stateindex, N+1])
-heatmap!(ax, field[:, :, stateindex, N+1], colormap = :viridis)
+crange = extrema(field[:, :, stateindex, contextind1])
+heatmap!(ax, field[:, :, stateindex, contextind1], colormap = :viridis)
 ax = Axis(fig[1, 3]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, 1], colormap = :viridis)
 ax = Axis(fig[1, 4]; title = "samples")
@@ -48,20 +48,20 @@ heatmap!(ax, total_samples[:, :, stateindex, 2], colormap = :viridis)
 ax = Axis(fig[2, 1]; title = "context")
 heatmap!(ax, contextfield[:, :, 1, end]; colormap = :viridis)
 ax = Axis(fig[2, 2]; title = "ground truth")
-heatmap!(ax, field[:, :, stateindex, N+2], colormap = :viridis)
+heatmap!(ax, field[:, :, stateindex, contextind2], colormap = :viridis)
 ax = Axis(fig[2, 3]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, end], colormap = :viridis)
 ax = Axis(fig[2, 4]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, end-1], colormap = :viridis)
 
-save("double_gyre_samples_u.png", fig)
+save("double_gyre_samples_u_case_$casevar.png", fig)
 
 fig = Figure()
 stateindex = 2
 ax = Axis(fig[1, 1]; title = "context")
 heatmap!(ax, contextfield[:, :, 1, 1]; colormap = :viridis)
 ax = Axis(fig[1, 2]; title = "ground truth")
-heatmap!(ax, field[:, :, stateindex, N+1], colormap = :viridis)
+heatmap!(ax, field[:, :, stateindex, contextind1], colormap = :viridis)
 ax = Axis(fig[1, 3]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, 1], colormap = :viridis)
 ax = Axis(fig[1, 4]; title = "samples")
@@ -70,20 +70,20 @@ heatmap!(ax, total_samples[:, :, stateindex, 2], colormap = :viridis)
 ax = Axis(fig[2, 1]; title = "context")
 heatmap!(ax, contextfield[:, :, 1, end]; colormap = :viridis)
 ax = Axis(fig[2, 2]; title = "ground truth")
-heatmap!(ax, field[:, :, stateindex, N+2], colormap = :viridis)
+heatmap!(ax, field[:, :, stateindex, contextind2], colormap = :viridis)
 ax = Axis(fig[2, 3]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, end], colormap = :viridis)
 ax = Axis(fig[2, 4]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, end-1], colormap = :viridis)
 
-save("double_gyre_samples_v.png", fig)
+save("double_gyre_samples_v_$casevar.png", fig)
 
 fig = Figure()
 stateindex = 3
 ax = Axis(fig[1, 1]; title = "context")
 heatmap!(ax, contextfield[:, :, 1, 1]; colormap = :viridis)
 ax = Axis(fig[1, 2]; title = "ground truth")
-heatmap!(ax, field[:, :, stateindex, N+1], colormap = :viridis)
+heatmap!(ax, field[:, :, stateindex, contextind1], colormap = :viridis)
 ax = Axis(fig[1, 3]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, 1], colormap = :viridis)
 ax = Axis(fig[1, 4]; title = "samples")
@@ -92,25 +92,25 @@ heatmap!(ax, total_samples[:, :, stateindex, 2], colormap = :viridis)
 ax = Axis(fig[2, 1]; title = "context")
 heatmap!(ax, contextfield[:, :, 1, end]; colormap = :viridis)
 ax = Axis(fig[2, 2]; title = "ground truth")
-heatmap!(ax, field[:, :, stateindex, N+2], colormap = :viridis)
+heatmap!(ax, field[:, :, stateindex, contextind2], colormap = :viridis)
 ax = Axis(fig[2, 3]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, end], colormap = :viridis)
 ax = Axis(fig[2, 4]; title = "samples")
 heatmap!(ax, total_samples[:, :, stateindex, end-1], colormap = :viridis)
 
-save("double_gyre_samples_b.png", fig)
+save("double_gyre_samples_b_$casevar.png", fig)
 
 fig = Figure()
 ax = Axis(fig[1,1]; title = "losses")
 lines!(ax, [loss[1] for loss in losses], color = :blue)
 lines!(ax, [loss[1] for loss in losses_test], color = :red)
-save("losses_double_gyre.png", fig)
+save("losses_double_gyre_$casevar.png", fig)
 
 
 #=
 ax = Axis(fig[2, 1]; title = "context")
 hist!(ax, contextfield[:, :, 1, 1][:])
 ax = Axis(fig[2, 2]; title = "samples and truth")
-hist!(ax, field[:, :, stateindex, N+1][:], color = (:blue, 0.5))
+hist!(ax, field[:, :, stateindex, contextind1][:], color = (:blue, 0.5))
 hist!(ax, total_samples[:, :, stateindex, 1][:], color = (:red, 0.5))
 =#
