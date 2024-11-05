@@ -6,7 +6,7 @@ const extra_scale = 2
 # train differently, t = 0 and t = 1 
 # condition using different information (such as global and ensemble average mean surface)
 FT = Float32
-casevar = 7
+casevar = 5
 include("utils.jl")
 include("process_data.jl")
 field = FT.(field[:, :, :, :])
