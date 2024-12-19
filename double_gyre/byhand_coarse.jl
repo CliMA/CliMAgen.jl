@@ -7,10 +7,16 @@ const extra_scale = 2
 # condition using different information (such as global and ensemble average mean surface)
 FT = Float32
 data_directory_training = "/orcd/data/raffaele/001/sandre/DoubleGyreTrainingData/"
+save_directory = "/orcd/data/raffaele/001/sandre/DoubleGyreAnalysisData/DoubleGyre/"
+
 M = 128
 casevar = 5
 level_index = 1
-factor = 2^3
+factor = 2^5
+
+prefix = "eta_to_uvwb_at_z$(level_index)_$(M)_$(casevar)_$(factor)_"
+figure_directory = "DoubleGyreFigures/"
+
 include("utils_coarse.jl")
 include("process_data.jl")
 field = FT.(field[:, :, :, :])
@@ -122,11 +128,11 @@ for epoch in ProgressBar(1:epochs)
     end
     if epoch % 100 == 0
         @info "saving model"
-        CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, "double_gyre_factor_$(factor)_$epoch.bson")
+        CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, save_directory  * "double_gyre_factor_$(factor)_$epoch.bson")
     end
 end
 
-hfile = h5open("double_gyre_losses_$(factor)_$casevar.hdf5", "w")
+hfile = h5open(save_directory * "double_gyre_losses_$(factor)_$casevar.hdf5", "w")
 hfile["losses"] = [loss[1] for loss in losses]
 hfile["losses_test"] = [loss[1] for loss in losses_test]
 close(hfile)
