@@ -1,5 +1,9 @@
 using LinearAlgebra
-
+@info "reading data"
+hfile = h5open(data_directory_training * "eta_to_v_at_z$(level_index)_$(M)_$(casevar).hdf5", "r")
+field = read(hfile["field"])
+close(hfile)
+#=
 hfile = h5open("/nobackup1/sandre/OceananigansData/baroclinic_training_data_$casevar.hdf5")
 field = read(hfile["timeseries"])
 close(hfile)
@@ -43,7 +47,8 @@ field[:, :, 1, :] ./= ustd
 field[:, :, 2, :] ./= vstd
 field[:, :, 3, :] ./= bstd
 field[:, :, 4, :] ./= etastd
+=#
 
 is = rand(1:size(field, 4),100)
 js = rand(1:size(field, 4),100)
-sigma_max = maximum([norm(field[:, :, 1:3, i] - field[:, :, 1:3, j]) for i in is, j in js]) 
+sigma_max = maximum([norm(field[:, :, 1:2, i] - field[:, :, 1:2, j]) for i in is, j in js]) 

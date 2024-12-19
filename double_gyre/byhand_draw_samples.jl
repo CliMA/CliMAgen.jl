@@ -1,8 +1,8 @@
 include("sampler.jl")
 using CairoMakie
-
+# /orcd/data/raffaele/001/sandre/OceananigansData
 nsamples = 10
-nsteps = 250 
+nsteps = 300 
 resolution = size(field)[1:2]
 time_steps, Δt, init_x = setup_sampler(
     score_model_smooth,
