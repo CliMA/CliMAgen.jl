@@ -8,10 +8,10 @@ FT = Float32
 
 data_directory_training = "/orcd/data/raffaele/001/sandre/DoubleGyreTrainingData/"
 save_directory = "/orcd/data/raffaele/001/sandre/DoubleGyreAnalysisData/DoubleGyre/"
-M = 256
+M = 128
 casevar = 5
 factor = 1
-level_index = 1
+level_index = 7
 
 prefix = "eta_to_uvwb_at_z$(level_index)_$(M)_$(casevar)_$(factor)_"
 figure_directory = "DoubleGyreFigures/"
