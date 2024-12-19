@@ -24,8 +24,8 @@ epsilon = FT(1e-8);
 ema_rate = FT(0.999);
 # Optimization
 device = Flux.gpu
-inchannels = size(field, 3) - 1
 context_channels = 1
+inchannels = size(field, 3) - context_channels
 sigma_min = FT.(1e-2)
 sigma_max = FT.(sigma_max)
 

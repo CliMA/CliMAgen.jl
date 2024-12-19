@@ -32,12 +32,18 @@ for i in ProgressBar(1:tot)
     total_samples[:, :, :, (i-1)*nsamples+1:i*nsamples] .= samples
 end
 
+fig = Figure()
+ax = Axis(fig[1,1]; title = "losses")
+lines!(ax, [loss[1] for loss in losses], color = :blue)
+lines!(ax, [loss[1] for loss in losses_test], color = :red)
+save("losses_double_gyre_$casevar.png", fig)
+
 
 fig = Figure(resolution = (1600, 800))
 stateindex = 1
 ηmax = maximum(contextfield[:, :, 1, 1])
 ηrange = (-ηmax, ηmax)
-colormap_η = :berlin
+colormap_η = :balance
 colormap = :balance
 ax = Axis(fig[1, 1]; title = "context")
 heatmap!(ax, contextfield[:, :, 1, 1]; colormap = colormap_η, colorrange = ηrange  )
@@ -111,11 +117,7 @@ heatmap!(ax, total_samples[:, :, stateindex, end-1], colormap = colormap, colorr
 
 save("double_gyre_samples_b_$casevar.png", fig)
 
-fig = Figure()
-ax = Axis(fig[1,1]; title = "losses")
-lines!(ax, [loss[1] for loss in losses], color = :blue)
-lines!(ax, [loss[1] for loss in losses_test], color = :red)
-save("losses_double_gyre_$casevar.png", fig)
+
 
 
 #=

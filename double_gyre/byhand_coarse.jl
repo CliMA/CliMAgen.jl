@@ -10,7 +10,7 @@ data_directory_training = "/orcd/data/raffaele/001/sandre/DoubleGyreTrainingData
 M = 128
 casevar = 5
 level_index = 1
-factor = 2^1
+factor = 2^3
 include("utils_coarse.jl")
 include("process_data.jl")
 field = FT.(field[:, :, :, :])
