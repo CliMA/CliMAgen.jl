@@ -11,7 +11,7 @@ save_directory = "/orcd/data/raffaele/001/sandre/DoubleGyreAnalysisData/DoubleGy
 M = 128
 casevar = 5
 factor = 1
-level_index = 7
+level_index = 2
 
 prefix = "eta_to_uvwb_at_z$(level_index)_$(M)_$(casevar)_$(factor)_"
 figure_directory = "DoubleGyreFigures/"
@@ -93,7 +93,7 @@ skipind = N ÷ batchsize
 collections = [i:skipind:N for i in 1:skipind-1]
 skipind2 = Ntest ÷ batchsize
 collections_test = [N+i:skipind2:N + Ntest for i in 1:skipind2-1]
-epochs = 1000
+epochs = 500
 
 contextfield = zeros(FT, Ma, Mb, 1, 2)
 contextind1 = M 
@@ -127,9 +127,11 @@ for epoch in ProgressBar(1:epochs)
     end
     if epoch % 100 == 0
         @info "saving model"
-        CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, save_directory  * prefix  * "double_gyre.bson")
+        CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, save_directory  * prefix  * "double_gyre_epoch_$(epoch).bson")
     end
 end
+
+CliMAgen.save_model_and_optimizer(Flux.cpu(score_model), Flux.cpu(score_model_smooth), opt, opt_smooth, save_directory * prefix * "double_gyre.bson")
 
 hfile = h5open(save_directory  * prefix * "double_gyre_losses.hdf5", "w")
 hfile["losses"] = [loss[1] for loss in losses]
