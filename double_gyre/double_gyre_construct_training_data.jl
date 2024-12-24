@@ -1,4 +1,4 @@
-using HDF5, Statistics
+using HDF5, Statistics, ProgressBars
 
 M = 128
 kmax = round(Int, log2(M))

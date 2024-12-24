@@ -14,7 +14,7 @@ save_directory = "/orcd/data/raffaele/001/sandre/DoubleGyreAnalysisData/DoubleGy
 include("sampler.jl")
 
 factors = [2^k for k in 1:7]
-level_indices = [3, 5, 7]
+level_indices = [1]
 for level_index in ProgressBar(level_indices )
 M = 128
 casevar = 5
@@ -117,9 +117,9 @@ for factor in ProgressBar(factors)
     collections_test = [N+i:skipind2:N + Ntest for i in 1:skipind2-1]
 
     if factor == factors[1]
-        epochs = 500
+        epochs = 1000
     else 
-        epochs = 101 
+        epochs = 201 
     end
 
     contextfield = zeros(FT, Ma, Mb, 1, 2)

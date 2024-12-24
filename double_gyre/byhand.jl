@@ -11,7 +11,7 @@ save_directory = "/orcd/data/raffaele/001/sandre/DoubleGyreAnalysisData/DoubleGy
 M = 128
 casevar = 5
 factor = 1
-level_index = 2
+level_index = 6 # left
 
 prefix = "eta_to_uvwb_at_z$(level_index)_$(M)_$(casevar)_$(factor)_"
 figure_directory = "DoubleGyreFigures/"
