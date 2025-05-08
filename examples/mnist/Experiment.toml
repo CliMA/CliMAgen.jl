@@ -3,7 +3,7 @@ project           = "CliMAgen.jl"
 name              = "mnist"
 savedir           = "output"
 rngseed           = 123
-logging           = true
+logging           = false
 nogpu             = false
 
 [data]
