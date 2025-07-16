@@ -259,22 +259,35 @@ end
 scp3 = lineplot(25 * third_moment[4, 1, 1, 1:100])
 lineplot!(scp3, 25 * sras_3[end][4, 1, 1:100], color = :cyan)
 
+first_moment_at_zero = mean(trj)
+second_moment_at_zero = mean(trj .^2)
+third_moment_at_zero = mean(trj .^3)
+fourth_moment_at_zero = mean(trj .^4)
+fifth_moment_at_zero = mean(trj .^5)
+
+first_matrix_moment_at_zero = zeros(N, N)
+third_matrix_moment_at_zero = zeros(N, N)
+fifth_matrix_moment_at_zero = zeros(N, N)
+first_matrix_moment_at_zero[1, 1] = 1
+third_matrix_moment_at_zero[1, 1] = second_moment_at_zero * 3
+fifth_matrix_moment_at_zero[1, 1] = fourth_moment_at_zero * 5
+
 # For first moment 
-hrsa = hack(sras[end], first_moment[:, :, 1, 1])
+hrsa = hack(sras[end], first_matrix_moment_at_zero)
 generative_response_1 = zeros(N, N, length(hrsa))
 for i in 1:N, j in 1:N
     generative_response_1[i, j, :] .= [reshape(hrsa[k][:, 1], (N, N))[i, j] for k in eachindex(hrsa)]
 end
 
 # For third moment
-hrsa = hack(sras_3[end], third_moment[:, :, 1, 1])
+hrsa = hack(sras_3[end], third_matrix_moment_at_zero)
 generative_response_3 = zeros(N, N, length(hrsa))
 for i in 1:N, j in 1:N
     generative_response_3[i, j, :] .= [reshape(hrsa[k][:, 1], (N, N))[i, j] for k in eachindex(hrsa)]
 end
 
 # For fifth moment
-hrsa = hack(sras_5[end], fifth_moment[:, :, 1, 1])
+hrsa = hack(sras_5[end], fifth_matrix_moment_at_zero)
 generative_response_5 = zeros(N, N, length(hrsa))
 for i in 1:N, j in 1:N
     generative_response_5[i, j, :] .= [reshape(hrsa[k][:, 1], (N, N))[i, j] for k in eachindex(hrsa)]
@@ -305,11 +318,11 @@ hfile["dynamical_response_5"] = fifth_moment[:, :, 1, :]
 hfile["hack_response_1"] = generative_response_1
 hfile["hack_response_3"] = generative_response_3
 hfile["hack_response_5"] = generative_response_5
-hfile["first_moment"] = mean(trj)
-hfile["second_moment"] = mean(trj .^2)
-hfile["third_moment"] = mean(trj .^3)
-hfile["fourth_moment"] = mean(trj .^4)
-hfile["fifth_moment"] = mean(trj .^5)
+hfile["first_moment"] = first_moment_at_zero
+hfile["second_moment"] = second_moment_at_zero
+hfile["third_moment"] = third_moment_at_zero
+hfile["fourth_moment"] = fourth_moment_at_zero
+hfile["fifth_moment"] = fifth_moment_at_zero
 close(hfile)
 
 for i in 1:5
