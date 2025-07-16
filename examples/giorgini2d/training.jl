@@ -77,7 +77,7 @@ function run_training(params, f_path, savedir; FT=Float32)
         loss_data = DelimitedFiles.readdlm(loss_file, ',', skipstart = 1)
         start_epoch = loss_data[end,1]+1
     else
-        channel_scale = 1
+        channel_scale = 2
         net = NoiseConditionalScoreNetwork(;
                                            channels = channel_scale .* [32, 64, 128, 256],
                                            noised_channels = inchannels,
@@ -152,7 +152,7 @@ function main(; model_toml="Model.toml", experiment_toml="Experiment.toml")
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
 
-    savedir = "$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
+    savedir = "/nobackup1/sandre/ResponseFunctionRestartFiles/$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
     # set up directory for saving checkpoints
     !ispath(savedir) && mkpath(savedir)
     run_training(params, f_path, savedir; FT=FT)

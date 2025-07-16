@@ -110,7 +110,7 @@ function main(;model_toml="Model.toml", experiment_toml="Experiment.toml")
     params = TOML.parsefile(experiment_toml)
     params = CliMAgen.dict2nt(params)
 
-    savedir = "$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
+    savedir = "/nobackup1/sandre/ResponseFunctionRestartFiles/$(params.experiment.savedir)_$(α)_$(β)_$(γ)_$(σ)"
     # set up directory for saving checkpoints
     !ispath(savedir) && mkpath(savedir)
     run_analysis(params, f_path, savedir; FT=FT)

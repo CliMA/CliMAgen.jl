@@ -1,6 +1,7 @@
 experiment_toml = "ExperimentNavier4.toml"
 model_toml = "ModelNavier4.toml"
 
+
 @info "Training Score Function"
 include("training.jl")
 main(; experiment_toml, model_toml) 
