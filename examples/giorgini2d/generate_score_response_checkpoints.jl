@@ -280,6 +280,16 @@ for i in 1:N, j in 1:N
     generative_response_5[i, j, :] .= [reshape(hrsa[k][:, 1], (N, N))[i, j] for k in eachindex(hrsa)]
 end
 
+scp1 = lineplot(first_moment[1, 1, 1, 1:100])
+lineplot!(scp1, generative_response_1[1, 1, 1:100], color = :cyan)
+
+scp3 = lineplot(third_moment[1, 1, 1, 1:100])
+lineplot!(scp3, generative_response_3[1, 1, 1:100], color = :cyan)
+
+scp5 = lineplot(fifth_moment[1, 1, 1, 1:100])
+lineplot!(scp5, generative_response_5[1, 1, 1:100], color = :cyan)
+
+
 
 hfile = h5open("/orcd/data/raffaele/001/sandre/Repositories/ResponseFunction/CliMAgen.jl/"*"generative_responses.hdf5", "w")
 hfile["score_response_1"] = sras[end]
@@ -287,10 +297,21 @@ hfile["score_response_2"] = sras_2[end]
 hfile["score_response_3"] = sras_3[end]
 hfile["score_response_4"] = sras_4[end]
 hfile["score_response_5"] = sras_5[end]
-
 hfile["dynamical_response_1"] = first_moment[:, :, 1, :]
-
+hfile["dynamical_response_2"] = second_moment[:, :, 1, :]
+hfile["dynamical_response_3"] = third_moment[:, :, 1, :]
+hfile["dynamical_response_4"] = fourth_moment[:, :, 1, :]
+hfile["dynamical_response_5"] = fifth_moment[:, :, 1, :]
 hfile["hack_response_1"] = generative_response_1
 hfile["hack_response_3"] = generative_response_3
 hfile["hack_response_5"] = generative_response_5
+hfile["first_moment"] = mean(trj)
+hfile["second_moment"] = mean(trj .^2)
+hfile["third_moment"] = mean(trj .^3)
+hfile["fourth_moment"] = mean(trj .^4)
+hfile["fifth_moment"] = mean(trj .^5)
 close(hfile)
+
+for i in 1:5
+    println("moment $i: ", mean(trj .^i))
+end
