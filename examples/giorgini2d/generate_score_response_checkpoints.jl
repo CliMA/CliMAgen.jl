@@ -302,6 +302,9 @@ lineplot!(scp3, generative_response_3[1, 1, 1:100], color = :cyan)
 scp5 = lineplot(fifth_moment[1, 1, 1, 1:100])
 lineplot!(scp5, generative_response_5[1, 1, 1:100], color = :cyan)
 
+scp5 = lineplot(fifth_moment[8, 1, 1, 1:100])
+lineplot!(scp5, generative_response_5[8, 1, 1:100], color = :cyan)
+
 
 
 hfile = h5open("/orcd/data/raffaele/001/sandre/Repositories/ResponseFunction/CliMAgen.jl/"*"generative_responses.hdf5", "w")
