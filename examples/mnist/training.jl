@@ -81,7 +81,7 @@ function run_training(params; FT=Float32, logger=nothing)
         model = device(model)
         model_smooth = deepcopy(model)
     
-        opt = Flux.Optimise.Optimiser(
+        opt = OptimiserChain(
             WarmupSchedule{FT}(
                 nwarmup 
             ),
@@ -104,7 +104,7 @@ function run_training(params; FT=Float32, logger=nothing)
     end
  
     # set up loss function
-    lossfn = x -> score_matching_loss(model, x)
+    lossfn = score_matching_loss#(model, x)
 
     # train the model
     train!(

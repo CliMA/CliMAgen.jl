@@ -104,11 +104,11 @@ function probability_flow_ode(m::AbstractDiffusionModel)
 end
 
 """
-    Flux.params(m::AbstractDiffusionModel)
+    Flux.trainable(m::AbstractDiffusionModel)
 
 Returns the trainable parameters of the diffusion model.
 """
-Flux.params(m::AbstractDiffusionModel) = Flux.params(m.net)
+#Flux.trainable(m::AbstractDiffusionModel) = Flux.trainable(m.net)
 
 """
     Base.deepcopy(m::M)

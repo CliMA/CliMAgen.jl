@@ -37,12 +37,6 @@ function train!(model,
                 savedir="./output/",
                 logger=nothing,
                 freq_chckpt=Inf)
-    # model parameters
-    ps = Flux.params(model)
-
-    # setup smoothed parameters
-    ps_smooth = Flux.params(model_smooth)
-
     # training loop
     loss_train, loss_test = Inf, Inf
     @info "Start Training, total $(nepochs) epochs"
@@ -50,8 +44,8 @@ function train!(model,
         @info "Epoch $(epoch)"
 
         # update the params and compute losses
-        CliMAgen.update_step!(ps, ps_smooth, opt, opt_smooth, dataloaders.loader_train, lossfn, device)
-        loss_train, loss_test = CliMAgen.compute_losses(lossfn, dataloaders, device)
+        CliMAgen.update_step!(opt, opt_smooth, model, model_smooth, dataloaders.loader_train, lossfn, device)
+        loss_train, loss_test = CliMAgen.compute_losses((x) -> lossfn(model, x), dataloaders, device)
         for (ltrain, ltest) in zip(loss_train, loss_test)
             @info "Loss: $(ltrain) (train) | $(ltest) (test)"
         end
@@ -88,17 +82,18 @@ end
 Updates the parameters `ps` and the exponential-moving averaged set `ps_smooth) by computing
 a gradient of the `lossfn` evaluated on each batch of `loader_train`. 
 """
-function update_step!(ps, ps_smooth, opt, opt_smooth, loader_train, lossfn::Function, device::Function)
+function update_step!(opt, opt_smooth, model, model_smooth, loader_train, lossfn::Function, device::Function)
     progress = ProgressMeter.Progress(length(loader_train); showspeed=true)
-
+    opt_state = Flux.setup(opt, model)
+    #opt_smooth_state = Flux.setup(opt_smooth, model_smooth)
     # epoch loop
     for batch in loader_train
         batch = device(batch)
         
-        grad = Flux.gradient(() -> sum(lossfn(batch)), ps)
+        grad = Flux.gradient((m) -> sum(lossfn(m, batch)), model);
 
-        Flux.Optimise.update!(opt, ps, grad)
-        Flux.Optimise.update!(opt_smooth, ps_smooth, ps)
+        Flux.update!(opt_state, model, grad[1]); # updates opt_state and model in place
+        Flux.update!(opt_smooth, model_smooth, model) # this doesnt require the opt_state, is there a better way?
 
         ProgressMeter.next!(progress)
     end

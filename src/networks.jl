@@ -544,12 +544,12 @@ function (gfp::GaussianFourierProjection{FT})(t) where {FT}
 end
 
 """
-    Flux.params(::GaussianFourierProjection)
+    Flux.trainable(::GaussianFourierProjection)
 
 Returns the trainable parameters of the GaussianFourierProjection,
 which are `nothing`.
 """
-Flux.params(::GaussianFourierProjection) = nothing
+Flux.trainable(::GaussianFourierProjection) = (;)
 
 """
     ClimaGen.DenoisingDiffusionNetwork

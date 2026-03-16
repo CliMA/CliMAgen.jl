@@ -1,7 +1,7 @@
 """
-    WarmupSchedule{FT} <: Flux.Optimisers.AbstractOptimiser
+    WarmupSchedule{FT} <: Flux.Optimisers.AbstractRule
 
-An Flux.Optimisers Optimiser for a warmup schedule.
+An Flux.Optimisers Rule for a warmup schedule.
 
 Notes: 
 - The gradient multiplier varies from 1.0/n_warmup_steps
@@ -11,7 +11,7 @@ remains constant at 1.0 afterwards.
 of the learning rate is set by the Adam optimizer's learning rate parameter.
 - The default n_warmup_steps is 1, which would imply no warmup.
 """
-mutable struct WarmupSchedule{FT} <: Flux.Optimise.AbstractOptimiser
+mutable struct WarmupSchedule{FT} <: Flux.Optimisers.AbstractRule
     η::FT
     n_warmup_steps::Int
     current::Int
@@ -26,20 +26,22 @@ where `n_warmup_steps` is the number of warmup steps.
 WarmupSchedule{FT}(n_warmup_steps=1) where {FT} =
     WarmupSchedule(FT(1.0), n_warmup_steps, 0)
 
+Flux.Optimisers.init(o::WarmupSchedule, x) = nothing
 """
-   Flux.Optimise.apply!(o::WarmupSchedule{FT}, x, Δ) where {FT}
+   Flux.Optimisers.apply!(o::WarmupSchedule{FT}, x, Δ) where {FT}
 
-An extension of the Flux.Optimise.apply! function for the WarmupSchedule,
+An extension of the Flux.Optimisers.apply! function for the WarmupSchedule,
 which multiplies the parameter update `Δ` by the warmup factor.
 """
-function Flux.Optimise.apply!(o::WarmupSchedule{FT}, x, Δ) where {FT}
+function Flux.Optimisers.apply!(o::WarmupSchedule{FT}, state, x, Δ) where {FT}
     η, n_warmup_steps = o.η, o.n_warmup_steps
     current_step = o.current = o.current + 1
     Δ .*= min(η * FT(current_step / n_warmup_steps), η)
+    return state, Δ
 end
 
 """
-    ExponentialMovingAverage{FT} <: Flux.Optimisers.AbstractOptimiser
+    ExponentialMovingAverage{FT} <: Flux.Optimisers.AbstractRule
 
 A Flux.Optimisers Optimiser for an exponential moving average accumulation of
 parameters during training. 
@@ -49,17 +51,18 @@ The 'rate' parameter is the exponential decay rate, following the update rule
 where `xs` are the smoothed parameters, `x` are the instantaneous parameters,
 and `i` is the iteration number.
 """
-mutable struct ExponentialMovingAverage{FT} <: Flux.Optimise.AbstractOptimiser
+mutable struct ExponentialMovingAverage{FT} <: Flux.Optimisers.AbstractRule
     rate::FT
 end
+Flux.Optimisers.init(o::ExponentialMovingAverage, x) = nothing
 
 """
     Flux.update!(opt::ExponentialMovingAverage, ps_smooth::Flux.Params, ps::Flux.Params)
 
 Updates the exponential-moving-average parameters in place.
 """
-function Flux.update!(opt::ExponentialMovingAverage, ps_smooth::Flux.Params, ps::Flux.Params)
-    for (xs, x) in zip(ps_smooth, ps)
+function Flux.update!(opt::ExponentialMovingAverage, model_smooth, model)
+    for (xs, x) in zip(trainables(model_smooth), trainables(model))
         @. xs = opt.rate * xs + (1 - opt.rate) * x
     end
 end
